@@ -7,7 +7,7 @@ It is designed as a code-only alternative to asset-pack-based avatar systems: th
 ## Features
 
 - Deterministic avatars derived from `SHA-512`
-- Multiple avatar families: `cat`, `dog`, `robot`, `fox`, `alien`
+- Multiple avatar families: `cat`, `dog`, `robot`, `fox`, `alien`, `monsters`
 - Multiple background modes: `themed`, `white`
 - Export paths for `WebP`, `PNG`, and `SVG`
 - Public API suitable for web apps, services, CLIs, and batch jobs
@@ -220,6 +220,7 @@ Use `AvatarKind` to select the visual family:
 - `Robot`
 - `Fox`
 - `Alien`
+- `monsters`
 
 ### Background Mode
 
