@@ -176,10 +176,18 @@ pub enum AvatarKind {
     Robot,
     Fox,
     Alien,
+    Monster,
 }
 
 impl AvatarKind {
-    pub const ALL: [Self; 5] = [Self::Cat, Self::Dog, Self::Robot, Self::Fox, Self::Alien];
+    pub const ALL: [Self; 6] = [
+        Self::Cat,
+        Self::Dog,
+        Self::Robot,
+        Self::Fox,
+        Self::Alien,
+        Self::Monster,
+    ];
 
     pub const fn as_str(self) -> &'static str {
         match self {
@@ -188,6 +196,7 @@ impl AvatarKind {
             Self::Robot => "robot",
             Self::Fox => "fox",
             Self::Alien => "alien",
+            Self::Monster => "monster",
         }
     }
 }
@@ -202,6 +211,7 @@ impl FromStr for AvatarKind {
             "robot" => Ok(Self::Robot),
             "fox" => Ok(Self::Fox),
             "alien" => Ok(Self::Alien),
+            "monster" => Ok(Self::Monster),
             _ => Err("unsupported avatar kind"),
         }
     }
@@ -430,6 +440,10 @@ pub fn encode_avatar_for_id<T: AsRef<[u8]>>(
             &render_alien_avatar_for_identity(spec, &AvatarIdentity::new(id), options.background),
             format,
         ),
+        AvatarKind::Monster => encode_rgba_image(
+            &render_monster_avatar_for_identity(spec, &AvatarIdentity::new(id), options.background),
+            format,
+        ),
     }
 }
 
@@ -448,6 +462,9 @@ pub fn render_avatar_for_id<T: AsRef<[u8]>>(
         AvatarKind::Robot => render_robot_avatar_for_identity(spec, &identity, options.background),
         AvatarKind::Fox => render_fox_avatar_for_identity(spec, &identity, options.background),
         AvatarKind::Alien => render_alien_avatar_for_identity(spec, &identity, options.background),
+        AvatarKind::Monster => {
+            render_monster_avatar_for_identity(spec, &identity, options.background)
+        }
     }
 }
 
@@ -465,6 +482,7 @@ pub fn render_avatar_svg_for_id<T: AsRef<[u8]>>(
             AvatarKind::Robot => hsl_to_color(220.0 + identity.unit_f32(4) * 50.0, 0.18, 0.93),
             AvatarKind::Fox => hsl_to_color(18.0 + identity.unit_f32(5) * 30.0, 0.28, 0.93),
             AvatarKind::Alien => hsl_to_color(260.0 + identity.unit_f32(6) * 60.0, 0.20, 0.93),
+            AvatarKind::Monster => hsl_to_color(300.0 + identity.unit_f32(7) * 45.0, 0.24, 0.92),
         },
         AvatarBackground::White => Color::rgb(255, 255, 255),
     };
@@ -475,6 +493,7 @@ pub fn render_avatar_svg_for_id<T: AsRef<[u8]>>(
         AvatarKind::Robot => render_robot_svg(spec, &identity),
         AvatarKind::Fox => render_fox_svg(spec, &identity),
         AvatarKind::Alien => render_alien_svg(spec, &identity),
+        AvatarKind::Monster => render_monster_svg(spec, &identity),
     };
 
     format!(
@@ -1121,6 +1140,290 @@ pub fn render_alien_avatar_for_identity(
             shade.into(),
         );
     }
+    image
+}
+
+pub fn render_monster_avatar_for_identity(
+    spec: AvatarSpec,
+    identity: &AvatarIdentity,
+    background: AvatarBackground,
+) -> RgbaImage {
+    assert!(spec.width >= 64, "width must be at least 64 pixels");
+    assert!(spec.height >= 64, "height must be at least 64 pixels");
+
+    let width = spec.width as i32;
+    let height = spec.height as i32;
+    let center_x = width / 2;
+    let center_y = (height as f32 * 0.58) as i32;
+    let mut image =
+        ImageBuffer::from_pixel(spec.width, spec.height, Color::rgb(255, 255, 255).into());
+
+    let skin = hsl_to_color(
+        identity.unit_f32(0) * 360.0,
+        0.48 + identity.unit_f32(1) * 0.24,
+        0.46 + identity.unit_f32(2) * 0.20,
+    );
+    let shade = hsl_to_color(
+        identity.unit_f32(3) * 360.0,
+        0.38 + identity.unit_f32(4) * 0.18,
+        0.24 + identity.unit_f32(5) * 0.10,
+    );
+    let accent = hsl_to_color(
+        20.0 + identity.unit_f32(6) * 320.0,
+        0.34 + identity.unit_f32(7) * 0.26,
+        0.86,
+    );
+    let mouth = Color::rgb(48, 18, 24);
+    let eye_white = Color::rgb(252, 248, 236);
+    let pupil = Color::rgb(24, 20, 28);
+
+    image
+        .pixels_mut()
+        .for_each(|pixel| *pixel = background_fill(background, accent).into());
+
+    let head_rx = (width as f32 * (0.23 + identity.unit_f32(8) * 0.10)) as i32;
+    let head_ry = (height as f32 * (0.22 + identity.unit_f32(9) * 0.11)) as i32;
+    let horn_height = (height as f32 * (0.08 + identity.unit_f32(10) * 0.10)) as i32;
+    let horn_width = (width as f32 * (0.06 + identity.unit_f32(11) * 0.05)) as i32;
+    let eye_count = 1 + (identity.byte(12) % 3) as usize;
+    let mouth_style = identity.byte(13) % 3;
+    let body_style = identity.byte(14) % 3;
+    let spot_count = 3 + (identity.byte(15) % 5) as i32;
+    let tentacle_count = 2 + (identity.byte(16) % 4) as i32;
+
+    draw_background_accent(
+        &mut image,
+        center_x,
+        center_y,
+        head_rx,
+        head_ry,
+        shade,
+        0.30 + identity.unit_f32(17) * 0.25,
+        background,
+    );
+
+    match body_style {
+        0 => draw_filled_ellipse_mut(&mut image, (center_x, center_y), head_rx, head_ry, skin.into()),
+        1 => {
+            draw_filled_ellipse_mut(
+                &mut image,
+                (center_x, center_y + head_ry / 8),
+                head_rx,
+                head_ry - head_ry / 8,
+                skin.into(),
+            );
+            draw_polygon_mut(
+                &mut image,
+                &[
+                    Point::new(center_x - head_rx, center_y),
+                    Point::new(center_x, center_y - head_ry),
+                    Point::new(center_x + head_rx, center_y),
+                    Point::new(center_x + head_rx / 2, center_y + head_ry),
+                    Point::new(center_x - head_rx / 2, center_y + head_ry),
+                ],
+                skin.into(),
+            );
+        }
+        _ => {
+            draw_filled_rect_mut(
+                &mut image,
+                Rect::at(center_x - head_rx, center_y - head_ry).of_size(
+                    (head_rx * 2) as u32,
+                    (head_ry * 2) as u32,
+                ),
+                skin.into(),
+            );
+            draw_filled_circle_mut(
+                &mut image,
+                (center_x - head_rx, center_y - head_ry / 2),
+                head_ry / 2,
+                skin.into(),
+            );
+            draw_filled_circle_mut(
+                &mut image,
+                (center_x + head_rx, center_y - head_ry / 2),
+                head_ry / 2,
+                skin.into(),
+            );
+            draw_filled_circle_mut(
+                &mut image,
+                (center_x - head_rx, center_y + head_ry / 2),
+                head_ry / 2,
+                skin.into(),
+            );
+            draw_filled_circle_mut(
+                &mut image,
+                (center_x + head_rx, center_y + head_ry / 2),
+                head_ry / 2,
+                skin.into(),
+            );
+        }
+    }
+
+    if identity.byte(18).is_multiple_of(2) {
+        draw_polygon_mut(
+            &mut image,
+            &[
+                Point::new(center_x - head_rx / 2, center_y - head_ry),
+                Point::new(center_x - head_rx / 3 - horn_width, center_y - head_ry - horn_height),
+                Point::new(center_x - head_rx / 8, center_y - head_ry / 2),
+            ],
+            shade.into(),
+        );
+        draw_polygon_mut(
+            &mut image,
+            &[
+                Point::new(center_x + head_rx / 2, center_y - head_ry),
+                Point::new(center_x + head_rx / 3 + horn_width, center_y - head_ry - horn_height),
+                Point::new(center_x + head_rx / 8, center_y - head_ry / 2),
+            ],
+            shade.into(),
+        );
+    } else {
+        for spike in 0..3 {
+            let spike_x = center_x - head_rx / 2 + spike * head_rx / 2;
+            draw_polygon_mut(
+                &mut image,
+                &[
+                    Point::new(spike_x - horn_width / 2, center_y - head_ry / 2),
+                    Point::new(spike_x, center_y - head_ry - horn_height / 2),
+                    Point::new(spike_x + horn_width / 2, center_y - head_ry / 2),
+                ],
+                shade.into(),
+            );
+        }
+    }
+
+    for index in 0..spot_count {
+        let x = center_x - head_rx / 2 + (index * head_rx) / spot_count;
+        let y = center_y - head_ry / 3 + ((index * 37 + identity.byte(19) as i32) % head_ry.max(1));
+        let radius = (head_rx as f32 * (0.05 + ((index + 1) as f32 / spot_count as f32) * 0.06)) as i32;
+        draw_filled_circle_mut(
+            &mut image,
+            (x, y),
+            radius.max(3),
+            Color::rgba(shade.0[0], shade.0[1], shade.0[2], 168).into(),
+        );
+    }
+
+    let eye_y = center_y - head_ry / 5;
+    let eye_rx = (head_rx as f32 * (0.10 + identity.unit_f32(20) * 0.08)) as i32;
+    let eye_ry = (head_ry as f32 * (0.10 + identity.unit_f32(21) * 0.10)) as i32;
+    let eye_spacing = if eye_count == 1 {
+        0
+    } else {
+        (head_rx as f32 * 0.46 / (eye_count - 1) as f32) as i32
+    };
+    let eye_start = center_x - eye_spacing * ((eye_count.saturating_sub(1)) as i32) / 2;
+    for index in 0..eye_count {
+        let x = eye_start + eye_spacing * index as i32;
+        draw_filled_ellipse_mut(&mut image, (x, eye_y), eye_rx, eye_ry, eye_white.into());
+        if identity.byte(22).is_multiple_of(2) {
+            draw_filled_ellipse_mut(
+                &mut image,
+                (x, eye_y),
+                (eye_rx / 3).max(2),
+                (eye_ry - 1).max(2),
+                pupil.into(),
+            );
+        } else {
+            draw_filled_circle_mut(&mut image, (x, eye_y), (eye_ry / 2).max(2), pupil.into());
+        }
+        draw_filled_circle_mut(
+            &mut image,
+            (x - eye_rx / 3, eye_y - eye_ry / 3),
+            (eye_rx / 5).max(1),
+            Color::rgba(255, 255, 255, 220).into(),
+        );
+    }
+
+    let mouth_y = center_y + head_ry / 3;
+    match mouth_style {
+        0 => {
+            draw_filled_ellipse_mut(
+                &mut image,
+                (center_x, mouth_y),
+                head_rx / 3,
+                head_ry / 8,
+                mouth.into(),
+            );
+            for fang_x in [center_x - head_rx / 8, center_x + head_rx / 8] {
+                draw_polygon_mut(
+                    &mut image,
+                    &[
+                        Point::new(fang_x - head_rx / 24, mouth_y - 2),
+                        Point::new(fang_x + head_rx / 24, mouth_y - 2),
+                        Point::new(fang_x, mouth_y + head_ry / 5),
+                    ],
+                    eye_white.into(),
+                );
+            }
+        }
+        1 => {
+            draw_smile_arc(
+                &mut image,
+                center_x - head_rx / 10,
+                mouth_y,
+                head_rx / 4,
+                mouth,
+                0.50,
+            );
+            draw_smile_arc(
+                &mut image,
+                center_x + head_rx / 10,
+                mouth_y,
+                head_rx / 4,
+                mouth,
+                0.50,
+            );
+            draw_line_segment_mut(
+                &mut image,
+                ((center_x - head_rx / 4) as f32, mouth_y as f32),
+                ((center_x + head_rx / 4) as f32, mouth_y as f32),
+                mouth.into(),
+            );
+        }
+        _ => {
+            draw_filled_rect_mut(
+                &mut image,
+                Rect::at(center_x - head_rx / 3, mouth_y - head_ry / 10).of_size(
+                    (head_rx * 2 / 3) as u32,
+                    (head_ry / 5).max(1) as u32,
+                ),
+                mouth.into(),
+            );
+            for tooth in 0..4 {
+                let tooth_x = center_x - head_rx / 4 + tooth * head_rx / 6;
+                draw_polygon_mut(
+                    &mut image,
+                    &[
+                        Point::new(tooth_x - head_rx / 30, mouth_y - head_ry / 10),
+                        Point::new(tooth_x + head_rx / 30, mouth_y - head_ry / 10),
+                        Point::new(tooth_x, mouth_y + head_ry / 14),
+                    ],
+                    eye_white.into(),
+                );
+            }
+        }
+    }
+
+    if identity.byte(23).is_multiple_of(2) {
+        for index in 0..tentacle_count {
+            let start_x = center_x - head_rx / 2 + (index * head_rx) / tentacle_count;
+            let start_y = center_y + head_ry - 4;
+            let end_x = start_x + ((index % 2) * 2 - 1) * head_rx / 6;
+            let end_y = start_y + head_ry / 2;
+            draw_antialiased_line_segment_mut(
+                &mut image,
+                (start_x, start_y),
+                (end_x, end_y),
+                shade.into(),
+                interpolate,
+            );
+            draw_filled_circle_mut(&mut image, (end_x, end_y), (head_rx / 18).max(2), shade.into());
+        }
+    }
+
     image
 }
 
@@ -1865,6 +2168,114 @@ fn render_alien_svg(spec: AvatarSpec, identity: &AvatarIdentity) -> String {
     )
 }
 
+fn render_monster_svg(spec: AvatarSpec, identity: &AvatarIdentity) -> String {
+    let w = spec.width as f32;
+    let h = spec.height as f32;
+    let cx = w / 2.0;
+    let cy = h * 0.58;
+    let skin = hsl_to_color(
+        identity.unit_f32(0) * 360.0,
+        0.52 + identity.unit_f32(1) * 0.20,
+        0.50 + identity.unit_f32(2) * 0.16,
+    );
+    let shade = hsl_to_color(
+        identity.unit_f32(3) * 360.0,
+        0.40 + identity.unit_f32(4) * 0.16,
+        0.26 + identity.unit_f32(5) * 0.08,
+    );
+    let eyes = 1 + (identity.byte(12) % 3) as usize;
+    let eye_spacing = if eyes == 1 { 0.0 } else { w * 0.22 / (eyes - 1) as f32 };
+    let eye_start = cx - eye_spacing * (eyes.saturating_sub(1) as f32) / 2.0;
+    let mut eye_markup = String::new();
+    for index in 0..eyes {
+        let ex = eye_start + eye_spacing * index as f32;
+        eye_markup.push_str(&format!(
+            r##"<ellipse cx="{ex}" cy="{ey}" rx="{erx}" ry="{ery}" fill="#fcf8ec"/><ellipse cx="{ex}" cy="{ey}" rx="{prx}" ry="{pry}" fill="#18141c"/>"##,
+            ey = cy - h * 0.08,
+            erx = w * 0.038,
+            ery = h * 0.042,
+            prx = w * 0.012,
+            pry = h * 0.030,
+        ));
+    }
+
+    let horns = if identity.byte(18).is_multiple_of(2) {
+        format!(
+            r#"<polygon points="{},{}, {},{}, {},{}" fill="{}"/><polygon points="{},{}, {},{}, {},{}" fill="{}"/>"#,
+            cx - w * 0.18,
+            cy - h * 0.18,
+            cx - w * 0.22,
+            cy - h * 0.34,
+            cx - w * 0.08,
+            cy - h * 0.14,
+            color_hex(shade),
+            cx + w * 0.18,
+            cy - h * 0.18,
+            cx + w * 0.22,
+            cy - h * 0.34,
+            cx + w * 0.08,
+            cy - h * 0.14,
+            color_hex(shade),
+        )
+    } else {
+        format!(
+            r#"<polygon points="{},{}, {},{}, {},{}" fill="{}"/><polygon points="{},{}, {},{}, {},{}" fill="{}"/><polygon points="{},{}, {},{}, {},{}" fill="{}"/>"#,
+            cx - w * 0.12,
+            cy - h * 0.14,
+            cx - w * 0.08,
+            cy - h * 0.30,
+            cx - w * 0.02,
+            cy - h * 0.14,
+            color_hex(shade),
+            cx,
+            cy - h * 0.15,
+            cx,
+            cy - h * 0.32,
+            cx + w * 0.05,
+            cy - h * 0.15,
+            color_hex(shade),
+            cx + w * 0.12,
+            cy - h * 0.14,
+            cx + w * 0.08,
+            cy - h * 0.30,
+            cx + w * 0.02,
+            cy - h * 0.14,
+            color_hex(shade),
+        )
+    };
+
+    format!(
+        r##"<ellipse cx="{cx}" cy="{cy}" rx="{rx}" ry="{ry}" fill="{skin}"/>{horns}<circle cx="{sx1}" cy="{sy1}" r="{sr}" fill="{shade}" fill-opacity="0.55"/><circle cx="{sx2}" cy="{sy2}" r="{sr2}" fill="{shade}" fill-opacity="0.55"/>{eye_markup}<rect x="{mx}" y="{my}" width="{mw}" height="{mh}" rx="{mr}" fill="#301218"/><polygon points="{tx1},{ty1}, {tx2},{ty1}, {txm1},{ty2}" fill="#fcf8ec"/><polygon points="{tx3},{ty1}, {tx4},{ty1}, {txm2},{ty2}" fill="#fcf8ec"/>"##,
+        cx = cx,
+        cy = cy,
+        rx = w * 0.24,
+        ry = h * 0.23,
+        skin = color_hex(skin),
+        horns = horns,
+        shade = color_hex(shade),
+        sx1 = cx - w * 0.12,
+        sy1 = cy - h * 0.02,
+        sr = w * 0.034,
+        sx2 = cx + w * 0.14,
+        sy2 = cy + h * 0.07,
+        sr2 = w * 0.026,
+        eye_markup = eye_markup,
+        mx = cx - w * 0.14,
+        my = cy + h * 0.08,
+        mw = w * 0.28,
+        mh = h * 0.09,
+        mr = w * 0.02,
+        tx1 = cx - w * 0.10,
+        tx2 = cx - w * 0.06,
+        txm1 = cx - w * 0.08,
+        tx3 = cx + w * 0.06,
+        tx4 = cx + w * 0.10,
+        txm2 = cx + w * 0.08,
+        ty1 = cy + h * 0.08,
+        ty2 = cy + h * 0.16,
+    )
+}
+
 fn encode_rgba_image(image: &RgbaImage, format: AvatarOutputFormat) -> ImageResult<Vec<u8>> {
     let mut bytes = Vec::new();
     {
@@ -2029,6 +2440,16 @@ mod tests {
     }
 
     #[test]
+    fn monster_variant_is_distinct_from_alien() {
+        let spec = AvatarSpec::new(128, 128, 0);
+        let id = AvatarIdentity::new("alice@example.com");
+        let alien = render_alien_avatar_for_identity(spec, &id, AvatarBackground::Themed);
+        let monster = render_monster_avatar_for_identity(spec, &id, AvatarBackground::Themed);
+
+        assert_ne!(alien.as_raw(), monster.as_raw());
+    }
+
+    #[test]
     fn generic_avatar_encoder_supports_robot_and_white_background() {
         let bytes = encode_avatar_for_id(
             AvatarSpec::new(96, 96, 0),
@@ -2147,6 +2568,10 @@ mod tests {
             (
                 "robot-white",
                 AvatarOptions::new(AvatarKind::Robot, AvatarBackground::White),
+            ),
+            (
+                "monster-themed",
+                AvatarOptions::new(AvatarKind::Monster, AvatarBackground::Themed),
             ),
         ] {
             let image = render_avatar_for_id(
