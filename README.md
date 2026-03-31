@@ -7,15 +7,16 @@ It is designed as a code-only alternative to asset-pack-based avatar systems: th
 ## Features
 
 - Deterministic avatars derived from `SHA-512`
-- Multiple avatar families: `cat`, `dog`, `robot`, `fox`, `alien`, `monsters`
+- Multiple avatar families: `cat`, `dog`, `robot`, `fox`, `alien`, `monster`, `ghost`, `slime`, `bird`, `wizard`, `skull`
 - Multiple background modes: `themed`, `white`
 - Export paths for `WebP`, `PNG`, and `SVG`
+- Namespace-aware identity hashing for multi-tenant or versioned rollouts
 - Public API suitable for web apps, services, CLIs, and batch jobs
 
 ## Why Use It
 
 - No bundled avatar art assets
-- Stable output for a given identity string
+- Stable output for a given namespace and identity tuple
 - Small modern default output through `WebP`
 - Simple integration into Rust servers and applications
 - Suitable for CDN-backed avatar URLs because output is deterministic
@@ -26,7 +27,7 @@ Add the crate to your project:
 
 ```toml
 [dependencies]
-hashavatar = "0.1"
+hashavatar = "0.2"
 ```
 
 If you are using it from a local checkout:
@@ -42,6 +43,7 @@ The main types are:
 
 - `AvatarSpec`: image dimensions and rendering seed
 - `AvatarIdentity`: stable hash-backed identity derived from input bytes
+- `AvatarNamespace`: stable tenant/style namespace for deterministic isolation
 - `AvatarKind`: avatar family such as `Cat`, `Dog`, or `Robot`
 - `AvatarBackground`: background mode such as `Themed` or `White`
 - `AvatarOptions`: avatar family plus background mode
@@ -53,6 +55,13 @@ In most applications, you only need:
 - `AvatarOptions`
 - `encode_avatar_for_id(...)`
 - or `render_avatar_svg_for_id(...)`
+
+For multi-tenant products or staged visual rollouts, also use:
+
+- `AvatarNamespace`
+- `encode_avatar_for_namespace(...)`
+- `render_avatar_for_namespace(...)`
+- `render_avatar_svg_for_namespace(...)`
 
 ## Basic Usage
 
@@ -220,7 +229,6 @@ Use `AvatarKind` to select the visual family:
 - `Robot`
 - `Fox`
 - `Alien`
-- `monsters`
 
 ### Background Mode
 

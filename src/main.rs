@@ -336,6 +336,7 @@ fn render_index_html(default_identity: &str) -> String {
                 <option value="fox">Fox</option>
                 <option value="alien">Alien</option>
                 <option value="monster">Monster</option>
+                <option value="paws">Paws</option>
               </select>
             </div>
             <div>

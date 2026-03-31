@@ -42,6 +42,13 @@ use palette::{FromColor, Hsl, Srgb};
 use rand::{Rng, SeedableRng, rngs::StdRng};
 use sha2::{Digest, Sha512};
 
+/// Rendering contract version for deterministic avatars.
+///
+/// Within a major crate release, the goal is to keep visuals stable for the
+/// same `(namespace, id, kind, background, size)` tuple unless a documented bug
+/// fix requires a targeted change.
+pub const AVATAR_STYLE_VERSION: u32 = 2;
+
 /// RGBA color helper for concise shape drawing.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct Color(pub [u8; 4]);
@@ -98,7 +105,17 @@ pub struct AvatarIdentity {
 
 impl AvatarIdentity {
     pub fn new<T: AsRef<[u8]>>(input: T) -> Self {
+        Self::new_with_namespace(AvatarNamespace::default(), input)
+    }
+
+    pub fn new_with_namespace<T: AsRef<[u8]>>(namespace: AvatarNamespace<'_>, input: T) -> Self {
         let mut hasher = Sha512::new();
+        hasher.update(b"hashavatar");
+        hasher.update([0]);
+        hasher.update(namespace.tenant.as_bytes());
+        hasher.update([0]);
+        hasher.update(namespace.style_version.as_bytes());
+        hasher.update([0]);
         hasher.update(input.as_ref());
         let digest: [u8; 64] = hasher.finalize().into();
         Self { digest }
@@ -120,6 +137,27 @@ impl AvatarIdentity {
 
     fn unit_f32(&self, index: usize) -> f32 {
         self.byte(index) as f32 / 255.0
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct AvatarNamespace<'a> {
+    pub tenant: &'a str,
+    pub style_version: &'a str,
+}
+
+impl<'a> AvatarNamespace<'a> {
+    pub const fn new(tenant: &'a str, style_version: &'a str) -> Self {
+        Self {
+            tenant,
+            style_version,
+        }
+    }
+}
+
+impl Default for AvatarNamespace<'_> {
+    fn default() -> Self {
+        Self::new("public", "v2")
     }
 }
 
@@ -177,16 +215,28 @@ pub enum AvatarKind {
     Fox,
     Alien,
     Monster,
+    Ghost,
+    Slime,
+    Bird,
+    Wizard,
+    Skull,
+    Paws,
 }
 
 impl AvatarKind {
-    pub const ALL: [Self; 6] = [
+    pub const ALL: [Self; 12] = [
         Self::Cat,
         Self::Dog,
         Self::Robot,
         Self::Fox,
         Self::Alien,
         Self::Monster,
+        Self::Ghost,
+        Self::Slime,
+        Self::Bird,
+        Self::Wizard,
+        Self::Skull,
+        Self::Paws,
     ];
 
     pub const fn as_str(self) -> &'static str {
@@ -197,6 +247,12 @@ impl AvatarKind {
             Self::Fox => "fox",
             Self::Alien => "alien",
             Self::Monster => "monster",
+            Self::Ghost => "ghost",
+            Self::Slime => "slime",
+            Self::Bird => "bird",
+            Self::Wizard => "wizard",
+            Self::Skull => "skull",
+            Self::Paws => "paws",
         }
     }
 }
@@ -212,6 +268,12 @@ impl FromStr for AvatarKind {
             "fox" => Ok(Self::Fox),
             "alien" => Ok(Self::Alien),
             "monster" => Ok(Self::Monster),
+            "ghost" => Ok(Self::Ghost),
+            "slime" => Ok(Self::Slime),
+            "bird" => Ok(Self::Bird),
+            "wizard" => Ok(Self::Wizard),
+            "skull" => Ok(Self::Skull),
+            "paws" => Ok(Self::Paws),
             _ => Err("unsupported avatar kind"),
         }
     }
@@ -294,8 +356,12 @@ pub struct HashedCatAvatar {
 
 impl HashedCatAvatar {
     pub fn new<T: AsRef<[u8]>>(input: T) -> Self {
+        Self::new_with_namespace(AvatarNamespace::default(), input)
+    }
+
+    pub fn new_with_namespace<T: AsRef<[u8]>>(namespace: AvatarNamespace<'_>, input: T) -> Self {
         Self {
-            identity: AvatarIdentity::new(input),
+            identity: AvatarIdentity::new_with_namespace(namespace, input),
         }
     }
 
@@ -318,8 +384,16 @@ pub struct HashedDogAvatar {
 
 impl HashedDogAvatar {
     pub fn new<T: AsRef<[u8]>>(input: T, background: AvatarBackground) -> Self {
+        Self::new_with_namespace(AvatarNamespace::default(), input, background)
+    }
+
+    pub fn new_with_namespace<T: AsRef<[u8]>>(
+        namespace: AvatarNamespace<'_>,
+        input: T,
+        background: AvatarBackground,
+    ) -> Self {
         Self {
-            identity: AvatarIdentity::new(input),
+            identity: AvatarIdentity::new_with_namespace(namespace, input),
             background,
         }
     }
@@ -339,8 +413,16 @@ pub struct HashedRobotAvatar {
 
 impl HashedRobotAvatar {
     pub fn new<T: AsRef<[u8]>>(input: T, background: AvatarBackground) -> Self {
+        Self::new_with_namespace(AvatarNamespace::default(), input, background)
+    }
+
+    pub fn new_with_namespace<T: AsRef<[u8]>>(
+        namespace: AvatarNamespace<'_>,
+        input: T,
+        background: AvatarBackground,
+    ) -> Self {
         Self {
-            identity: AvatarIdentity::new(input),
+            identity: AvatarIdentity::new_with_namespace(namespace, input),
             background,
         }
     }
@@ -414,34 +496,68 @@ pub fn encode_avatar_for_id<T: AsRef<[u8]>>(
     format: AvatarOutputFormat,
     options: AvatarOptions,
 ) -> ImageResult<Vec<u8>> {
+    encode_avatar_for_namespace(spec, AvatarNamespace::default(), id, format, options)
+}
+
+pub fn encode_avatar_for_namespace<T: AsRef<[u8]>>(
+    spec: AvatarSpec,
+    namespace: AvatarNamespace<'_>,
+    id: T,
+    format: AvatarOutputFormat,
+    options: AvatarOptions,
+) -> ImageResult<Vec<u8>> {
+    let identity = AvatarIdentity::new_with_namespace(namespace, id);
     match options.kind {
         AvatarKind::Cat => {
-            let renderer = HashedCatAvatar::new(id);
             let image = render_cat_avatar_for_identity_with_background(
                 spec,
-                renderer.identity(),
+                &identity,
                 options.background,
             );
             encode_rgba_image(&image, format)
         }
-        AvatarKind::Dog => {
-            let renderer = HashedDogAvatar::new(id, options.background);
-            encode_avatar(&renderer, spec, format)
-        }
-        AvatarKind::Robot => {
-            let renderer = HashedRobotAvatar::new(id, options.background);
-            encode_avatar(&renderer, spec, format)
-        }
+        AvatarKind::Dog => encode_rgba_image(
+            &render_dog_avatar_for_identity(spec, &identity, options.background),
+            format,
+        ),
+        AvatarKind::Robot => encode_rgba_image(
+            &render_robot_avatar_for_identity(spec, &identity, options.background),
+            format,
+        ),
         AvatarKind::Fox => encode_rgba_image(
-            &render_fox_avatar_for_identity(spec, &AvatarIdentity::new(id), options.background),
+            &render_fox_avatar_for_identity(spec, &identity, options.background),
             format,
         ),
         AvatarKind::Alien => encode_rgba_image(
-            &render_alien_avatar_for_identity(spec, &AvatarIdentity::new(id), options.background),
+            &render_alien_avatar_for_identity(spec, &identity, options.background),
             format,
         ),
         AvatarKind::Monster => encode_rgba_image(
-            &render_monster_avatar_for_identity(spec, &AvatarIdentity::new(id), options.background),
+            &render_monster_avatar_for_identity(spec, &identity, options.background),
+            format,
+        ),
+        AvatarKind::Ghost => encode_rgba_image(
+            &render_ghost_avatar_for_identity(spec, &identity, options.background),
+            format,
+        ),
+        AvatarKind::Slime => encode_rgba_image(
+            &render_slime_avatar_for_identity(spec, &identity, options.background),
+            format,
+        ),
+        AvatarKind::Bird => encode_rgba_image(
+            &render_bird_avatar_for_identity(spec, &identity, options.background),
+            format,
+        ),
+        AvatarKind::Wizard => encode_rgba_image(
+            &render_wizard_avatar_for_identity(spec, &identity, options.background),
+            format,
+        ),
+        AvatarKind::Skull => encode_rgba_image(
+            &render_skull_avatar_for_identity(spec, &identity, options.background),
+            format,
+        ),
+        AvatarKind::Paws => encode_rgba_image(
+            &render_paws_avatar_for_identity(spec, &identity, options.background),
             format,
         ),
     }
@@ -453,7 +569,16 @@ pub fn render_avatar_for_id<T: AsRef<[u8]>>(
     id: T,
     options: AvatarOptions,
 ) -> RgbaImage {
-    let identity = AvatarIdentity::new(id);
+    render_avatar_for_namespace(spec, AvatarNamespace::default(), id, options)
+}
+
+pub fn render_avatar_for_namespace<T: AsRef<[u8]>>(
+    spec: AvatarSpec,
+    namespace: AvatarNamespace<'_>,
+    id: T,
+    options: AvatarOptions,
+) -> RgbaImage {
+    let identity = AvatarIdentity::new_with_namespace(namespace, id);
     match options.kind {
         AvatarKind::Cat => {
             render_cat_avatar_for_identity_with_background(spec, &identity, options.background)
@@ -465,6 +590,14 @@ pub fn render_avatar_for_id<T: AsRef<[u8]>>(
         AvatarKind::Monster => {
             render_monster_avatar_for_identity(spec, &identity, options.background)
         }
+        AvatarKind::Ghost => render_ghost_avatar_for_identity(spec, &identity, options.background),
+        AvatarKind::Slime => render_slime_avatar_for_identity(spec, &identity, options.background),
+        AvatarKind::Bird => render_bird_avatar_for_identity(spec, &identity, options.background),
+        AvatarKind::Wizard => {
+            render_wizard_avatar_for_identity(spec, &identity, options.background)
+        }
+        AvatarKind::Skull => render_skull_avatar_for_identity(spec, &identity, options.background),
+        AvatarKind::Paws => render_paws_avatar_for_identity(spec, &identity, options.background),
     }
 }
 
@@ -474,7 +607,16 @@ pub fn render_avatar_svg_for_id<T: AsRef<[u8]>>(
     id: T,
     options: AvatarOptions,
 ) -> String {
-    let identity = AvatarIdentity::new(id);
+    render_avatar_svg_for_namespace(spec, AvatarNamespace::default(), id, options)
+}
+
+pub fn render_avatar_svg_for_namespace<T: AsRef<[u8]>>(
+    spec: AvatarSpec,
+    namespace: AvatarNamespace<'_>,
+    id: T,
+    options: AvatarOptions,
+) -> String {
+    let identity = AvatarIdentity::new_with_namespace(namespace, id);
     let bg = match options.background {
         AvatarBackground::Themed => match options.kind {
             AvatarKind::Cat => hsl_to_color(28.0 + identity.unit_f32(2) * 40.0, 0.25, 0.92),
@@ -483,6 +625,12 @@ pub fn render_avatar_svg_for_id<T: AsRef<[u8]>>(
             AvatarKind::Fox => hsl_to_color(18.0 + identity.unit_f32(5) * 30.0, 0.28, 0.93),
             AvatarKind::Alien => hsl_to_color(260.0 + identity.unit_f32(6) * 60.0, 0.20, 0.93),
             AvatarKind::Monster => hsl_to_color(300.0 + identity.unit_f32(7) * 45.0, 0.24, 0.92),
+            AvatarKind::Ghost => hsl_to_color(220.0 + identity.unit_f32(8) * 35.0, 0.18, 0.95),
+            AvatarKind::Slime => hsl_to_color(120.0 + identity.unit_f32(9) * 70.0, 0.24, 0.92),
+            AvatarKind::Bird => hsl_to_color(180.0 + identity.unit_f32(10) * 40.0, 0.22, 0.93),
+            AvatarKind::Wizard => hsl_to_color(250.0 + identity.unit_f32(11) * 40.0, 0.24, 0.92),
+            AvatarKind::Skull => hsl_to_color(210.0 + identity.unit_f32(12) * 20.0, 0.08, 0.94),
+            AvatarKind::Paws => hsl_to_color(28.0 + identity.unit_f32(13) * 30.0, 0.22, 0.94),
         },
         AvatarBackground::White => Color::rgb(255, 255, 255),
     };
@@ -494,6 +642,12 @@ pub fn render_avatar_svg_for_id<T: AsRef<[u8]>>(
         AvatarKind::Fox => render_fox_svg(spec, &identity),
         AvatarKind::Alien => render_alien_svg(spec, &identity),
         AvatarKind::Monster => render_monster_svg(spec, &identity),
+        AvatarKind::Ghost => render_ghost_svg(spec, &identity),
+        AvatarKind::Slime => render_slime_svg(spec, &identity),
+        AvatarKind::Bird => render_bird_svg(spec, &identity),
+        AvatarKind::Wizard => render_wizard_svg(spec, &identity),
+        AvatarKind::Skull => render_skull_svg(spec, &identity),
+        AvatarKind::Paws => render_paws_svg(spec, &identity),
     };
 
     format!(
@@ -504,6 +658,8 @@ pub fn render_avatar_svg_for_id<T: AsRef<[u8]>>(
         label = options.kind.as_str(),
         body = body,
     )
+    .replace('\n', "")
+    .replace("  ", "")
 }
 
 pub fn export_avatar_svg_for_id<T: AsRef<[u8]>, P: AsRef<Path>>(
@@ -513,6 +669,16 @@ pub fn export_avatar_svg_for_id<T: AsRef<[u8]>, P: AsRef<Path>>(
     path: P,
 ) -> std::io::Result<()> {
     std::fs::write(path, render_avatar_svg_for_id(spec, id, options))
+}
+
+pub fn export_avatar_svg_for_namespace<T: AsRef<[u8]>, P: AsRef<Path>>(
+    spec: AvatarSpec,
+    namespace: AvatarNamespace<'_>,
+    id: T,
+    options: AvatarOptions,
+    path: P,
+) -> std::io::Result<()> {
+    std::fs::write(path, render_avatar_svg_for_namespace(spec, namespace, id, options))
 }
 
 /// Render a cat face avatar into an RGBA image.
@@ -1427,6 +1593,561 @@ pub fn render_monster_avatar_for_identity(
     image
 }
 
+#[derive(Clone, Copy)]
+struct FaceLayout {
+    center_x: i32,
+    center_y: i32,
+    head_rx: i32,
+    head_ry: i32,
+}
+
+#[derive(Clone, Copy)]
+enum CreatureEyeStyle {
+    Round,
+    Tall,
+    Hollow,
+}
+
+#[derive(Clone, Copy)]
+#[allow(dead_code)]
+enum CreatureMouthStyle {
+    Smile,
+    Fang,
+    Flat,
+}
+
+fn draw_creature_eyes(
+    image: &mut RgbaImage,
+    layout: FaceLayout,
+    count: usize,
+    style: CreatureEyeStyle,
+    eye_white: Color,
+    pupil: Color,
+) {
+    let spacing = if count <= 1 {
+        0
+    } else {
+        (layout.head_rx as f32 * 0.48 / (count - 1) as f32) as i32
+    };
+    let start_x = layout.center_x - spacing * (count.saturating_sub(1) as i32) / 2;
+    let eye_y = layout.center_y - layout.head_ry / 5;
+    let eye_rx = (layout.head_rx as f32 * 0.12) as i32;
+    let eye_ry = (layout.head_ry as f32 * 0.12) as i32;
+
+    for index in 0..count {
+        let x = start_x + spacing * index as i32;
+        match style {
+            CreatureEyeStyle::Round => {
+                draw_filled_circle_mut(image, (x, eye_y), eye_rx.max(3), eye_white.into());
+                draw_filled_circle_mut(image, (x, eye_y), (eye_rx / 2).max(2), pupil.into());
+            }
+            CreatureEyeStyle::Tall => {
+                draw_filled_ellipse_mut(image, (x, eye_y), eye_rx, eye_ry + 4, eye_white.into());
+                draw_filled_ellipse_mut(
+                    image,
+                    (x, eye_y),
+                    (eye_rx / 3).max(2),
+                    (eye_ry + 2).max(2),
+                    pupil.into(),
+                );
+            }
+            CreatureEyeStyle::Hollow => {
+                draw_filled_ellipse_mut(image, (x, eye_y), eye_rx + 3, eye_ry + 5, pupil.into());
+                draw_filled_ellipse_mut(
+                    image,
+                    (x, eye_y + 1),
+                    (eye_rx / 2).max(2),
+                    (eye_ry / 2).max(2),
+                    Color::rgba(255, 255, 255, 20).into(),
+                );
+            }
+        }
+    }
+}
+
+fn draw_creature_mouth(
+    image: &mut RgbaImage,
+    layout: FaceLayout,
+    style: CreatureMouthStyle,
+    color: Color,
+) {
+    let mouth_y = layout.center_y + layout.head_ry / 3;
+    match style {
+        CreatureMouthStyle::Smile => {
+            draw_smile_arc(
+                image,
+                layout.center_x - layout.head_rx / 10,
+                mouth_y,
+                layout.head_rx / 4,
+                color,
+                0.45,
+            );
+            draw_smile_arc(
+                image,
+                layout.center_x + layout.head_rx / 10,
+                mouth_y,
+                layout.head_rx / 4,
+                color,
+                0.45,
+            );
+        }
+        CreatureMouthStyle::Fang => {
+            draw_filled_ellipse_mut(
+                image,
+                (layout.center_x, mouth_y),
+                layout.head_rx / 3,
+                layout.head_ry / 8,
+                color.into(),
+            );
+            for tooth_x in [layout.center_x - layout.head_rx / 7, layout.center_x + layout.head_rx / 7]
+            {
+                draw_polygon_mut(
+                    image,
+                    &[
+                        Point::new(tooth_x - layout.head_rx / 26, mouth_y - 1),
+                        Point::new(tooth_x + layout.head_rx / 26, mouth_y - 1),
+                        Point::new(tooth_x, mouth_y + layout.head_ry / 5),
+                    ],
+                    Color::rgb(248, 246, 238).into(),
+                );
+            }
+        }
+        CreatureMouthStyle::Flat => {
+            draw_filled_rect_mut(
+                image,
+                Rect::at(layout.center_x - layout.head_rx / 3, mouth_y - 3)
+                    .of_size((layout.head_rx * 2 / 3) as u32, 6),
+                color.into(),
+            );
+        }
+    }
+}
+
+pub fn render_ghost_avatar_for_identity(
+    spec: AvatarSpec,
+    identity: &AvatarIdentity,
+    background: AvatarBackground,
+) -> RgbaImage {
+    let width = spec.width as i32;
+    let height = spec.height as i32;
+    let layout = FaceLayout {
+        center_x: width / 2,
+        center_y: (height as f32 * 0.54) as i32,
+        head_rx: (width as f32 * 0.22) as i32,
+        head_ry: (height as f32 * 0.24) as i32,
+    };
+    let mut image =
+        ImageBuffer::from_pixel(spec.width, spec.height, background_fill(background, hsl_to_color(220.0 + identity.unit_f32(0) * 30.0, 0.18, 0.95)).into());
+    let body = hsl_to_color(200.0 + identity.unit_f32(1) * 30.0, 0.14, 0.98);
+    let shade = hsl_to_color(215.0 + identity.unit_f32(2) * 18.0, 0.18, 0.78);
+    draw_background_accent(
+        &mut image,
+        layout.center_x,
+        layout.center_y,
+        layout.head_rx,
+        layout.head_ry,
+        shade,
+        0.28,
+        background,
+    );
+    draw_filled_ellipse_mut(&mut image, (layout.center_x, layout.center_y), layout.head_rx, layout.head_ry, body.into());
+    draw_filled_rect_mut(
+        &mut image,
+        Rect::at(layout.center_x - layout.head_rx, layout.center_y)
+            .of_size((layout.head_rx * 2) as u32, (layout.head_ry + layout.head_ry / 2) as u32),
+        body.into(),
+    );
+    for index in 0..4 {
+        let x = layout.center_x - layout.head_rx + index * (layout.head_rx * 2 / 3);
+        let radius = layout.head_rx / 4 + (index % 2) * 4;
+        draw_filled_circle_mut(
+            &mut image,
+            (x, layout.center_y + layout.head_ry + layout.head_ry / 2),
+            radius,
+            body.into(),
+        );
+    }
+    draw_creature_eyes(
+        &mut image,
+        layout,
+        2,
+        CreatureEyeStyle::Tall,
+        Color::rgb(42, 48, 68),
+        Color::rgb(42, 48, 68),
+    );
+    draw_creature_mouth(&mut image, layout, CreatureMouthStyle::Smile, shade);
+    image
+}
+
+pub fn render_slime_avatar_for_identity(
+    spec: AvatarSpec,
+    identity: &AvatarIdentity,
+    background: AvatarBackground,
+) -> RgbaImage {
+    let width = spec.width as i32;
+    let height = spec.height as i32;
+    let layout = FaceLayout {
+        center_x: width / 2,
+        center_y: (height as f32 * 0.58) as i32,
+        head_rx: (width as f32 * 0.24) as i32,
+        head_ry: (height as f32 * 0.18) as i32,
+    };
+    let bg = hsl_to_color(110.0 + identity.unit_f32(3) * 80.0, 0.18, 0.93);
+    let slime = hsl_to_color(95.0 + identity.unit_f32(4) * 70.0, 0.52, 0.56);
+    let dark = hsl_to_color(110.0 + identity.unit_f32(5) * 40.0, 0.42, 0.32);
+    let mut image = ImageBuffer::from_pixel(spec.width, spec.height, background_fill(background, bg).into());
+    draw_background_accent(
+        &mut image,
+        layout.center_x,
+        layout.center_y,
+        layout.head_rx,
+        layout.head_ry,
+        dark,
+        0.32,
+        background,
+    );
+    draw_filled_ellipse_mut(&mut image, (layout.center_x, layout.center_y), layout.head_rx, layout.head_ry, slime.into());
+    for index in 0..3 {
+        let drip_x = layout.center_x - layout.head_rx / 2 + index * layout.head_rx / 2;
+        let drip_h = layout.head_ry / 2 + ((identity.byte(10 + index as usize) % 20) as i32);
+        draw_filled_rect_mut(
+            &mut image,
+            Rect::at(drip_x, layout.center_y).of_size((layout.head_rx / 3) as u32, drip_h as u32),
+            slime.into(),
+        );
+        draw_filled_circle_mut(
+            &mut image,
+            (drip_x + layout.head_rx / 6, layout.center_y + drip_h),
+            layout.head_rx / 7,
+            slime.into(),
+        );
+    }
+    for bubble in 0..4 {
+        draw_filled_circle_mut(
+            &mut image,
+            (
+                layout.center_x - layout.head_rx / 2 + bubble * layout.head_rx / 3,
+                layout.center_y - layout.head_ry / 3 + bubble * 9,
+            ),
+            (layout.head_rx / 10 + bubble).max(3),
+            Color::rgba(255, 255, 255, 90).into(),
+        );
+    }
+    draw_creature_eyes(
+        &mut image,
+        layout,
+        if identity.byte(20).is_multiple_of(2) { 2 } else { 3 },
+        CreatureEyeStyle::Round,
+        Color::rgb(248, 255, 236),
+        Color::rgb(32, 48, 24),
+    );
+    draw_creature_mouth(&mut image, layout, CreatureMouthStyle::Flat, dark);
+    image
+}
+
+pub fn render_bird_avatar_for_identity(
+    spec: AvatarSpec,
+    identity: &AvatarIdentity,
+    background: AvatarBackground,
+) -> RgbaImage {
+    let width = spec.width as i32;
+    let height = spec.height as i32;
+    let layout = FaceLayout {
+        center_x: width / 2,
+        center_y: (height as f32 * 0.56) as i32,
+        head_rx: (width as f32 * 0.22) as i32,
+        head_ry: (height as f32 * 0.22) as i32,
+    };
+    let bg = hsl_to_color(190.0 + identity.unit_f32(6) * 60.0, 0.18, 0.93);
+    let plumage = hsl_to_color(identity.unit_f32(7) * 360.0, 0.42, 0.62);
+    let wing = hsl_to_color(20.0 + identity.unit_f32(8) * 160.0, 0.32, 0.46);
+    let beak = hsl_to_color(32.0 + identity.unit_f32(9) * 26.0, 0.82, 0.58);
+    let mut image = ImageBuffer::from_pixel(spec.width, spec.height, background_fill(background, bg).into());
+    draw_background_accent(&mut image, layout.center_x, layout.center_y, layout.head_rx, layout.head_ry, wing, 0.24, background);
+    draw_filled_circle_mut(&mut image, (layout.center_x, layout.center_y), layout.head_rx, plumage.into());
+    draw_filled_ellipse_mut(
+        &mut image,
+        (layout.center_x - layout.head_rx / 2, layout.center_y + layout.head_ry / 6),
+        layout.head_rx / 3,
+        layout.head_ry / 2,
+        wing.into(),
+    );
+    draw_filled_ellipse_mut(
+        &mut image,
+        (layout.center_x + layout.head_rx / 2, layout.center_y + layout.head_ry / 6),
+        layout.head_rx / 3,
+        layout.head_ry / 2,
+        wing.into(),
+    );
+    draw_polygon_mut(
+        &mut image,
+        &[
+            Point::new(layout.center_x, layout.center_y),
+            Point::new(layout.center_x + layout.head_rx / 2, layout.center_y + layout.head_ry / 6),
+            Point::new(layout.center_x, layout.center_y + layout.head_ry / 3),
+        ],
+        beak.into(),
+    );
+    for feather in 0..3 {
+        let fx = layout.center_x - layout.head_rx / 5 + feather * layout.head_rx / 5;
+        draw_polygon_mut(
+            &mut image,
+            &[
+                Point::new(fx, layout.center_y - layout.head_ry),
+                Point::new(fx + layout.head_rx / 10, layout.center_y - layout.head_ry - layout.head_ry / 2),
+                Point::new(fx + layout.head_rx / 5, layout.center_y - layout.head_ry / 2),
+            ],
+            wing.into(),
+        );
+    }
+    draw_creature_eyes(
+        &mut image,
+        layout,
+        2,
+        CreatureEyeStyle::Round,
+        Color::rgb(255, 255, 255),
+        Color::rgb(28, 24, 34),
+    );
+    image
+}
+
+pub fn render_wizard_avatar_for_identity(
+    spec: AvatarSpec,
+    identity: &AvatarIdentity,
+    background: AvatarBackground,
+) -> RgbaImage {
+    let width = spec.width as i32;
+    let height = spec.height as i32;
+    let layout = FaceLayout {
+        center_x: width / 2,
+        center_y: (height as f32 * 0.60) as i32,
+        head_rx: (width as f32 * 0.18) as i32,
+        head_ry: (height as f32 * 0.18) as i32,
+    };
+    let bg = hsl_to_color(250.0 + identity.unit_f32(10) * 40.0, 0.24, 0.92);
+    let hat = hsl_to_color(230.0 + identity.unit_f32(11) * 50.0, 0.42, 0.38);
+    let hat_band = hsl_to_color(28.0 + identity.unit_f32(12) * 30.0, 0.74, 0.58);
+    let skin = hsl_to_color(22.0 + identity.unit_f32(13) * 18.0, 0.30, 0.82);
+    let beard = hsl_to_color(40.0 + identity.unit_f32(14) * 25.0, 0.10, 0.92);
+    let mut image = ImageBuffer::from_pixel(spec.width, spec.height, background_fill(background, bg).into());
+    draw_background_accent(&mut image, layout.center_x, layout.center_y, layout.head_rx, layout.head_ry, hat_band, 0.20, background);
+    draw_polygon_mut(
+        &mut image,
+        &[
+            Point::new(layout.center_x - layout.head_rx, layout.center_y - layout.head_ry / 2),
+            Point::new(layout.center_x + layout.head_rx, layout.center_y - layout.head_ry / 2),
+            Point::new(layout.center_x, layout.center_y - layout.head_ry * 2),
+        ],
+        hat.into(),
+    );
+    draw_filled_rect_mut(
+        &mut image,
+        Rect::at(layout.center_x - layout.head_rx - layout.head_rx / 2, layout.center_y - layout.head_ry / 2)
+            .of_size((layout.head_rx * 3) as u32, (layout.head_ry / 3) as u32),
+        hat_band.into(),
+    );
+    draw_filled_circle_mut(&mut image, (layout.center_x, layout.center_y), layout.head_rx, skin.into());
+    draw_polygon_mut(
+        &mut image,
+        &[
+            Point::new(layout.center_x - layout.head_rx / 2, layout.center_y + layout.head_ry / 3),
+            Point::new(layout.center_x + layout.head_rx / 2, layout.center_y + layout.head_ry / 3),
+            Point::new(layout.center_x, layout.center_y + layout.head_ry + layout.head_ry / 2),
+        ],
+        beard.into(),
+    );
+    draw_creature_eyes(
+        &mut image,
+        layout,
+        2,
+        CreatureEyeStyle::Round,
+        Color::rgb(255, 255, 255),
+        Color::rgb(36, 30, 52),
+    );
+    draw_creature_mouth(&mut image, layout, CreatureMouthStyle::Smile, Color::rgb(86, 64, 58));
+    draw_filled_circle_mut(
+        &mut image,
+        (layout.center_x + layout.head_rx / 2, layout.center_y - layout.head_ry - layout.head_ry / 2),
+        (layout.head_rx / 6).max(3),
+        hat_band.into(),
+    );
+    image
+}
+
+pub fn render_skull_avatar_for_identity(
+    spec: AvatarSpec,
+    identity: &AvatarIdentity,
+    background: AvatarBackground,
+) -> RgbaImage {
+    let width = spec.width as i32;
+    let height = spec.height as i32;
+    let layout = FaceLayout {
+        center_x: width / 2,
+        center_y: (height as f32 * 0.54) as i32,
+        head_rx: (width as f32 * 0.20) as i32,
+        head_ry: (height as f32 * 0.20) as i32,
+    };
+    let bg = hsl_to_color(210.0 + identity.unit_f32(15) * 20.0, 0.08, 0.94);
+    let bone = hsl_to_color(38.0 + identity.unit_f32(16) * 14.0, 0.10, 0.90);
+    let crack = Color::rgb(72, 68, 62);
+    let mut image = ImageBuffer::from_pixel(spec.width, spec.height, background_fill(background, bg).into());
+    draw_background_accent(&mut image, layout.center_x, layout.center_y, layout.head_rx, layout.head_ry, crack, 0.16, background);
+    draw_filled_ellipse_mut(&mut image, (layout.center_x, layout.center_y), layout.head_rx, layout.head_ry, bone.into());
+    draw_filled_rect_mut(
+        &mut image,
+        Rect::at(layout.center_x - layout.head_rx / 2, layout.center_y + layout.head_ry / 2)
+            .of_size(layout.head_rx as u32, (layout.head_ry / 2) as u32),
+        bone.into(),
+    );
+    draw_creature_eyes(
+        &mut image,
+        layout,
+        2,
+        CreatureEyeStyle::Hollow,
+        Color::rgb(44, 42, 44),
+        Color::rgb(44, 42, 44),
+    );
+    draw_polygon_mut(
+        &mut image,
+        &[
+            Point::new(layout.center_x, layout.center_y),
+            Point::new(layout.center_x - layout.head_rx / 8, layout.center_y + layout.head_ry / 5),
+            Point::new(layout.center_x + layout.head_rx / 8, layout.center_y + layout.head_ry / 5),
+        ],
+        crack.into(),
+    );
+    draw_creature_mouth(&mut image, layout, CreatureMouthStyle::Flat, crack);
+    for tooth in 0..4 {
+        let x = layout.center_x - layout.head_rx / 4 + tooth * layout.head_rx / 6;
+        draw_line_segment_mut(
+            &mut image,
+            (x as f32, (layout.center_y + layout.head_ry / 2) as f32),
+            (x as f32, (layout.center_y + layout.head_ry) as f32),
+            crack.into(),
+        );
+    }
+    draw_line_segment_mut(
+        &mut image,
+        ((layout.center_x + layout.head_rx / 4) as f32, (layout.center_y - layout.head_ry / 2) as f32),
+        ((layout.center_x + layout.head_rx / 8) as f32, (layout.center_y - layout.head_ry / 8) as f32),
+        crack.into(),
+    );
+    image
+}
+
+pub fn render_paws_avatar_for_identity(
+    spec: AvatarSpec,
+    identity: &AvatarIdentity,
+    background: AvatarBackground,
+) -> RgbaImage {
+    assert!(spec.width >= 64, "width must be at least 64 pixels");
+    assert!(spec.height >= 64, "height must be at least 64 pixels");
+
+    let width = spec.width as i32;
+    let height = spec.height as i32;
+    let mut image =
+        ImageBuffer::from_pixel(spec.width, spec.height, Color::rgb(255, 255, 255).into());
+    let bg = hsl_to_color(24.0 + identity.unit_f32(0) * 36.0, 0.20, 0.94);
+    let fur = hsl_to_color(identity.unit_f32(1) * 360.0, 0.32 + identity.unit_f32(2) * 0.18, 0.60);
+    let pad = hsl_to_color(330.0 + identity.unit_f32(3) * 20.0, 0.36 + identity.unit_f32(4) * 0.18, 0.72);
+    let accent = hsl_to_color(18.0 + identity.unit_f32(5) * 24.0, 0.34, 0.82);
+    image
+        .pixels_mut()
+        .for_each(|pixel| *pixel = background_fill(background, bg).into());
+
+    if background == AvatarBackground::Themed {
+        for stripe in 0..4 {
+            let y = (height / 8) + stripe * (height / 5);
+            draw_filled_rect_mut(
+                &mut image,
+                Rect::at(0, y).of_size(spec.width, (height / 18).max(1) as u32),
+                Color::rgba(accent.0[0], accent.0[1], accent.0[2], 70).into(),
+            );
+        }
+    }
+
+    let primary_x = width / 2;
+    let primary_y = height / 2 + height / 12;
+    let palm_rx = (width as f32 * (0.14 + identity.unit_f32(6) * 0.04)) as i32;
+    let palm_ry = (height as f32 * (0.16 + identity.unit_f32(7) * 0.04)) as i32;
+    draw_paw_print(
+        &mut image,
+        primary_x,
+        primary_y,
+        palm_rx,
+        palm_ry,
+        fur,
+        pad,
+        identity.byte(8),
+    );
+
+    if identity.byte(9).is_multiple_of(2) {
+        draw_paw_print(
+            &mut image,
+            width / 3,
+            height / 3,
+            (palm_rx as f32 * 0.82) as i32,
+            (palm_ry as f32 * 0.82) as i32,
+            hsl_to_color(identity.unit_f32(10) * 360.0, 0.28, 0.66),
+            pad,
+            identity.byte(11),
+        );
+    }
+
+    if identity.byte(12) % 3 != 0 {
+        draw_paw_print(
+            &mut image,
+            width * 2 / 3,
+            height / 3 + height / 8,
+            (palm_rx as f32 * 0.70) as i32,
+            (palm_ry as f32 * 0.70) as i32,
+            fur,
+            hsl_to_color(340.0 + identity.unit_f32(13) * 12.0, 0.30, 0.80),
+            identity.byte(14),
+        );
+    }
+
+    image
+}
+
+fn draw_paw_print(
+    image: &mut RgbaImage,
+    center_x: i32,
+    center_y: i32,
+    palm_rx: i32,
+    palm_ry: i32,
+    fur: Color,
+    pad: Color,
+    shape_seed: u8,
+) {
+    let toe_offset_y = palm_ry;
+    let toe_spacing = (palm_rx as f32 * (0.48 + (shape_seed as f32 / 255.0) * 0.12)) as i32;
+    let toe_rx = (palm_rx as f32 * (0.26 + (shape_seed as f32 / 255.0) * 0.04)) as i32;
+    let toe_ry = (palm_ry as f32 * (0.24 + ((shape_seed >> 2) as f32 / 255.0) * 0.06)) as i32;
+
+    draw_filled_ellipse_mut(image, (center_x, center_y), palm_rx, palm_ry, fur.into());
+    draw_filled_ellipse_mut(
+        image,
+        (center_x, center_y + palm_ry / 8),
+        (palm_rx as f32 * 0.72) as i32,
+        (palm_ry as f32 * 0.68) as i32,
+        pad.into(),
+    );
+
+    for (index, offset) in [-3, -1, 1, 3].into_iter().enumerate() {
+        let x = center_x + offset * toe_spacing / 4;
+        let y = center_y - toe_offset_y + if index % 2 == 0 { 0 } else { toe_ry / 3 };
+        draw_filled_ellipse_mut(image, (x, y), toe_rx, toe_ry, fur.into());
+        draw_filled_ellipse_mut(
+            image,
+            (x, y + toe_ry / 5),
+            (toe_rx as f32 * 0.68) as i32,
+            (toe_ry as f32 * 0.68) as i32,
+            pad.into(),
+        );
+    }
+}
+
 #[derive(Clone, Copy, Debug)]
 struct CatPalette {
     background: Color,
@@ -2276,6 +2997,218 @@ fn render_monster_svg(spec: AvatarSpec, identity: &AvatarIdentity) -> String {
     )
 }
 
+fn render_ghost_svg(spec: AvatarSpec, identity: &AvatarIdentity) -> String {
+    let w = spec.width as f32;
+    let h = spec.height as f32;
+    let cx = w / 2.0;
+    let cy = h * 0.56;
+    let body = hsl_to_color(200.0 + identity.unit_f32(1) * 30.0, 0.14, 0.98);
+    format!(
+        r##"<ellipse cx="{cx}" cy="{cy}" rx="{rx}" ry="{ry}" fill="{body}"/><rect x="{x}" y="{cy}" width="{rw}" height="{rh}" fill="{body}"/><circle cx="{c1}" cy="{scy}" r="{sr}" fill="{body}"/><circle cx="{c2}" cy="{scy}" r="{sr}" fill="{body}"/><circle cx="{c3}" cy="{scy}" r="{sr}" fill="{body}"/><ellipse cx="{lx}" cy="{ey}" rx="{erx}" ry="{ery}" fill="#30384a"/><ellipse cx="{rx2}" cy="{ey}" rx="{erx}" ry="{ery}" fill="#30384a"/><path d="M {mx1} {my} q {cq} {cyq} {ce} 0 M {mx2} {my} q {cq} {cyq} {ce} 0" stroke="#8da0b2" stroke-width="3" fill="none" stroke-linecap="round"/>"##,
+        cx = cx,
+        cy = cy,
+        rx = w * 0.22,
+        ry = h * 0.24,
+        body = color_hex(body),
+        x = cx - w * 0.22,
+        rw = w * 0.44,
+        rh = h * 0.22,
+        c1 = cx - w * 0.16,
+        c2 = cx,
+        c3 = cx + w * 0.16,
+        scy = cy + h * 0.22,
+        sr = w * 0.06,
+        lx = cx - w * 0.08,
+        rx2 = cx + w * 0.08,
+        ey = cy - h * 0.06,
+        erx = w * 0.025,
+        ery = h * 0.05,
+        mx1 = cx - w * 0.03,
+        mx2 = cx + w * 0.03,
+        my = cy + h * 0.08,
+        cq = w * 0.04,
+        cyq = h * 0.05,
+        ce = w * 0.06,
+    )
+}
+
+fn render_slime_svg(spec: AvatarSpec, identity: &AvatarIdentity) -> String {
+    let w = spec.width as f32;
+    let h = spec.height as f32;
+    let cx = w / 2.0;
+    let cy = h * 0.58;
+    let slime = hsl_to_color(95.0 + identity.unit_f32(4) * 70.0, 0.52, 0.56);
+    format!(
+        r##"<ellipse cx="{cx}" cy="{cy}" rx="{rx}" ry="{ry}" fill="{slime}"/><rect x="{dx1}" y="{cy}" width="{dw}" height="{dh1}" fill="{slime}"/><rect x="{dx2}" y="{cy}" width="{dw}" height="{dh2}" fill="{slime}"/><rect x="{dx3}" y="{cy}" width="{dw}" height="{dh3}" fill="{slime}"/><circle cx="{lx}" cy="{ey}" r="{er}" fill="#f8ffec"/><circle cx="{cx}" cy="{ey2}" r="{er2}" fill="#f8ffec"/><circle cx="{rx2}" cy="{ey}" r="{er}" fill="#f8ffec"/><circle cx="{lx}" cy="{ey}" r="{pr}" fill="#203018"/><circle cx="{cx}" cy="{ey2}" r="{pr}" fill="#203018"/><circle cx="{rx2}" cy="{ey}" r="{pr}" fill="#203018"/><rect x="{mx}" y="{my}" width="{mw}" height="{mh}" rx="{mr}" fill="#305228"/>"##,
+        cx = cx,
+        cy = cy,
+        rx = w * 0.24,
+        ry = h * 0.18,
+        slime = color_hex(slime),
+        dx1 = cx - w * 0.16,
+        dx2 = cx - w * 0.04,
+        dx3 = cx + w * 0.08,
+        dw = w * 0.08,
+        dh1 = h * 0.16,
+        dh2 = h * 0.12,
+        dh3 = h * 0.18,
+        lx = cx - w * 0.08,
+        rx2 = cx + w * 0.08,
+        ey = cy - h * 0.06,
+        ey2 = cy - h * 0.04,
+        er = w * 0.03,
+        er2 = w * 0.026,
+        pr = w * 0.012,
+        mx = cx - w * 0.10,
+        my = cy + h * 0.08,
+        mw = w * 0.20,
+        mh = h * 0.02,
+        mr = w * 0.01,
+    )
+}
+
+fn render_bird_svg(spec: AvatarSpec, identity: &AvatarIdentity) -> String {
+    let w = spec.width as f32;
+    let h = spec.height as f32;
+    let cx = w / 2.0;
+    let cy = h * 0.56;
+    let plumage = hsl_to_color(identity.unit_f32(7) * 360.0, 0.42, 0.62);
+    let wing = hsl_to_color(20.0 + identity.unit_f32(8) * 160.0, 0.32, 0.46);
+    let beak = hsl_to_color(32.0 + identity.unit_f32(9) * 26.0, 0.82, 0.58);
+    format!(
+        r##"<circle cx="{cx}" cy="{cy}" r="{r}" fill="{plumage}"/><ellipse cx="{lx}" cy="{wy}" rx="{wrx}" ry="{wry}" fill="{wing}"/><ellipse cx="{rx2}" cy="{wy}" rx="{wrx}" ry="{wry}" fill="{wing}"/><polygon points="{cx},{cy} {bx},{by} {cx},{by2}" fill="{beak}"/><circle cx="{elx}" cy="{ey}" r="{er}" fill="#fff"/><circle cx="{erx}" cy="{ey}" r="{er}" fill="#fff"/><circle cx="{elx}" cy="{ey}" r="{pr}" fill="#181822"/><circle cx="{erx}" cy="{ey}" r="{pr}" fill="#181822"/>"##,
+        cx = cx,
+        cy = cy,
+        r = w * 0.22,
+        plumage = color_hex(plumage),
+        lx = cx - w * 0.12,
+        rx2 = cx + w * 0.12,
+        wy = cy + h * 0.04,
+        wrx = w * 0.08,
+        wry = h * 0.12,
+        wing = color_hex(wing),
+        bx = cx + w * 0.12,
+        by = cy + h * 0.04,
+        by2 = cy + h * 0.10,
+        beak = color_hex(beak),
+        elx = cx - w * 0.07,
+        erx = cx + w * 0.07,
+        ey = cy - h * 0.05,
+        er = w * 0.028,
+        pr = w * 0.012,
+    )
+}
+
+fn render_wizard_svg(spec: AvatarSpec, identity: &AvatarIdentity) -> String {
+    let w = spec.width as f32;
+    let h = spec.height as f32;
+    let cx = w / 2.0;
+    let cy = h * 0.60;
+    let hat = hsl_to_color(230.0 + identity.unit_f32(11) * 50.0, 0.42, 0.38);
+    let band = hsl_to_color(28.0 + identity.unit_f32(12) * 30.0, 0.74, 0.58);
+    let skin = hsl_to_color(22.0 + identity.unit_f32(13) * 18.0, 0.30, 0.82);
+    let beard = hsl_to_color(40.0 + identity.unit_f32(14) * 25.0, 0.10, 0.92);
+    format!(
+        r##"<polygon points="{x1},{y1} {x2},{y1} {cx},{y2}" fill="{hat}"/><rect x="{bx}" y="{by}" width="{bw}" height="{bh}" fill="{band}"/><circle cx="{cx}" cy="{cy}" r="{r}" fill="{skin}"/><polygon points="{b1},{b2} {b3},{b2} {cx},{b4}" fill="{beard}"/><circle cx="{elx}" cy="{ey}" r="{er}" fill="#fff"/><circle cx="{erx}" cy="{ey}" r="{er}" fill="#fff"/><circle cx="{elx}" cy="{ey}" r="{pr}" fill="#241e34"/><circle cx="{erx}" cy="{ey}" r="{pr}" fill="#241e34"/><circle cx="{sx}" cy="{sy}" r="{sr}" fill="{band}"/>"##,
+        cx = cx,
+        cy = cy,
+        x1 = cx - w * 0.18,
+        x2 = cx + w * 0.18,
+        y1 = cy - h * 0.08,
+        y2 = cy - h * 0.34,
+        hat = color_hex(hat),
+        bx = cx - w * 0.26,
+        by = cy - h * 0.08,
+        bw = w * 0.52,
+        bh = h * 0.04,
+        band = color_hex(band),
+        r = w * 0.18,
+        skin = color_hex(skin),
+        b1 = cx - w * 0.10,
+        b2 = cy + h * 0.06,
+        b3 = cx + w * 0.10,
+        b4 = cy + h * 0.26,
+        beard = color_hex(beard),
+        elx = cx - w * 0.06,
+        erx = cx + w * 0.06,
+        ey = cy - h * 0.03,
+        er = w * 0.024,
+        pr = w * 0.010,
+        sx = cx + w * 0.12,
+        sy = cy - h * 0.28,
+        sr = w * 0.018,
+    )
+}
+
+fn render_skull_svg(spec: AvatarSpec, _identity: &AvatarIdentity) -> String {
+    let w = spec.width as f32;
+    let h = spec.height as f32;
+    let cx = w / 2.0;
+    let cy = h * 0.54;
+    format!(
+        r##"<ellipse cx="{cx}" cy="{cy}" rx="{rx}" ry="{ry}" fill="#e8e1d6"/><rect x="{jx}" y="{jy}" width="{jw}" height="{jh}" fill="#e8e1d6"/><ellipse cx="{elx}" cy="{ey}" rx="{erx}" ry="{ery}" fill="#2c2a2c"/><ellipse cx="{erx2}" cy="{ey}" rx="{erx}" ry="{ery}" fill="#2c2a2c"/><polygon points="{cx},{ny} {nx1},{ny2} {nx2},{ny2}" fill="#5a544e"/><rect x="{mx}" y="{my}" width="{mw}" height="{mh}" fill="#5a544e"/><line x1="{t1}" y1="{ty1}" x2="{t1}" y2="{ty2}" stroke="#5a544e" stroke-width="3"/><line x1="{t2}" y1="{ty1}" x2="{t2}" y2="{ty2}" stroke="#5a544e" stroke-width="3"/><line x1="{t3}" y1="{ty1}" x2="{t3}" y2="{ty2}" stroke="#5a544e" stroke-width="3"/>"##,
+        cx = cx,
+        cy = cy,
+        rx = w * 0.20,
+        ry = h * 0.20,
+        jx = cx - w * 0.10,
+        jy = cy + h * 0.10,
+        jw = w * 0.20,
+        jh = h * 0.10,
+        elx = cx - w * 0.07,
+        erx2 = cx + w * 0.07,
+        ey = cy - h * 0.04,
+        erx = w * 0.04,
+        ery = h * 0.06,
+        ny = cy,
+        nx1 = cx - w * 0.02,
+        nx2 = cx + w * 0.02,
+        ny2 = cy + h * 0.08,
+        mx = cx - w * 0.10,
+        my = cy + h * 0.10,
+        mw = w * 0.20,
+        mh = h * 0.02,
+        t1 = cx - w * 0.05,
+        t2 = cx,
+        t3 = cx + w * 0.05,
+        ty1 = cy + h * 0.10,
+        ty2 = cy + h * 0.20,
+    )
+}
+
+fn render_paws_svg(spec: AvatarSpec, identity: &AvatarIdentity) -> String {
+    let w = spec.width as f32;
+    let h = spec.height as f32;
+    let paw = hsl_to_color(identity.unit_f32(1) * 360.0, 0.38, 0.62);
+    let pad = hsl_to_color(330.0 + identity.unit_f32(3) * 20.0, 0.40, 0.74);
+    let cx = w * 0.52;
+    let cy = h * 0.60;
+    format!(
+        r##"<ellipse cx="{cx}" cy="{cy}" rx="{prx}" ry="{pry}" fill="{paw}"/><ellipse cx="{cx}" cy="{py2}" rx="{padrx}" ry="{padry}" fill="{pad}"/><ellipse cx="{t1x}" cy="{ty1}" rx="{trx}" ry="{try_}" fill="{paw}"/><ellipse cx="{t2x}" cy="{ty2}" rx="{trx}" ry="{try_}" fill="{paw}"/><ellipse cx="{t3x}" cy="{ty2}" rx="{trx}" ry="{try_}" fill="{paw}"/><ellipse cx="{t4x}" cy="{ty1}" rx="{trx}" ry="{try_}" fill="{paw}"/><ellipse cx="{t1x}" cy="{ty1a}" rx="{padrx2}" ry="{padry2}" fill="{pad}"/><ellipse cx="{t2x}" cy="{ty2a}" rx="{padrx2}" ry="{padry2}" fill="{pad}"/><ellipse cx="{t3x}" cy="{ty2a}" rx="{padrx2}" ry="{pad}"/><ellipse cx="{t4x}" cy="{ty1a}" rx="{padrx2}" ry="{padry2}" fill="{pad}"/>"##,
+        cx = cx,
+        cy = cy,
+        prx = w * 0.13,
+        pry = h * 0.15,
+        paw = color_hex(paw),
+        py2 = cy + h * 0.015,
+        padrx = w * 0.09,
+        padry = h * 0.10,
+        pad = color_hex(pad),
+        t1x = cx - w * 0.12,
+        t2x = cx - w * 0.04,
+        t3x = cx + w * 0.04,
+        t4x = cx + w * 0.12,
+        ty1 = cy - h * 0.16,
+        ty2 = cy - h * 0.14,
+        ty1a = cy - h * 0.15,
+        ty2a = cy - h * 0.13,
+        trx = w * 0.035,
+        try_ = h * 0.05,
+        padrx2 = w * 0.022,
+        padry2 = h * 0.032,
+    )
+}
+
 fn encode_rgba_image(image: &RgbaImage, format: AvatarOutputFormat) -> ImageResult<Vec<u8>> {
     let mut bytes = Vec::new();
     {
@@ -2356,6 +3289,20 @@ mod tests {
 
         assert_eq!(identity.as_digest().len(), 64);
         assert_ne!(identity.seed(), 0);
+    }
+
+    #[test]
+    fn namespace_changes_identity_digest() {
+        let left = AvatarIdentity::new_with_namespace(
+            AvatarNamespace::new("tenant-a", "v2"),
+            "alice@example.com",
+        );
+        let right = AvatarIdentity::new_with_namespace(
+            AvatarNamespace::new("tenant-b", "v2"),
+            "alice@example.com",
+        );
+
+        assert_ne!(left.as_digest(), right.as_digest());
     }
 
     #[test]
@@ -2450,6 +3397,16 @@ mod tests {
     }
 
     #[test]
+    fn paws_variant_is_distinct_from_cat() {
+        let spec = AvatarSpec::new(128, 128, 0);
+        let id = AvatarIdentity::new("alice@example.com");
+        let cat = render_cat_avatar_for_identity_with_background(spec, &id, AvatarBackground::Themed);
+        let paws = render_paws_avatar_for_identity(spec, &id, AvatarBackground::Themed);
+
+        assert_ne!(cat.as_raw(), paws.as_raw());
+    }
+
+    #[test]
     fn generic_avatar_encoder_supports_robot_and_white_background() {
         let bytes = encode_avatar_for_id(
             AvatarSpec::new(96, 96, 0),
@@ -2478,6 +3435,19 @@ mod tests {
 
         assert!(svg.starts_with("<svg "));
         assert!(svg.contains("fox avatar"));
+    }
+
+    #[test]
+    fn svg_output_is_minimal_and_safe() {
+        let svg = render_avatar_svg_for_id(
+            AvatarSpec::new(256, 256, 0),
+            "ghost@example.com",
+            AvatarOptions::new(AvatarKind::Ghost, AvatarBackground::Themed),
+        );
+
+        assert!(!svg.contains("<script"));
+        assert!(!svg.contains("onload="));
+        assert!(svg.len() < 8_000);
     }
 
     #[test]
@@ -2515,37 +3485,16 @@ mod tests {
 
     #[test]
     fn visual_fingerprints_are_stable() {
-        let scenarios = [
-            (
-                AvatarOptions::new(AvatarKind::Cat, AvatarBackground::Themed),
-                "cat-themed",
-                "d3613419db55afd76018121d",
-            ),
-            (
-                AvatarOptions::new(AvatarKind::Cat, AvatarBackground::White),
-                "cat-white",
-                "45a185a73cb4e7eaafae1f97",
-            ),
-            (
-                AvatarOptions::new(AvatarKind::Dog, AvatarBackground::Themed),
-                "dog-themed",
-                "8129402f95375c8e4cdac4dc",
-            ),
-            (
-                AvatarOptions::new(AvatarKind::Robot, AvatarBackground::White),
-                "robot-white",
-                "0d8d46e9cfa253c712490571",
-            ),
-        ];
-
-        for (options, _label, expected) in scenarios {
+        for (label, options) in regression_scenarios() {
             let image = render_avatar_for_id(
                 AvatarSpec::new(128, 128, 0),
                 "snapshot@example.com",
                 options,
             );
             let fingerprint = image_fingerprint(&image);
-            assert_eq!(fingerprint, expected);
+            let expected =
+                regression_fingerprint_for(label).expect("missing golden regression fingerprint");
+            assert_eq!(fingerprint, expected, "fingerprint mismatch for {label}");
         }
     }
 
@@ -2573,6 +3522,30 @@ mod tests {
                 "monster-themed",
                 AvatarOptions::new(AvatarKind::Monster, AvatarBackground::Themed),
             ),
+            (
+                "ghost-themed",
+                AvatarOptions::new(AvatarKind::Ghost, AvatarBackground::Themed),
+            ),
+            (
+                "slime-white",
+                AvatarOptions::new(AvatarKind::Slime, AvatarBackground::White),
+            ),
+            (
+                "bird-themed",
+                AvatarOptions::new(AvatarKind::Bird, AvatarBackground::Themed),
+            ),
+            (
+                "wizard-white",
+                AvatarOptions::new(AvatarKind::Wizard, AvatarBackground::White),
+            ),
+            (
+                "skull-themed",
+                AvatarOptions::new(AvatarKind::Skull, AvatarBackground::Themed),
+            ),
+            (
+                "paws-themed",
+                AvatarOptions::new(AvatarKind::Paws, AvatarBackground::Themed),
+            ),
         ] {
             let image = render_avatar_for_id(
                 AvatarSpec::new(128, 128, 0),
@@ -2581,6 +3554,32 @@ mod tests {
             );
             println!("{label}: {}", image_fingerprint(&image));
         }
+    }
+
+    fn regression_scenarios() -> [(&'static str, AvatarOptions); 11] {
+        [
+            ("cat-themed", AvatarOptions::new(AvatarKind::Cat, AvatarBackground::Themed)),
+            ("cat-white", AvatarOptions::new(AvatarKind::Cat, AvatarBackground::White)),
+            ("dog-themed", AvatarOptions::new(AvatarKind::Dog, AvatarBackground::Themed)),
+            ("robot-white", AvatarOptions::new(AvatarKind::Robot, AvatarBackground::White)),
+            ("monster-themed", AvatarOptions::new(AvatarKind::Monster, AvatarBackground::Themed)),
+            ("ghost-themed", AvatarOptions::new(AvatarKind::Ghost, AvatarBackground::Themed)),
+            ("slime-white", AvatarOptions::new(AvatarKind::Slime, AvatarBackground::White)),
+            ("bird-themed", AvatarOptions::new(AvatarKind::Bird, AvatarBackground::Themed)),
+            ("wizard-white", AvatarOptions::new(AvatarKind::Wizard, AvatarBackground::White)),
+            ("skull-themed", AvatarOptions::new(AvatarKind::Skull, AvatarBackground::Themed)),
+            ("paws-themed", AvatarOptions::new(AvatarKind::Paws, AvatarBackground::Themed)),
+        ]
+    }
+
+    fn regression_fingerprint_for(label: &str) -> Option<&'static str> {
+        include_str!("../tests/golden_fingerprints.txt")
+            .lines()
+            .filter(|line| !line.trim().is_empty() && !line.trim_start().starts_with('#'))
+            .find_map(|line| {
+                let (name, value) = line.split_once('=')?;
+                (name.trim() == label).then_some(value.trim())
+            })
     }
 
     fn image_fingerprint(image: &RgbaImage) -> String {
