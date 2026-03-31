@@ -1,0 +1,19 @@
+target/
+**/target/
+
+# Environment overrides
+.env
+.env.local
+.env.*
+
+# Editor and OS noise
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+
+# Local logs and temp files
+*.log
+*.tmp
+*.swp
+*.swo

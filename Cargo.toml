@@ -1,0 +1,22 @@
+[package]
+name = "hashavatar"
+version = "0.1.0"
+edition = "2024"
+default-run = "hashavatar"
+description = "Deterministic procedural avatars in Rust with SHA-512 identities and WebP, PNG, and SVG export"
+license = "EUPL-1.2"
+repository = "https://repoheim.eu/valkyoth/hashavatar"
+homepage = "https://repoheim.eu/valkyoth/hashavatar"
+documentation = "https://repoheim.eu/valkyoth/hashavatar"
+readme = "README.md"
+keywords = ["avatar", "identicon", "procedural", "webp", "svg"]
+categories = ["multimedia::images", "graphics"]
+
+[dependencies]
+axum = { version = "0.8", default-features = false, features = ["http1", "tokio", "query"] }
+image = { version = "0.25", default-features = false, features = ["png", "webp"] }
+imageproc = { version = "0.25", default-features = false }
+palette = { version = "0.7", default-features = false, features = ["std"] }
+rand = { version = "0.9", default-features = false, features = ["std", "std_rng"] }
+sha2 = { version = "0.10", default-features = false, features = ["std"] }
+tokio = { version = "1.47", default-features = false, features = ["macros", "rt-multi-thread", "net"] }
