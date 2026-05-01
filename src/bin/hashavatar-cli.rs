@@ -1,16 +1,22 @@
 use std::ffi::OsString;
 use std::fs;
+use std::io::Read;
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
 
 use hashavatar::{
     AvatarBackground, AvatarKind, AvatarOptions, AvatarOutputFormat, AvatarSpec,
-    encode_avatar_for_id, export_avatar_svg_for_id,
+    MAX_AVATAR_DIMENSION, MIN_AVATAR_DIMENSION, encode_avatar_for_id, export_avatar_svg_for_id,
 };
+
+const MAX_IDENTITY_BYTES: usize = 1024;
+const MAX_BATCH_INPUT_BYTES: u64 = 1_048_576;
+const MAX_OUTPUT_BASENAME_CHARS: usize = 96;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let args = CliArgs::parse(std::env::args_os().skip(1).collect())?;
     let spec = AvatarSpec::new(args.size, args.size, 0);
+    spec.validate()?;
 
     if let Some(input) = args.input.as_ref() {
         let out_dir = args
@@ -20,6 +26,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         fs::create_dir_all(&out_dir)?;
 
         for identity in read_batch_identities(input)? {
+            validate_identity(&identity)?;
             let output = out_dir.join(output_file_name(&identity, args.kind, args.format));
             export_one(
                 &identity,
@@ -39,6 +46,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .as_deref()
         .filter(|value| !value.trim().is_empty())
         .ok_or("missing --id or --input")?;
+    validate_identity(identity)?;
     let output = args
         .output
         .clone()
@@ -59,6 +67,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 enum CliFormat {
     WebP,
     Png,
+    Jpeg,
+    Gif,
     Svg,
 }
 
@@ -67,6 +77,8 @@ impl CliFormat {
         match self {
             Self::WebP => "webp",
             Self::Png => "png",
+            Self::Jpeg => "jpg",
+            Self::Gif => "gif",
             Self::Svg => "svg",
         }
     }
@@ -79,6 +91,8 @@ impl FromStr for CliFormat {
         match s.trim().to_ascii_lowercase().as_str() {
             "webp" => Ok(Self::WebP),
             "png" => Ok(Self::Png),
+            "jpg" | "jpeg" => Ok(Self::Jpeg),
+            "gif" => Ok(Self::Gif),
             "svg" => Ok(Self::Svg),
             _ => Err("unsupported format"),
         }
@@ -160,13 +174,36 @@ fn next_string(
 }
 
 fn read_batch_identities(path: &Path) -> Result<Vec<String>, Box<dyn std::error::Error>> {
-    let contents = fs::read_to_string(path)?;
+    if let Ok(metadata) = fs::metadata(path)
+        && metadata.len() > MAX_BATCH_INPUT_BYTES
+    {
+        return Err(format!("input file is too large: max {MAX_BATCH_INPUT_BYTES} bytes").into());
+    }
+
+    let mut contents = String::new();
+    let mut file = fs::File::open(path)?;
+    let bytes_read = file
+        .by_ref()
+        .take(MAX_BATCH_INPUT_BYTES + 1)
+        .read_to_string(&mut contents)?;
+    if bytes_read as u64 > MAX_BATCH_INPUT_BYTES {
+        return Err(format!("input file is too large: max {MAX_BATCH_INPUT_BYTES} bytes").into());
+    }
+
     Ok(contents
         .lines()
         .map(str::trim)
         .filter(|line| !line.is_empty())
         .map(ToOwned::to_owned)
         .collect())
+}
+
+fn validate_identity(identity: &str) -> Result<(), Box<dyn std::error::Error>> {
+    if identity.len() > MAX_IDENTITY_BYTES {
+        Err(format!("identity is too long: max {MAX_IDENTITY_BYTES} bytes").into())
+    } else {
+        Ok(())
+    }
 }
 
 fn export_one(
@@ -180,16 +217,24 @@ fn export_one(
     let options = AvatarOptions::new(kind, background);
     match format {
         CliFormat::Svg => export_avatar_svg_for_id(spec, identity, options, output)?,
-        CliFormat::WebP => {
-            let bytes = encode_avatar_for_id(spec, identity, AvatarOutputFormat::WebP, options)?;
-            fs::write(output, bytes)?;
-        }
-        CliFormat::Png => {
-            let bytes = encode_avatar_for_id(spec, identity, AvatarOutputFormat::Png, options)?;
+        CliFormat::WebP | CliFormat::Png | CliFormat::Jpeg | CliFormat::Gif => {
+            let bytes = encode_avatar_for_id(spec, identity, format.into(), options)?;
             fs::write(output, bytes)?;
         }
     }
     Ok(())
+}
+
+impl From<CliFormat> for AvatarOutputFormat {
+    fn from(value: CliFormat) -> Self {
+        match value {
+            CliFormat::WebP => Self::WebP,
+            CliFormat::Png => Self::Png,
+            CliFormat::Jpeg => Self::Jpeg,
+            CliFormat::Gif => Self::Gif,
+            CliFormat::Svg => unreachable!("SVG is handled outside AvatarOutputFormat"),
+        }
+    }
 }
 
 fn output_file_name(identity: &str, kind: AvatarKind, format: CliFormat) -> String {
@@ -199,6 +244,7 @@ fn output_file_name(identity: &str, kind: AvatarKind, format: CliFormat) -> Stri
             'a'..='z' | 'A'..='Z' | '0'..='9' => ch,
             _ => '-',
         })
+        .take(MAX_OUTPUT_BASENAME_CHARS)
         .collect::<String>()
         .trim_matches('-')
         .to_ascii_lowercase();
@@ -219,7 +265,7 @@ fn print_help() {
         "hashavatar-cli\n\
          \n\
          Single export:\n\
-           cargo run --bin hashavatar-cli -- --id alice@example.com --kind robot --background white --format svg --output alice.svg\n\
+           cargo run --bin hashavatar-cli -- --id robot@hashavatar.app --kind robot --background transparent --format svg --output robot.svg\n\
          \n\
          Batch export:\n\
            cargo run --bin hashavatar-cli -- --input ids.txt --out-dir exports --kind fox --format webp\n\
@@ -229,9 +275,9 @@ fn print_help() {
            --input <path>\n\
            --output <path>\n\
            --out-dir <path>\n\
-           --kind <cat|dog|robot|fox|alien>\n\
-           --background <themed|white>\n\
-           --format <webp|png|svg>\n\
-           --size <pixels>\n"
+           --kind <cat|dog|robot|fox|alien|monster|ghost|slime|bird|wizard|skull|paws|planet|rocket|mushroom|cactus|frog|panda|cupcake|pizza|icecream|octopus|knight>\n\
+           --background <themed|white|black|dark|light|transparent>\n\
+           --format <webp|png|jpg|gif|svg>\n\
+           --size <pixels> ({MIN_AVATAR_DIMENSION}..={MAX_AVATAR_DIMENSION})\n"
     );
 }

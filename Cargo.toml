@@ -1,21 +1,21 @@
 [package]
 name = "hashavatar"
-version = "0.3.0"
+version = "0.4.0"
 edition = "2024"
 default-run = "hashavatar"
-description = "Deterministic procedural avatars in Rust with SHA-512 identities and WebP, PNG, and SVG export"
+description = "Deterministic procedural avatars in Rust with SHA-512 identities and WebP, PNG, JPEG, GIF, and SVG export"
 license = "EUPL-1.2"
 repository = "https://repoheim.eu/valkyoth/hashavatar"
 homepage = "https://repoheim.eu/valkyoth/hashavatar"
-documentation = "https://repoheim.eu/valkyoth/hashavatar"
+documentation = "https://docs.rs/hashavatar/latest/hashavatar/"
 readme = "README.md"
 keywords = ["avatar", "identicon", "procedural", "webp", "svg"]
 categories = ["multimedia::images", "graphics"]
+exclude = ["Screenshot_*.png"]
 
 [dependencies]
 axum = { version = "0.8", default-features = false, features = ["http1", "tokio", "query"] }
-image = { version = "0.25", default-features = false, features = ["png", "webp"] }
-imageproc = { version = "0.25", default-features = false }
+image = { version = "0.25", default-features = false, features = ["gif", "jpeg", "png", "webp"] }
 palette = { version = "0.7", default-features = false, features = ["std"] }
 rand = { version = "0.9", default-features = false, features = ["std", "std_rng"] }
 sha2 = { version = "0.10", default-features = false, features = ["std"] }

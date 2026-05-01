@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.4.0
+
+- Added `transparent` background support for raster and SVG avatars
+- Added `black`, `dark`, and `light` background modes
+- Added `JPEG` and `GIF` raster export formats
+- Added new avatar families: `planet`, `rocket`, `mushroom`, `cactus`, `frog`, and `panda`
+- Added new food and adventure families: `cupcake`, `pizza`, `icecream`, `octopus`, and `knight`
+- Improved identity-driven variation for `ghost`, `slime`, `wizard`, and `skull`
+- Added stricter input and dimension validation for safer public avatar endpoints
+- Removed a vulnerable transitive dependency path while keeping drawing code asset-free
+- Refreshed README examples and demo preset identities for the latest public API
+
 ## 0.3.0
 
 - Added namespace-aware identity hashing through `AvatarNamespace`

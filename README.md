@@ -7,11 +7,12 @@ It is designed as a code-only alternative to asset-pack-based avatar systems: th
 ## Features
 
 - Deterministic avatars derived from `SHA-512`
-- Multiple avatar families: `cat`, `dog`, `robot`, `fox`, `alien`, `monster`, `ghost`, `slime`, `bird`, `wizard`, `skull`
-- Multiple background modes: `themed`, `white`
-- Export paths for `WebP`, `PNG`, and `SVG`
+- Multiple avatar families: `cat`, `dog`, `robot`, `fox`, `alien`, `monster`, `ghost`, `slime`, `bird`, `wizard`, `skull`, `paws`, `planet`, `rocket`, `mushroom`, `cactus`, `frog`, `panda`, `cupcake`, `pizza`, `icecream`, `octopus`, `knight`
+- Multiple background modes: `themed`, `white`, `black`, `dark`, `light`, `transparent`
+- Export paths for `WebP`, `PNG`, `JPEG`, `GIF`, and `SVG`
 - Namespace-aware identity hashing for multi-tenant or versioned rollouts
 - Public API suitable for web apps, services, CLIs, and batch jobs
+- Built-in dimension validation for internet-facing avatar endpoints
 
 ## Why Use It
 
@@ -27,7 +28,7 @@ Add the crate to your project:
 
 ```toml
 [dependencies]
-hashavatar = "0.2"
+hashavatar = "0.4"
 ```
 
 If you are using it from a local checkout:
@@ -44,8 +45,8 @@ The main types are:
 - `AvatarSpec`: image dimensions and rendering seed
 - `AvatarIdentity`: stable hash-backed identity derived from input bytes
 - `AvatarNamespace`: stable tenant/style namespace for deterministic isolation
-- `AvatarKind`: avatar family such as `Cat`, `Dog`, or `Robot`
-- `AvatarBackground`: background mode such as `Themed` or `White`
+- `AvatarKind`: avatar family such as `Cat`, `Dog`, `Robot`, `Ghost`, `Planet`, or `Panda`
+- `AvatarBackground`: background mode: `Themed`, `White`, `Black`, `Dark`, `Light`, or `Transparent`
 - `AvatarOptions`: avatar family plus background mode
 - `AvatarOutputFormat`: raster output format for encoded bytes
 
@@ -75,9 +76,9 @@ use hashavatar::{
 
 let bytes = encode_avatar_for_id(
     AvatarSpec::new(256, 256, 0),
-    "alice@example.com",
+    "robot@hashavatar.app",
     AvatarOutputFormat::WebP,
-    AvatarOptions::new(AvatarKind::Robot, AvatarBackground::White),
+    AvatarOptions::new(AvatarKind::Robot, AvatarBackground::Transparent),
 )?;
 
 # Ok::<(), image::ImageError>(())
@@ -99,7 +100,7 @@ use hashavatar::{
 
 let png = encode_avatar_for_id(
     AvatarSpec::new(256, 256, 0),
-    "bob@example.com",
+    "dog@hashavatar.app",
     AvatarOutputFormat::Png,
     AvatarOptions::new(AvatarKind::Dog, AvatarBackground::Themed),
 )?;
@@ -116,8 +117,8 @@ use hashavatar::{
 
 let svg = render_avatar_svg_for_id(
     AvatarSpec::new(256, 256, 0),
-    "carol@example.com",
-    AvatarOptions::new(AvatarKind::Alien, AvatarBackground::White),
+    "alien@hashavatar.app",
+    AvatarOptions::new(AvatarKind::Alien, AvatarBackground::Transparent),
 );
 
 assert!(svg.starts_with("<svg "));
@@ -140,7 +141,7 @@ use hashavatar::{
 
 let image = render_avatar_for_id(
     AvatarSpec::new(256, 256, 0),
-    "dave@example.com",
+    "fox@hashavatar.app",
     AvatarOptions::new(AvatarKind::Fox, AvatarBackground::Themed),
 );
 
@@ -172,7 +173,7 @@ fn generate_avatar_bytes(user_id: &str) -> Result<Vec<u8>, image::ImageError> {
         AvatarSpec::new(256, 256, 0),
         user_id,
         AvatarOutputFormat::WebP,
-        AvatarOptions::new(AvatarKind::Cat, AvatarBackground::White),
+        AvatarOptions::new(AvatarKind::Cat, AvatarBackground::Transparent),
     )
 }
 ```
@@ -181,6 +182,8 @@ Use these content types:
 
 - `image/webp`
 - `image/png`
+- `image/jpeg`
+- `image/gif`
 - `image/svg+xml`
 
 ### For Public Avatar URLs
@@ -189,7 +192,7 @@ For internet-facing avatar endpoints:
 
 - use deterministic IDs
 - validate requested size
-- cap maximum size
+- keep requested dimensions within the crate-supported `64..=2048` pixel range
 - cache aggressively at the CDN edge
 - treat the full request tuple as the cache key:
   - identity
@@ -209,7 +212,7 @@ Use the crate when:
 The repository also contains a CLI exporter:
 
 ```bash
-cargo run --bin hashavatar-cli -- --id alice@example.com --kind robot --background white --format svg --output alice.svg
+cargo run --bin hashavatar-cli -- --id robot@hashavatar.app --kind robot --background transparent --format svg --output robot.svg
 ```
 
 Batch export from a newline-delimited file:
@@ -229,6 +232,24 @@ Use `AvatarKind` to select the visual family:
 - `Robot`
 - `Fox`
 - `Alien`
+- `Monster`
+- `Ghost`
+- `Slime`
+- `Bird`
+- `Wizard`
+- `Skull`
+- `Paws`
+- `Planet`
+- `Rocket`
+- `Mushroom`
+- `Cactus`
+- `Frog`
+- `Panda`
+- `Cupcake`
+- `Pizza`
+- `Icecream`
+- `Octopus`
+- `Knight`
 
 ### Background Mode
 
@@ -236,6 +257,10 @@ Use `AvatarBackground` to control the canvas:
 
 - `Themed`: stylized background chosen by the renderer
 - `White`: pure white background for cleaner export and compositing
+- `Black`: pure black background for dark surfaces
+- `Dark`: softer charcoal background for dark UI previews
+- `Light`: subtle off-white background for softer neutral output
+- `Transparent`: fully transparent canvas for compositing onto another surface
 
 ### Output Format
 
@@ -243,6 +268,10 @@ Use `AvatarOutputFormat` for raster output:
 
 - `WebP`: recommended default for modern web delivery
 - `Png`: useful for compatibility or lossless workflows
+- `Jpeg`: legacy-compatible export; transparent pixels are composited over white
+- `Gif`: legacy-compatible single-frame export
+
+AVIF and JPEG XL are not currently exposed because they introduce a larger encoder dependency tree or lack a stable first-party encoder in the crate's current image stack.
 
 Use `render_avatar_svg_for_id(...)` when you need vector output.
 
@@ -273,7 +302,20 @@ The test suite includes:
 - different-input divergence checks
 - raster export round-trips
 - enum parsing checks
+- transparent background checks
 - visual fingerprint regression tests
+
+## What's New In 0.4.0
+
+- Added `AvatarBackground::Transparent` for transparent raster and SVG output
+- Added `AvatarBackground::Black`, `AvatarBackground::Dark`, and `AvatarBackground::Light`
+- Added `JPEG` and `GIF` raster export formats
+- Added new avatar families: `planet`, `rocket`, `mushroom`, `cactus`, `frog`, and `panda`
+- Added new food and adventure families: `cupcake`, `pizza`, `icecream`, `octopus`, and `knight`
+- Improved visual variation for the `ghost`, `slime`, `wizard`, and `skull` families
+- Added stricter input and dimension validation for safer public endpoints
+- Removed a vulnerable transitive dependency path while keeping raster drawing code asset-free
+- Refreshed the demo presets around `@hashavatar.app` sample identities
 
 ## Provenance
 

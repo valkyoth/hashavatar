@@ -11,6 +11,8 @@ target/
 Thumbs.db
 .idea/
 .vscode/
+.codex
+.agents
 
 # Local logs and temp files
 *.log

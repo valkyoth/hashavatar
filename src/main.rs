@@ -2,17 +2,19 @@ use std::collections::HashMap;
 use std::net::SocketAddr;
 use std::str::FromStr;
 
-use hashavatar::{
-    AvatarBackground, AvatarKind, AvatarOptions, AvatarOutputFormat, AvatarSpec,
-    encode_avatar_for_id,
-};
 use axum::Router;
 use axum::extract::Query;
 use axum::http::{HeaderMap, HeaderValue, StatusCode, header};
 use axum::response::{Html, IntoResponse, Response};
 use axum::routing::get;
+use hashavatar::{
+    AvatarBackground, AvatarKind, AvatarOptions, AvatarOutputFormat, AvatarSpec,
+    encode_avatar_for_id,
+};
 
-const DEFAULT_IDENTITY: &str = "cat@example.com";
+const DEFAULT_IDENTITY: &str = "cat@hashavatar.app";
+const DEFAULT_BIND_ADDR: &str = "127.0.0.1:3000";
+const MAX_QUERY_IDENTITY_BYTES: usize = 512;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -20,7 +22,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .route("/", get(index))
         .route("/avatar.webp", get(avatar_webp));
 
-    let address = SocketAddr::from(([127, 0, 0, 1], 3000));
+    let address = std::env::var("HASHAVATAR_BIND_ADDR")
+        .unwrap_or_else(|_| DEFAULT_BIND_ADDR.to_owned())
+        .parse::<SocketAddr>()?;
     let listener = tokio::net::TcpListener::bind(address).await?;
 
     println!("hashavatar demo listening on http://{address}");
@@ -39,6 +43,14 @@ async fn avatar_webp(Query(params): Query<HashMap<String, String>>) -> Response 
         .map(String::as_str)
         .filter(|value| !value.trim().is_empty())
         .unwrap_or(DEFAULT_IDENTITY);
+    if identity.len() > MAX_QUERY_IDENTITY_BYTES {
+        return (
+            StatusCode::BAD_REQUEST,
+            format!("identity is too long: max {MAX_QUERY_IDENTITY_BYTES} bytes"),
+        )
+            .into_response();
+    }
+
     let kind = parse_kind(params.get("kind").map(String::as_str));
     let background = parse_background(params.get("background").map(String::as_str));
 
@@ -305,8 +317,8 @@ fn render_index_html(default_identity: &str) -> String {
         <div class="eyebrow">Rust Demo</div>
         <h1>Choose The Avatar Personality</h1>
         <p>
-          Type an email, username, or stable identifier, then choose cat, dog, or robot.
-          You can keep the themed background or force a pure white background for export-friendly previews.
+          Type an email, username, or stable identifier, then choose an avatar family.
+          Backgrounds can be themed, white, black, dark, light, or transparent for compositing.
         </p>
 
         <form id="avatar-form">
@@ -318,7 +330,7 @@ fn render_index_html(default_identity: &str) -> String {
                 name="identity"
                 type="text"
                 value="{default_identity}"
-                placeholder="you@example.com"
+                placeholder="cat@hashavatar.app"
                 autocomplete="off"
                 spellcheck="false"
               />
@@ -330,20 +342,40 @@ fn render_index_html(default_identity: &str) -> String {
             <div>
               <label for="kind">Avatar Type</label>
               <select id="kind" name="kind">
-                <option value="cat" selected>Cat</option>
-                <option value="dog">Dog</option>
-                <option value="robot">Robot</option>
-                <option value="fox">Fox</option>
-                <option value="alien">Alien</option>
-                <option value="monster">Monster</option>
-                <option value="paws">Paws</option>
+                <option value="cat" data-identity="cat@hashavatar.app" selected>Cat</option>
+                <option value="dog" data-identity="dog@hashavatar.app">Dog</option>
+                <option value="robot" data-identity="robot@hashavatar.app">Robot</option>
+                <option value="fox" data-identity="fox@hashavatar.app">Fox</option>
+                <option value="alien" data-identity="alien@hashavatar.app">Alien</option>
+                <option value="monster" data-identity="monster@hashavatar.app">Monster</option>
+                <option value="ghost" data-identity="ghost@hashavatar.app">Ghost</option>
+                <option value="slime" data-identity="slime@hashavatar.app">Slime</option>
+                <option value="bird" data-identity="bird@hashavatar.app">Bird</option>
+                <option value="wizard" data-identity="wizard@hashavatar.app">Wizard</option>
+                <option value="skull" data-identity="skull@hashavatar.app">Skull</option>
+                <option value="paws" data-identity="paws@hashavatar.app">Paws</option>
+                <option value="planet" data-identity="planet@hashavatar.app">Planet</option>
+                <option value="rocket" data-identity="rocket@hashavatar.app">Rocket</option>
+                <option value="mushroom" data-identity="mushroom@hashavatar.app">Mushroom</option>
+                <option value="cactus" data-identity="cactus@hashavatar.app">Cactus</option>
+                <option value="frog" data-identity="frog@hashavatar.app">Frog</option>
+                <option value="panda" data-identity="panda@hashavatar.app">Panda</option>
+                <option value="cupcake" data-identity="cupcake@hashavatar.app">Cupcake</option>
+                <option value="pizza" data-identity="pizza@hashavatar.app">Pizza</option>
+                <option value="icecream" data-identity="icecream@hashavatar.app">Ice Cream</option>
+                <option value="octopus" data-identity="octopus@hashavatar.app">Octopus</option>
+                <option value="knight" data-identity="knight@hashavatar.app">Knight</option>
               </select>
             </div>
             <div>
               <label for="background">Background</label>
               <select id="background" name="background">
                 <option value="themed" selected>Themed</option>
-                <option value="white">Pure White</option>
+                <option value="white">White</option>
+                <option value="black">Black</option>
+                <option value="dark">Dark</option>
+                <option value="light">Light</option>
+                <option value="transparent">Transparent</option>
               </select>
             </div>
           </div>
@@ -380,9 +412,25 @@ fn render_index_html(default_identity: &str) -> String {
     const identityReadout = document.getElementById("identity-readout");
     const kindReadout = document.getElementById("kind-readout");
     const backgroundReadout = document.getElementById("background-readout");
+    const presetIdentities = new Map(
+      Array.from(kind.options).map((option) => [option.value, option.dataset.identity])
+    );
+
+    function selectedPresetIdentity() {{
+      return presetIdentities.get(kind.value) || "{default_identity}";
+    }}
+
+    function isPresetIdentity(value) {{
+      for (const identity of presetIdentities.values()) {{
+        if (value === identity) {{
+          return true;
+        }}
+      }}
+      return false;
+    }}
 
     function refreshAvatar() {{
-      const identity = input.value.trim() || "{default_identity}";
+      const identity = input.value.trim() || selectedPresetIdentity();
       const avatarKind = kind.value;
       const bg = background.value;
       const query = new URLSearchParams({{
@@ -403,9 +451,15 @@ fn render_index_html(default_identity: &str) -> String {
       refreshAvatar();
     }});
 
-    for (const element of [kind, background]) {{
-      element.addEventListener("change", refreshAvatar);
-    }}
+    kind.addEventListener("change", () => {{
+      const currentIdentity = input.value.trim();
+      if (currentIdentity === "" || isPresetIdentity(currentIdentity)) {{
+        input.value = selectedPresetIdentity();
+      }}
+      refreshAvatar();
+    }});
+
+    background.addEventListener("change", refreshAvatar);
 
     input.addEventListener("keydown", (event) => {{
       if (event.key === "Enter") {{
