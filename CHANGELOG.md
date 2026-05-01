@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.4.1
+
+- Updated direct dependencies to current compatible releases
+- Moved deterministic randomization from `rand` 0.9 to `rand` 0.10
+- Moved SHA-2 hashing from `sha2` 0.10 to `sha2` 0.11
+
 ## 0.4.0
 
 - Added `transparent` background support for raster and SVG avatars

@@ -28,7 +28,7 @@ Add the crate to your project:
 
 ```toml
 [dependencies]
-hashavatar = "0.4"
+hashavatar = "0.4.1"
 ```
 
 If you are using it from a local checkout:

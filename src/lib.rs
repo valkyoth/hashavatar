@@ -38,7 +38,7 @@ use image::{
     ExtendedColorType, ImageBuffer, ImageEncoder, ImageError, ImageResult, Rgba, RgbaImage,
 };
 use palette::{FromColor, Hsl, Srgb};
-use rand::{Rng, SeedableRng, rngs::StdRng};
+use rand::{RngExt, SeedableRng, rngs::StdRng};
 use sha2::{Digest, Sha512};
 
 /// Rendering contract version for deterministic avatars.

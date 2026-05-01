@@ -1,6 +1,6 @@
 [package]
 name = "hashavatar"
-version = "0.4.0"
+version = "0.4.1"
 edition = "2024"
 default-run = "hashavatar"
 description = "Deterministic procedural avatars in Rust with SHA-512 identities and WebP, PNG, JPEG, GIF, and SVG export"
@@ -14,9 +14,9 @@ categories = ["multimedia::images", "graphics"]
 exclude = ["Screenshot_*.png"]
 
 [dependencies]
-axum = { version = "0.8", default-features = false, features = ["http1", "tokio", "query"] }
-image = { version = "0.25", default-features = false, features = ["gif", "jpeg", "png", "webp"] }
-palette = { version = "0.7", default-features = false, features = ["std"] }
-rand = { version = "0.9", default-features = false, features = ["std", "std_rng"] }
-sha2 = { version = "0.10", default-features = false, features = ["std"] }
-tokio = { version = "1.47", default-features = false, features = ["macros", "rt-multi-thread", "net"] }
+axum = { version = "0.8.9", default-features = false, features = ["http1", "tokio", "query"] }
+image = { version = "0.25.10", default-features = false, features = ["gif", "jpeg", "png", "webp"] }
+palette = { version = "0.7.6", default-features = false, features = ["std"] }
+rand = { version = "0.10.1", default-features = false, features = ["std", "std_rng"] }
+sha2 = { version = "0.11.0", default-features = false, features = ["alloc"] }
+tokio = { version = "1.52.1", default-features = false, features = ["macros", "rt-multi-thread", "net"] }
