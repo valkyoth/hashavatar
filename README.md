@@ -28,7 +28,7 @@ Add the crate to your project:
 
 ```toml
 [dependencies]
-hashavatar = "0.4.1"
+hashavatar = "0.4.2"
 ```
 
 If you are using it from a local checkout:
@@ -304,6 +304,18 @@ The test suite includes:
 - enum parsing checks
 - transparent background checks
 - visual fingerprint regression tests
+
+## What's New In 0.4.2
+
+- Moved public repository and homepage metadata to GitHub
+- Added GitHub contributor, security, issue, pull request, and CI files
+- Kept docs.rs as the canonical Rust API documentation URL
+
+## What's New In 0.4.1
+
+- Updated direct dependencies to current compatible releases
+- Moved deterministic randomization from `rand` 0.9 to `rand` 0.10
+- Moved SHA-2 hashing from `sha2` 0.10 to `sha2` 0.11
 
 ## What's New In 0.4.0
 

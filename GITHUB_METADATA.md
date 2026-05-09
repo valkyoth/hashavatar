@@ -6,7 +6,7 @@ Repository:
 - `hashavatar`
 
 About:
-- `Deterministic procedural avatars in Rust with SHA-512 identities and WebP, PNG, and SVG export.`
+- `Deterministic procedural avatars in Rust with SHA-512 identities and WebP, PNG, JPEG, GIF, and SVG export.`
 
 Suggested topics:
 - `rust`
@@ -24,19 +24,18 @@ Short description variant:
 - `A Rust crate for deterministic, code-generated avatars without bundled art assets.`
 
 Release title example:
-- `hashavatar v0.1.0`
+- `hashavatar v0.4.2`
 
 Release notes template:
 
 ```text
-Initial public release of hashavatar.
+Metadata refresh for the GitHub repository move.
 
 Highlights:
-- Deterministic avatar generation from SHA-512 identities
-- Multiple avatar families: cat, dog, robot, fox, alien
-- WebP, PNG, and SVG output
-- White and themed background modes
-- CLI examples and integration examples
+- Repository metadata now points to https://github.com/valkyoth/hashavatar
+- Crate documentation remains on docs.rs
+- GitHub contributor, security, issue, pull request, and CI files are included
+- Dependency refresh from v0.4.1 is retained
 
 Licence:
 - EUPL-1.2

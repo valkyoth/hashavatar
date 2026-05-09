@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.4.2
+
+- Moved public repository and homepage metadata to GitHub
+- Added GitHub contributor, security, issue, pull request, and CI files
+- Kept docs.rs as the canonical Rust API documentation URL
+
 ## 0.4.1
 
 - Updated direct dependencies to current compatible releases
