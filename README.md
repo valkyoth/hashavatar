@@ -310,6 +310,10 @@ The test suite includes:
 - Starting with `0.5.0`, project licensing is dual `MIT OR Apache-2.0`
 - Added separate `LICENSE-MIT` and `LICENSE-APACHE` files
 - Removed the previous EUPL license files
+- Added Fluxheim-style local and GitHub CI checks through `scripts/checks.sh`
+- Pinned GitHub Actions to immutable commit SHAs for CodeQL-friendly workflow hardening
+- Moved demo-server WebP rendering and encoding onto Tokio's blocking task pool
+- Added defense-in-depth HTTP security headers to demo HTML, image, and error responses
 
 ## What's New In 0.4.2
 

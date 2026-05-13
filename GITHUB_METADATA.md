@@ -36,12 +36,20 @@ Release title example:
 Release notes template:
 
 ```text
-License migration and version preparation.
+License migration and demo server hardening.
 
 Highlights:
 - Starting with 0.5.0, project licensing is MIT OR Apache-2.0
 - LICENSE-MIT and LICENSE-APACHE are included
 - Previous EUPL license files were removed
+- Demo-server avatar encoding now runs on Tokio's blocking task pool
+- Demo responses now include defense-in-depth HTTP security headers
+- GitHub Actions are pinned to immutable commit SHAs
+- Local and GitHub checks now run through scripts/checks.sh
+
+Compatibility:
+- No avatar rendering behavior changes are intended
+- Published 0.4.x and older versions retain their original release licensing
 
 Licence:
 - MIT OR Apache-2.0
