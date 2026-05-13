@@ -26,11 +26,23 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .unwrap_or_else(|_| DEFAULT_BIND_ADDR.to_owned())
         .parse::<SocketAddr>()?;
     let listener = tokio::net::TcpListener::bind(address).await?;
+    let local_address = listener.local_addr()?;
 
-    println!("hashavatar demo listening on http://{address}");
+    println!(
+        "hashavatar demo listening on {}",
+        log_safe(format!("http://{local_address}"))
+    );
 
     axum::serve(listener, app).await?;
     Ok(())
+}
+
+fn log_safe(value: impl AsRef<str>) -> String {
+    value
+        .as_ref()
+        .chars()
+        .flat_map(char::escape_default)
+        .collect()
 }
 
 async fn index() -> Html<String> {
