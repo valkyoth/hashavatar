@@ -4,7 +4,7 @@ use std::str::FromStr;
 
 use axum::Router;
 use axum::extract::Query;
-use axum::http::{HeaderMap, HeaderValue, StatusCode, header};
+use axum::http::{HeaderMap, HeaderName, HeaderValue, StatusCode, header};
 use axum::response::{Html, IntoResponse, Response};
 use axum::routing::get;
 use hashavatar::{
@@ -15,6 +15,15 @@ use hashavatar::{
 const DEFAULT_IDENTITY: &str = "cat@hashavatar.app";
 const DEFAULT_BIND_ADDR: &str = "127.0.0.1:3000";
 const MAX_QUERY_IDENTITY_BYTES: usize = 512;
+const CONTENT_SECURITY_POLICY: &str = concat!(
+    "default-src 'self'; ",
+    "base-uri 'none'; ",
+    "frame-ancestors 'none'; ",
+    "form-action 'self'; ",
+    "img-src 'self' data:; ",
+    "style-src 'self' 'unsafe-inline'; ",
+    "script-src 'self' 'unsafe-inline'"
+);
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -45,8 +54,8 @@ fn log_safe(value: impl AsRef<str>) -> String {
         .collect()
 }
 
-async fn index() -> Html<String> {
-    Html(render_index_html(DEFAULT_IDENTITY))
+async fn index() -> Response {
+    with_security_headers(Html(render_index_html(DEFAULT_IDENTITY)))
 }
 
 async fn avatar_webp(Query(params): Query<HashMap<String, String>>) -> Response {
@@ -56,37 +65,70 @@ async fn avatar_webp(Query(params): Query<HashMap<String, String>>) -> Response 
         .filter(|value| !value.trim().is_empty())
         .unwrap_or(DEFAULT_IDENTITY);
     if identity.len() > MAX_QUERY_IDENTITY_BYTES {
-        return (
+        return with_security_headers((
             StatusCode::BAD_REQUEST,
             format!("identity is too long: max {MAX_QUERY_IDENTITY_BYTES} bytes"),
-        )
-            .into_response();
+        ));
     }
 
     let kind = parse_kind(params.get("kind").map(String::as_str));
     let background = parse_background(params.get("background").map(String::as_str));
+    let identity = identity.to_owned();
 
-    match encode_avatar_for_id(
-        AvatarSpec::new(256, 256, 0),
-        identity,
-        AvatarOutputFormat::WebP,
-        AvatarOptions { kind, background },
-    ) {
-        Ok(bytes) => {
+    match tokio::task::spawn_blocking(move || {
+        encode_avatar_for_id(
+            AvatarSpec::new(256, 256, 0),
+            identity,
+            AvatarOutputFormat::WebP,
+            AvatarOptions { kind, background },
+        )
+    })
+    .await
+    {
+        Ok(Ok(bytes)) => {
             let mut headers = HeaderMap::new();
             headers.insert(header::CONTENT_TYPE, HeaderValue::from_static("image/webp"));
             headers.insert(
                 header::CACHE_CONTROL,
                 HeaderValue::from_static("no-store, max-age=0"),
             );
-            (StatusCode::OK, headers, bytes).into_response()
+            with_security_headers((StatusCode::OK, headers, bytes))
         }
-        Err(error) => (
+        Ok(Err(error)) => with_security_headers((
             StatusCode::INTERNAL_SERVER_ERROR,
             format!("avatar generation failed: {error}"),
-        )
-            .into_response(),
+        )),
+        Err(_) => with_security_headers((
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "avatar generation task failed",
+        )),
     }
+}
+
+fn with_security_headers(response: impl IntoResponse) -> Response {
+    let mut response = response.into_response();
+    let headers = response.headers_mut();
+    headers.insert(
+        header::X_CONTENT_TYPE_OPTIONS,
+        HeaderValue::from_static("nosniff"),
+    );
+    headers.insert(
+        HeaderName::from_static("x-frame-options"),
+        HeaderValue::from_static("DENY"),
+    );
+    headers.insert(
+        HeaderName::from_static("referrer-policy"),
+        HeaderValue::from_static("no-referrer"),
+    );
+    headers.insert(
+        HeaderName::from_static("permissions-policy"),
+        HeaderValue::from_static("camera=(), microphone=(), geolocation=()"),
+    );
+    headers.insert(
+        header::CONTENT_SECURITY_POLICY,
+        HeaderValue::from_static(CONTENT_SECURITY_POLICY),
+    );
+    response
 }
 
 fn parse_kind(value: Option<&str>) -> AvatarKind {
@@ -484,4 +526,38 @@ fn render_index_html(default_identity: &str) -> String {
 </html>
 "#
     )
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn security_headers_are_added_to_responses() {
+        let response = with_security_headers((StatusCode::OK, "ok"));
+        let headers = response.headers();
+
+        assert_eq!(
+            headers.get(header::X_CONTENT_TYPE_OPTIONS),
+            Some(&HeaderValue::from_static("nosniff"))
+        );
+        assert_eq!(
+            headers.get(HeaderName::from_static("x-frame-options")),
+            Some(&HeaderValue::from_static("DENY"))
+        );
+        assert_eq!(
+            headers.get(HeaderName::from_static("referrer-policy")),
+            Some(&HeaderValue::from_static("no-referrer"))
+        );
+        assert_eq!(
+            headers.get(HeaderName::from_static("permissions-policy")),
+            Some(&HeaderValue::from_static(
+                "camera=(), microphone=(), geolocation=()"
+            ))
+        );
+        assert_eq!(
+            headers.get(header::CONTENT_SECURITY_POLICY),
+            Some(&HeaderValue::from_static(CONTENT_SECURITY_POLICY))
+        );
+    }
 }
