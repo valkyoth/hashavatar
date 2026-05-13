@@ -1,9 +1,9 @@
 # cargo-deny license policy for hashavatar.
 #
-# The project itself is licensed under EUPL-1.2. This allowlist admits the
-# project license and permissive dependency licenses that do not conflict with
-# EUPL-1.2 distribution. More restrictive reciprocal licenses should be reviewed
-# and added as crate-specific exceptions rather than allowed globally.
+# The project itself is dual-licensed under MIT OR Apache-2.0. This allowlist
+# admits the project license and permissive dependency licenses. More
+# restrictive reciprocal licenses should be reviewed and added as crate-specific
+# exceptions rather than allowed globally.
 
 [licenses]
 confidence-threshold = 0.8
@@ -17,7 +17,6 @@ allow = [
     "BSD-3-Clause",
     "BSL-1.0",
     "CC0-1.0",
-    "EUPL-1.2",
     "MIT",
     "Unicode-3.0",
     "Unlicense",

@@ -28,7 +28,7 @@ Add the crate to your project:
 
 ```toml
 [dependencies]
-hashavatar = "0.4.2"
+hashavatar = "0.5.0"
 ```
 
 If you are using it from a local checkout:
@@ -305,6 +305,12 @@ The test suite includes:
 - transparent background checks
 - visual fingerprint regression tests
 
+## What's New In 0.5.0
+
+- Starting with `0.5.0`, project licensing is dual `MIT OR Apache-2.0`
+- Added separate `LICENSE-MIT` and `LICENSE-APACHE` files
+- Removed the previous EUPL license files
+
 ## What's New In 0.4.2
 
 - Moved public repository and homepage metadata to GitHub
@@ -353,4 +359,7 @@ http://127.0.0.1:3000
 
 ## License
 
-Licensed under EUPL-1.2. See [`LICENSE`](./LICENSE).
+Licensed under either of:
+
+- Apache License, Version 2.0 ([`LICENSE-APACHE`](./LICENSE-APACHE))
+- MIT license ([`LICENSE-MIT`](./LICENSE-MIT))

@@ -23,22 +23,28 @@ Suggested topics:
 Short description variant:
 - `A Rust crate for deterministic, code-generated avatars without bundled art assets.`
 
+Repository security settings:
+- Enable Dependabot alerts
+- Enable Dependabot version updates from `.github/dependabot.yml`
+- Enable CodeQL default setup for code scanning alerts
+- Do not add an advanced CodeQL workflow while default setup is active
+- Enable private vulnerability reporting or GitHub security advisories
+
 Release title example:
-- `hashavatar v0.4.2`
+- `hashavatar v0.5.0`
 
 Release notes template:
 
 ```text
-Metadata refresh for the GitHub repository move.
+License migration and version preparation.
 
 Highlights:
-- Repository metadata now points to https://github.com/valkyoth/hashavatar
-- Crate documentation remains on docs.rs
-- GitHub contributor, security, issue, pull request, and CI files are included
-- Dependency refresh from v0.4.1 is retained
+- Starting with 0.5.0, project licensing is MIT OR Apache-2.0
+- LICENSE-MIT and LICENSE-APACHE are included
+- Previous EUPL license files were removed
 
 Licence:
-- EUPL-1.2
+- MIT OR Apache-2.0
 ```
 
 ## API Repository
@@ -80,5 +86,5 @@ Highlights:
 - Landing page and health endpoint
 
 Licence:
-- EUPL-1.2
+- MIT OR Apache-2.0
 ```

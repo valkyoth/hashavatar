@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.5.0
+
+- Starting with `0.5.0`, project licensing is dual `MIT OR Apache-2.0`
+- Added `LICENSE-MIT` and `LICENSE-APACHE`
+- Removed the previous EUPL license files
+
 ## 0.4.2
 
 - Moved public repository and homepage metadata to GitHub

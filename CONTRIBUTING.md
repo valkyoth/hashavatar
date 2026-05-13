@@ -7,12 +7,11 @@ Thanks for helping improve `hashavatar`.
 Use the stable Rust toolchain.
 
 ```bash
-cargo fmt --check
-cargo clippy --all-targets -- -D warnings
-cargo test
-cargo audit
-cargo deny check licenses
+scripts/checks.sh
 ```
+
+For a faster local loop while developing, run the individual Cargo commands the
+script prints before the failing step.
 
 ## Pull Requests
 

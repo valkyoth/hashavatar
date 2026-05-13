@@ -1,10 +1,10 @@
 [package]
 name = "hashavatar"
-version = "0.4.2"
+version = "0.5.0"
 edition = "2024"
 default-run = "hashavatar"
 description = "Deterministic procedural avatars in Rust with SHA-512 identities and WebP, PNG, JPEG, GIF, and SVG export"
-license = "EUPL-1.2"
+license = "MIT OR Apache-2.0"
 repository = "https://github.com/valkyoth/hashavatar"
 homepage = "https://github.com/valkyoth/hashavatar"
 documentation = "https://docs.rs/hashavatar/latest/hashavatar/"
