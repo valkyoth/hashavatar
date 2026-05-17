@@ -15,6 +15,8 @@ release without letting exploratory work blur into the release criteria.
   reusable avatar generation.
 - Treat visual-output changes as compatibility events and document them in
   release notes.
+- Derive enum-based choices from a single variant list instead of hard-coded
+  modulo counts.
 
 ## 0.7.0: Pluggable Identity Hashing
 
@@ -103,6 +105,8 @@ concerns so a future `no_std + alloc` core is realistic.
 - Reduce direct coupling between that core and `image::RgbaImage`.
 - Introduce an internal drawing target trait if it makes the core boundary
   cleaner.
+- Normalize public enum variant lists and byte-to-variant helpers before new
+  visual layers are added.
 - Keep the public crate behavior stable unless a breaking change is explicitly
   worth making before `1.0`.
 - Keep raster encoding in the main crate, not in the future core.
@@ -122,6 +126,9 @@ concerns so a future `no_std + alloc` core is realistic.
   and output encoding.
 - Raster and SVG outputs still pass golden fingerprint and safety tests.
 - The dependency graph is no larger than `0.7.0` unless explicitly justified.
+- Public enum derivation does not rely on duplicated magic counts such as
+  `value % 23`; it uses `ALL.len()` or an equivalent single source of truth.
+- Tests fail if public enum variant lists drift from parser/display behavior.
 - The README explains that `no_std` is planned but not yet a public contract.
 - `docs/DEPENDENCIES.md` explains which dependencies block or belong outside
   a future core crate.
@@ -188,6 +195,8 @@ the public API is frozen.
   when the caller chooses an automatic/default mode.
 - Make every new enum parseable and displayable like the existing public
   enums.
+- Derive automatic layer choices from each enum's variant list rather than
+  hard-coded modulo counts.
 - Document how layer choices affect the deterministic output tuple.
 
 ### Candidate API Shape
@@ -248,11 +257,23 @@ tests.
 - The `style_version` guidance in `VERSIONING.md` must be updated so services
   can roll out layered avatars deliberately.
 
+### Enum Derivation Policy
+
+- Prefer small hand-maintained `ALL` lists or `all()` accessors as the single
+  source of truth for public enum variants.
+- Avoid `strum` or other enum-reflection dependencies unless the boilerplate
+  becomes large enough to justify the additional dependency and audit surface.
+- Any byte-to-variant helper should index through the variant list, for
+  example `Self::ALL[(value as usize) % Self::ALL.len()]`, so adding a variant
+  cannot silently leave it unreachable.
+
 ### Finish Line
 
 `0.10.0` is done when:
 
 - Every visual layer enum has `ALL`, `as_str`, `Display`, and `FromStr`.
+- Every automatic public enum choice uses the enum's variant list instead of a
+  duplicated literal count.
 - Automatic layer derivation is deterministic and covered by tests.
 - Manual layer selection is covered by tests.
 - Raster and SVG renderers support all selected baseline layers.
