@@ -55,26 +55,13 @@ Dependency changes should be reviewed for:
 
 `scripts/validate-dependencies.sh` enforces the current direct dependency allowlist.
 
-## Future Core Boundary
+## Crate Boundary
 
-`0.8.0` starts preparing the code for a possible future `no_std + alloc`
-deterministic core, but the published crate still requires `std`.
+`hashavatar` is intentionally a single image-generation crate. Raster buffers,
+SVG rendering, encoders, deterministic identity hashing, and public avatar
+options are kept together so the published API stays focused on producing
+avatars.
 
-Dependencies that belong outside a future core crate:
-
-- `image`, because it provides raster buffers and encoders.
-- `palette`, unless color conversion is replaced or isolated behind a small
-  core color type.
-- `rand`, unless procedural variation is moved to a deterministic byte-schedule
-  that does not require an RNG dependency.
-
-Dependencies that can plausibly remain in or behind a future core boundary:
-
-- `sha2` for default identity hashing, subject to its active `no_std` support.
-- `zeroize` for clearing derived identity material.
-- `subtle` for constant-time identity digest comparison.
-- optional `blake3`, if the feature keeps its own platform acceleration and
-  dependency policy acceptable.
-
-`xxhash-rust` should stay optional and outside security-sensitive guidance
-because XXH3-128 is non-cryptographic.
+Lower-level planning helpers should remain internal unless a future
+image-generation use case justifies exposing them. A separate non-rendering
+core crate is not part of the current roadmap.

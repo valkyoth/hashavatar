@@ -6,7 +6,7 @@ The crate starts conservative: validated avatar dimensions, bounded identity inp
 
 ## Current Status
 
-The current development version is `0.8.0`.
+The current development version is `0.9.0`.
 
 Implemented now:
 
@@ -55,23 +55,23 @@ Planned or intentionally external:
 
 Security-control details live in [docs/SECURITY_CONTROLS.md](docs/SECURITY_CONTROLS.md). Dependency policy lives in [docs/DEPENDENCIES.md](docs/DEPENDENCIES.md). Panic policy lives in [docs/PANIC_POLICY.md](docs/PANIC_POLICY.md).
 
-Future version planning for possible `no_std + alloc` support, visual layers,
-and 1.0 stabilization lives in [docs/VERSION_PLAN.md](docs/VERSION_PLAN.md).
-`0.8.0` prepares the internal boundary for a future core crate, but `no_std`
-is not a public support contract yet.
+Future version planning for visual layers and 1.0 stabilization lives in
+[docs/VERSION_PLAN.md](docs/VERSION_PLAN.md). `hashavatar` remains a single
+image-generation crate; low-level core planning is kept internal unless a
+future release has a concrete image-generation reason to split it.
 
 ## Install
 
 ```toml
 [dependencies]
-hashavatar = "0.8.0"
+hashavatar = "0.9.0"
 ```
 
 Optional identity hash algorithms are disabled by default:
 
 ```toml
 [dependencies]
-hashavatar = { version = "0.8.0", features = ["blake3", "xxh3"] }
+hashavatar = { version = "0.9.0", features = ["blake3", "xxh3"] }
 ```
 
 For a local checkout:
@@ -228,7 +228,7 @@ cryptographic boundary.
 
 ```toml
 [dependencies]
-hashavatar = { version = "0.8.0", features = ["blake3"] }
+hashavatar = { version = "0.9.0", features = ["blake3"] }
 ```
 
 ```rust
@@ -256,7 +256,7 @@ assert!(svg.contains("alien avatar"));
 
 ```toml
 [dependencies]
-hashavatar = { version = "0.8.0", features = ["xxh3"] }
+hashavatar = { version = "0.9.0", features = ["xxh3"] }
 ```
 
 ```rust

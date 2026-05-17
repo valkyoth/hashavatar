@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.9.0
+
+- Bumped the crate to `0.9.0`.
+- Kept `hashavatar` as a single image-generation crate rather than publishing a
+  separate core crate.
+- Removed the near-term `no_std + alloc` crate split from the roadmap because
+  the public project goal is raster/SVG avatar generation.
+- Documented that lower-level planning boundaries should remain internal unless
+  a future image-generation use case justifies exposing them.
+
 ## 0.8.0
 
 - Bumped the crate to `0.8.0`.

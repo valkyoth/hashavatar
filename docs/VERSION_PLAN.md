@@ -101,7 +101,7 @@ deterministic identity input.
 Status: implemented in `0.8.0`.
 
 Goal: separate deterministic avatar decisions from encoding/integration
-concerns so a future `no_std + alloc` core is realistic.
+concerns internally so later visual-layer work can stay organized.
 
 ### Scope
 
@@ -119,11 +119,10 @@ concerns so a future `no_std + alloc` core is realistic.
   visual layers are added.
 - Keep the public crate behavior stable unless a breaking change is explicitly
   worth making before `1.0`.
-- Keep raster encoding in the main crate, not in the future core.
+- Keep raster encoding in the main crate.
 
 ### Non-Goals
 
-- Do not promise `no_std` in `0.8.0`.
 - Do not split the crate unless the internal boundary is already clean enough
   to maintain.
 - Do not add custom SIMD code.
@@ -139,9 +138,9 @@ concerns so a future `no_std + alloc` core is realistic.
 - Public enum derivation does not rely on duplicated magic counts such as
   `value % 23`; it uses `ALL.len()` or an equivalent single source of truth.
 - Tests fail if public enum variant lists drift from parser/display behavior.
-- The README explains that `no_std` is planned but not yet a public contract.
-- `docs/DEPENDENCIES.md` explains which dependencies block or belong outside
-  a future core crate.
+- The README explains that `hashavatar` remains a focused image-generation
+  crate.
+- `docs/DEPENDENCIES.md` explains the single-crate dependency boundary.
 - `scripts/stable_release_gate.sh check` passes.
 - crates.io publish dry run passes.
 
@@ -155,50 +154,35 @@ concerns so a future `no_std + alloc` core is realistic.
   enums.
 - Raster and SVG rendering now share an internal render plan before output
   encoding.
+- `0.9.0` later rejected a public core crate split because the project goal is
+  avatar image generation.
 
-## 0.9.0: `hashavatar-core` Experiment
+## 0.9.0: Single-Crate Boundary Decision
 
-Goal: publish or prepare a constrained core API that can work in
-`no_std + alloc` environments without image encoders.
+Status: implemented in `0.9.0`.
+
+Goal: keep `hashavatar` focused as one image-generation crate and avoid a
+separate public core crate until there is a concrete image-generation use case
+for that split.
 
 ### Scope
 
-- Create one of:
-  - a separate `hashavatar-core` crate, or
-  - a feature-isolated internal module that can later become a crate.
-- Target `no_std + alloc` for the core boundary.
-- Keep SVG string generation only if `alloc` is available and the API remains
-  clean.
-- Keep raster encoding, `image`, and format-specific encoders in the main
-  `hashavatar` crate.
-- Provide structured output or drawing commands if that is cleaner than
-  exposing image buffers from the core.
-
-### Likely Dependency Changes
-
-- Replace or isolate `palette` usage if it blocks `no_std`.
-- Replace `StdRng` usage with a deterministic, small, reviewable internal
-  generator or an admitted `no_std` RNG dependency.
-- Start moving critical geometry calculations toward fixed-point primitives so
-  future releases can make a stronger cross-platform determinism guarantee.
-- Keep cryptographic hashing behind dependency features that support the core
-  target.
+- Keep deterministic identity hashing, public options, raster rendering, SVG
+  rendering, and encoders in the `hashavatar` crate.
+- Keep lower-level planning helpers internal.
+- Remove `hashavatar-core` / `no_std + alloc` from the near-term release plan.
+- Preserve all 0.8.0 rendering output and security posture.
 
 ### Finish Line
 
 `0.9.0` is done when:
 
-- The core boundary builds without `std`.
-- The main crate still provides ergonomic raster/SVG APIs on top of the core.
-- Golden fingerprints prove the refactor did not accidentally change default
-  output, or release notes clearly document intentional changes.
-- `no_std + alloc` support is documented precisely, including what is not
-  available.
-- Fuzz harnesses cover the core identity and rendering-plan boundary.
-- Fixed-point geometry blockers are identified for the rendering paths that
-  still rely on `f32` coordinates.
+- The published package is still only `hashavatar`.
+- README and dependency docs describe the single-crate boundary.
+- Release notes explain why the separate core crate was not adopted.
+- Golden fingerprints prove the release did not accidentally change default
+  output.
 - `scripts/stable_release_gate.sh check` passes.
-- crates.io publish dry run passes for every crate intended to be published.
 
 ## 0.10.0: Visual Layer Model
 
@@ -466,7 +450,6 @@ contract.
 
 ### Scope
 
-- Decide whether `hashavatar-core` is public and versioned independently.
 - Freeze default hash algorithm and default visual style version.
 - Freeze the visual layer option model.
 - Freeze the baseline avatar kind and background catalog intended for `1.0`.
