@@ -26,6 +26,8 @@
   - namespace and identity-options variants for each
 - Public digest-byte constants for automatic style derivation.
 - Family-aware face anchors for accessory and expression placement.
+- README option catalog covering all public enum values and the difference
+  between `AvatarOptions` and `AvatarStyleOptions`.
 
 ## Compatibility
 

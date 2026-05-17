@@ -22,9 +22,16 @@ Implemented now:
   background, accessory, color, expression, and shape.
 - Namespace-aware identity derivation for tenant isolation and visual rollouts.
 - Length-prefixed hash components to avoid delimiter ambiguity.
-- Avatar families: `cat`, `dog`, `robot`, `fox`, `alien`, `monster`, `ghost`, `slime`, `bird`, `wizard`, `skull`, `paws`, `planet`, `rocket`, `mushroom`, `cactus`, `frog`, `panda`, `cupcake`, `pizza`, `icecream`, `octopus`, and `knight`.
-- Background modes: `themed`, `white`, `black`, `dark`, `light`, and `transparent`.
-- In-memory `WebP`, `PNG`, `JPEG`, and `GIF` encoding.
+- Avatar families through `AvatarKind`: `cat`, `dog`, `robot`, `fox`,
+  `alien`, `monster`, `ghost`, `slime`, `bird`, `wizard`, `skull`, `paws`,
+  `planet`, `rocket`, `mushroom`, `cactus`, `frog`, `panda`, `cupcake`,
+  `pizza`, `icecream`, `octopus`, and `knight`.
+- Background modes through `AvatarBackground`: `themed`, `white`, `black`,
+  `dark`, `light`, and `transparent`.
+- Visual layers through `AvatarAccessory`, `AvatarColor`,
+  `AvatarExpression`, and `AvatarShape`.
+- In-memory `WebP`, `PNG`, `JPEG`, and `GIF` encoding through
+  `AvatarOutputFormat`.
 - Compact SVG string rendering.
 - Typed errors for invalid dimensions and oversized identity inputs.
 - Private `AvatarSpec` fields so dimensions must pass construction-time validation.
@@ -104,6 +111,34 @@ license = "MIT OR Apache-2.0"
 | Maximum namespace style version | `128` bytes |
 
 These limits are enforced by constructors and render entry points. They are intended to make the safe path the normal path for public web endpoints.
+
+## Public Option Catalog
+
+All public option enums expose an `ALL` slice, `from_byte`, `as_str`,
+`Display`, and `FromStr` support. Byte-to-variant mapping always indexes
+through `ALL`, so adding variants does not require duplicated modulo constants
+in caller code.
+
+| Enum | Controls | Values |
+| --- | --- | --- |
+| `AvatarKind` | Base avatar family | `cat`, `dog`, `robot`, `fox`, `alien`, `monster`, `ghost`, `slime`, `bird`, `wizard`, `skull`, `paws`, `planet`, `rocket`, `mushroom`, `cactus`, `frog`, `panda`, `cupcake`, `pizza`, `icecream`, `octopus`, `knight` |
+| `AvatarBackground` | Canvas/background treatment | `themed`, `white`, `black`, `dark`, `light`, `transparent` |
+| `AvatarAccessory` | Optional accessory layer | `none`, `glasses`, `hat`, `headphones`, `crown`, `bowtie`, `eyepatch`, `scarf`, `halo`, `horns` |
+| `AvatarColor` | Optional accent palette | `default`, `neon-mint`, `pastel-pink`, `crimson`, `gold`, `deep-sea-blue` |
+| `AvatarExpression` | Optional expression overlay | `default`, `happy`, `grumpy`, `surprised`, `sleepy`, `winking`, `cool`, `crying` |
+| `AvatarShape` | Optional frame shape | `square`, `circle`, `squircle`, `hexagon`, `octagon` |
+| `AvatarOutputFormat` | Raster encoding format | `webp`, `png`, `jpg`, `gif` |
+
+`AvatarOptions` is the stable baseline option type for callers that only need
+`kind` and `background`. `AvatarStyleOptions` carries the full 0.10.0 visual
+style tuple: `kind`, `background`, `accessory`, `color`, `expression`, and
+`shape`.
+
+Accessories and expressions require face anchors. Face-like families have
+calibrated anchors; non-face families such as `paws`, `planet`, and `rocket`
+skip accessory/expression layers deterministically instead of placing them at
+arbitrary canvas coordinates. Accent colors and frame shapes are canvas-level
+layers and still apply.
 
 ## Example: Encode WebP
 
