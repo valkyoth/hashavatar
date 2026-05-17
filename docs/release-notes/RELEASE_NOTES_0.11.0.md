@@ -15,6 +15,9 @@
   and knight families.
 - Tuned eyepatch, horns, bowtie, crown, hat, and headphones placement for
   families where those overlays were visibly off-center.
+- Refreshed README guidance for the full layer model, single-accessory
+  behavior, supported face-layer families, endpoint query mapping, and style
+  recipes.
 - Added tests for supported face-layer families, unsupported fallback families,
   SVG frame clipping, and SVG radius-attribute integrity.
 

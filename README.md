@@ -6,7 +6,7 @@ The crate starts conservative: validated avatar dimensions, bounded identity inp
 
 ## Current Status
 
-The current development version is `0.11.0`.
+The current crate version is `0.11.0`.
 
 Implemented now:
 
@@ -66,7 +66,7 @@ Planned or intentionally external:
 
 Security-control details live in [docs/SECURITY_CONTROLS.md](docs/SECURITY_CONTROLS.md). Dependency policy lives in [docs/DEPENDENCIES.md](docs/DEPENDENCIES.md). Panic policy lives in [docs/PANIC_POLICY.md](docs/PANIC_POLICY.md).
 
-Future version planning for visual layer polish, variant expansion, and 1.0 stabilization lives in
+Future version planning for variant expansion and 1.0 stabilization lives in
 [docs/VERSION_PLAN.md](docs/VERSION_PLAN.md). `hashavatar` remains a single
 image-generation crate; low-level core planning is kept internal unless a
 future release has a concrete image-generation reason to split it.
@@ -133,11 +133,19 @@ in caller code.
 `kind` and `background`. `AvatarStyleOptions` carries the full visual style
 tuple: `kind`, `background`, `accessory`, `color`, `expression`, and `shape`.
 
-Accessories and expressions require face anchors. Face-like families have
-calibrated anchors; non-face families such as `paws`, `planet`, and `rocket`
-skip accessory/expression layers deterministically instead of placing them at
-arbitrary canvas coordinates. Accent colors and frame shapes are canvas-level
-layers and still apply.
+Each style has one accessory slot. For example, a caller can request
+`eyepatch` or `hat`, but not both in the same `AvatarStyleOptions`. Keeping one
+slot avoids ambiguous draw order and collision rules; a future version can add
+typed accessory slots if the project needs combinations such as headwear plus
+facewear.
+
+Accessories and expressions require face anchors. These families currently have
+calibrated face-layer anchors: `cat`, `dog`, `robot`, `fox`, `alien`,
+`monster`, `ghost`, `slime`, `bird`, `wizard`, `skull`, `frog`, `panda`,
+`octopus`, and `knight`. Non-face families such as `paws`, `planet`, and
+`rocket` skip accessory/expression layers deterministically instead of placing
+them at arbitrary canvas coordinates. Accent colors and frame shapes are
+canvas-level layers and still apply.
 
 Use `AvatarKind::supports_face_layers()` when mapping public endpoint query
 parameters. If it returns `false`, requested accessories and expressions are
@@ -161,6 +169,24 @@ Suggested public endpoint query mapping:
 Keep request parsing, rate limiting, authentication, and concurrency limits in
 the API service. This crate intentionally only validates rendering inputs and
 returns typed errors.
+
+## Style Recipes
+
+These are useful starting points for public APIs and examples:
+
+| Use case | Suggested style |
+| --- | --- |
+| Stable classic avatars | `AvatarOptions::new(kind, background)` |
+| Fully automatic variety | `render_avatar_auto_for_id` or `AvatarStyleOptions::from_identity` |
+| Profile pictures with transparent backgrounds | `background = transparent`, `shape = circle` or `squircle` |
+| Dense UI lists | `shape = square`, `background = themed`, `accessory = none` |
+| Playful public profiles | One face accessory, one expression, one accent color, and a frame shape |
+| Security-sensitive services | SHA-512 or BLAKE3 identity derivation, stable namespace, explicit concurrency limits |
+
+For public query parameters, prefer parsing labels with `FromStr` and returning
+a normal validation error for unknown labels. Do not silently map unsupported
+strings to defaults; silent fallback makes cache keys and user expectations
+harder to reason about.
 
 ## Example: Encode WebP
 
@@ -309,6 +335,11 @@ Accessories and expressions are rendered only for avatar families with
 calibrated face anchors. Non-face families such as `paws`, `planet`, and
 `rocket` skip those layers deterministically instead of drawing them in
 misleading positions. Color and frame-shape layers still apply.
+
+`AvatarStyleOptions` intentionally has one accessory field. Applications that
+want multiple accessory concepts should model that at the product layer for now
+and choose the single most important `AvatarAccessory` before calling this
+crate.
 
 ## Example: Optional Hash Algorithm
 
@@ -532,6 +563,7 @@ Important public entry points:
 - `AvatarIdentityOptions::new(namespace, algorithm)`
 - `AvatarNamespace::new(tenant, style_version) -> Result<AvatarNamespace, AvatarIdentityError>`
 - `AvatarOptions::new(kind, background)`
+- `AvatarKind::supports_face_layers()`
 - `AvatarStyleOptions::new(kind, background, accessory, color, expression, shape)`
 - `AvatarStyleOptions::from_identity(identity)`
 - `encode_avatar_for_id(...)`
@@ -576,7 +608,7 @@ This makes the crate suitable for stable CDN-backed avatar URLs and golden regre
 For style-aware rendering, the deterministic tuple also includes
 `accessory`, `color`, `expression`, and `shape`. Existing `AvatarOptions`
 entry points keep those extra layer choices at `none`, `default`, `default`,
-and `square`, so their default visual output is unchanged in `0.10.0`.
+and `square`, so their default visual output remains unchanged in `0.11.0`.
 Some family/layer combinations are deterministic no-ops when the layer has no
 sensible anchor for that family.
 
