@@ -388,16 +388,16 @@ fn draw_ellipse<F>(
     F: FnMut(&mut RgbaImage, i32, i32, i32, i32),
 {
     let (x0, y0) = center;
-    let w2 = (width_radius * width_radius) as f32;
-    let h2 = (height_radius * height_radius) as f32;
+    let w2 = (width_radius as f64).powi(2);
+    let h2 = (height_radius as f64).powi(2);
     let mut x = 0;
     let mut y = height_radius;
     let mut px = 0.0;
-    let mut py = 2.0 * w2 * y as f32;
+    let mut py = 2.0 * w2 * y as f64;
 
     render(image, x0, y0, x, y);
 
-    let mut p = h2 - (w2 * height_radius as f32) + (0.25 * w2);
+    let mut p = h2 - (w2 * height_radius as f64) + (0.25 * w2);
     while px < py {
         x += 1;
         px += 2.0 * h2;
@@ -411,7 +411,7 @@ fn draw_ellipse<F>(
         render(image, x0, y0, x, y);
     }
 
-    p = h2 * (x as f32 + 0.5).powi(2) + (w2 * (y - 1).pow(2) as f32) - w2 * h2;
+    p = h2 * (x as f64 + 0.5).powi(2) + w2 * ((y - 1) as f64).powi(2) - w2 * h2;
     while y > 0 {
         y -= 1;
         py += -2.0 * w2;
@@ -545,6 +545,9 @@ fn draw_polygon_mut(image: &mut RgbaImage, poly: &[Point<i32>], color: Rgba<u8>)
 
         intersections.sort_unstable();
         for range in intersections.chunks(2) {
+            if range.len() < 2 {
+                continue;
+            }
             let mut from = range[0].min(image.width() as i32);
             let mut to = range[1].min(image.width() as i32 - 1);
             if from < image.width() as i32 && to >= 0 {
@@ -6565,6 +6568,40 @@ mod tests {
 
         assert_eq!(rect.width(), 1);
         assert_eq!(rect.height(), 1);
+    }
+
+    #[test]
+    fn polygon_rasterizer_skips_unpaired_intersections() {
+        let mut image = RgbaImage::new(32, 32);
+        let triangle_with_horizontal_base =
+            [Point::new(0, 0), Point::new(16, 16), Point::new(31, 0)];
+
+        draw_polygon_mut(
+            &mut image,
+            &triangle_with_horizontal_base,
+            Rgba([255, 0, 0, 255]),
+        );
+
+        assert!(image.pixels().any(|pixel| pixel.0[3] == 255));
+    }
+
+    #[test]
+    fn ellipse_rasterizer_handles_max_supported_radius() {
+        let mut image = RgbaImage::new(1, 1);
+        let mut render_calls = 0;
+
+        draw_ellipse(
+            |_, _, _, _, _| render_calls += 1,
+            &mut image,
+            (
+                MAX_AVATAR_DIMENSION as i32 / 2,
+                MAX_AVATAR_DIMENSION as i32 / 2,
+            ),
+            MAX_AVATAR_DIMENSION as i32 / 2,
+            MAX_AVATAR_DIMENSION as i32 / 2,
+        );
+
+        assert!(render_calls > 0);
     }
 
     #[test]
