@@ -46,7 +46,9 @@ Dependency changes should be reviewed for:
   dependency-provided SIMD support where the crate and platform provide it.
 - `xxhash-rust` is admitted only for non-cryptographic XXH3-128 identity
   distribution. Do not present XXH3-128 as an adversarial collision-resistant
-  identity hash.
+  identity hash, and do not recommend it for user-controlled identifiers unless
+  the application first maps those identifiers through its own cryptographic
+  boundary.
 - Optional hash dependency features must be tested with `cargo test
   --all-features` before release.
 

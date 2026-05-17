@@ -16,6 +16,7 @@
 - Hardened JPEG alpha flattening with wider arithmetic intermediates
 - Hardened anti-aliased zero-length line drawing against NaN gradient propagation
 - Added `zeroize` cleanup for derived identity digests and temporary identity hash preimage buffers
+- Changed procedural cat RNG seeding to use 256 bits from the second half of the identity digest
 
 ## Compatibility
 
@@ -24,14 +25,19 @@
 - BLAKE3 and XXH3-128 output is intentionally different from SHA-512 output.
 - `AvatarHashAlgorithm::Blake3` exists only when the `blake3` feature is enabled.
 - `AvatarHashAlgorithm::Xxh3_128` exists only when the `xxh3` feature is enabled.
+- Cat-family output intentionally changes in `0.7.0` because procedural RNG
+  seeding now uses a separate 256-bit digest slice instead of the low 64 bits
+  that are also used by direct visual parameters.
 
 ## Security And Quality
 
 - SHA-512 remains the default for adversarial settings.
 - BLAKE3 is provided by the upstream `blake3` crate and uses dependency-provided acceleration where available.
-- XXH3-128 is non-cryptographic and should only be used for non-adversarial identity distribution.
+- XXH3-128 is non-cryptographic and should only be used for non-adversarial identity distribution. Do not use it for adversarial or user-controlled identifiers unless the application first maps those identifiers through its own cryptographic boundary.
 - All hash input components remain length-prefixed.
 - Non-default algorithms include an explicit algorithm domain component.
 - Oversized identity and namespace inputs are rejected before hashing for every enabled algorithm.
+- Procedural RNG seeding uses 256 bits from the second half of the identity
+  digest, separate from lower digest bytes used for direct visual parameters.
 - Derived identity digests and temporary identity hash preimage buffers are zeroized when dropped.
 - Tests cover parser round-trips, algorithm separation, optional feature paths, oversized input rejection, zero-length line drawing, JPEG alpha flattening, and zeroize trait coverage.

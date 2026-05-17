@@ -16,7 +16,12 @@
   domain-separated from the default path.
 - BLAKE3 support is available only through the explicit `blake3` feature.
 - XXH3-128 support is available only through the explicit `xxh3` feature and
-  is documented as non-cryptographic.
+  is documented as non-cryptographic. Do not use XXH3-128 for adversarial or
+  user-controlled identifiers unless the application first maps those
+  identifiers through its own cryptographic boundary.
+- Procedural RNG seeding uses 256 bits from the second half of the identity
+  digest, separate from the lower digest bytes commonly used for direct visual
+  parameters.
 - Derived identity digests and temporary hash preimage buffers are zeroized
   when dropped.
 - Internal rectangle helpers use saturating or clamping arithmetic.

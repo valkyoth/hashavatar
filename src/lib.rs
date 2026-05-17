@@ -981,6 +981,12 @@ impl AvatarIdentity {
         &self.digest
     }
 
+    pub fn rng_seed(&self) -> [u8; 32] {
+        let mut seed = [0u8; 32];
+        seed.copy_from_slice(&self.digest[32..64]);
+        seed
+    }
+
     pub fn seed(&self) -> u64 {
         let mut seed = [0u8; 8];
         seed.copy_from_slice(&self.digest[..8]);
@@ -1874,7 +1880,11 @@ fn render_cat_avatar_with_identity(
     identity: &AvatarIdentity,
     background: AvatarBackground,
 ) -> RgbaImage {
-    let mut rng = StdRng::seed_from_u64(identity.seed() ^ spec.seed.rotate_left(13));
+    let mut rng_seed = identity.rng_seed();
+    for (index, byte) in spec.seed.to_le_bytes().iter().enumerate() {
+        rng_seed[index] ^= *byte;
+    }
+    let mut rng = StdRng::from_seed(rng_seed);
     let genome = CatGenome::from_identity(identity, &mut rng);
     let palette = CatPalette::from_genome(&genome);
     let mut image = ImageBuffer::from_pixel(
@@ -6501,6 +6511,17 @@ mod tests {
 
         assert_eq!(identity.as_digest().len(), 64);
         assert_ne!(identity.seed(), 0);
+        assert_eq!(&identity.rng_seed(), &identity.as_digest()[32..64]);
+    }
+
+    #[test]
+    fn rng_seed_uses_second_half_of_identity_digest() {
+        let identity = valid_identity("alice@example.com");
+        let rng_seed = identity.rng_seed();
+
+        assert_eq!(rng_seed.len(), 32);
+        assert_eq!(&rng_seed, &identity.as_digest()[32..64]);
+        assert_ne!(&identity.as_digest()[..32], &rng_seed);
     }
 
     #[test]

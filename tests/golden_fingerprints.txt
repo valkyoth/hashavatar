@@ -1,7 +1,7 @@
 # Golden raster fingerprints for stable visual regression testing.
 # Format: label=sha512-prefix
-cat-themed=45ef266ceb9ee609bd1feef8
-cat-white=a489c1834962f662fbb1428a
+cat-themed=3314fdc27b694240194c586d
+cat-white=94c1b0abfd34e7e77c0dd4dc
 dog-themed=287de48a8a2dd039c25a7356
 robot-white=bfaaae333700bfd5c69d7894
 monster-themed=8769357fe549995f61f1684b

@@ -14,6 +14,8 @@
 - Hardened JPEG alpha flattening with wider arithmetic intermediates.
 - Hardened anti-aliased zero-length line drawing against NaN gradient propagation.
 - Added `zeroize` cleanup for derived identity digests and temporary identity hash preimage buffers.
+- Changed procedural cat RNG seeding to use 256 bits from the second half of
+  the identity digest, intentionally updating cat-family golden fingerprints.
 
 ## 0.6.0
 

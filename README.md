@@ -194,11 +194,12 @@ assert_eq!(image.width(), 128);
 # Ok::<(), Box<dyn std::error::Error>>(())
 ```
 
-`AvatarHashAlgorithm::Sha512` is always available and preserves the default
-stable identity behavior. `AvatarHashAlgorithm::Blake3` is available with the
-`blake3` feature. `AvatarHashAlgorithm::Xxh3_128` is available with the `xxh3`
-feature and is non-cryptographic; use it only for non-adversarial identity
-distribution.
+`AvatarHashAlgorithm::Sha512` is always available and is the security-sensitive
+default. `AvatarHashAlgorithm::Blake3` is available with the `blake3` feature.
+`AvatarHashAlgorithm::Xxh3_128` is available with the `xxh3` feature and is
+non-cryptographic. Do not use XXH3-128 for adversarial or user-controlled
+identifiers unless the application first maps those identifiers through its own
+cryptographic boundary.
 
 ### BLAKE3 Feature Example
 
@@ -259,7 +260,8 @@ assert!(!bytes.is_empty());
 ```
 
 XXH3-128 is fast and useful for non-adversarial distribution, but it is not a
-cryptographic hash. Keep SHA-512 or BLAKE3 for adversarial identity inputs.
+cryptographic hash. Keep SHA-512 or BLAKE3 for adversarial or user-controlled
+identity inputs.
 
 ## Example: Raw Image Buffer
 
@@ -344,6 +346,11 @@ identity hash algorithm + namespace tenant + namespace style version + identity 
 ```
 
 This makes the crate suitable for stable CDN-backed avatar URLs and golden regression tests. Namespace hashing uses length-prefixed components, so embedded separator bytes cannot create tenant/style-version ambiguity. The default SHA-512 path keeps the pre-0.7 identity preimage stable; non-default algorithms are domain-separated.
+
+The procedural cat renderer seeds its internal RNG from bytes `32..64` of the
+identity digest and uses the lower digest bytes for direct visual parameters.
+That keeps RNG state separate from directly observed parameter bytes. The
+change intentionally updates cat-family golden fingerprints in `0.7.0`.
 
 ## Testing And Release Evidence
 
