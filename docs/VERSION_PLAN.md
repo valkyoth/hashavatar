@@ -98,6 +98,8 @@ deterministic identity input.
 
 ## 0.8.0: Core Boundary Preparation
 
+Status: implemented in `0.8.0`.
+
 Goal: separate deterministic avatar decisions from encoding/integration
 concerns so a future `no_std + alloc` core is realistic.
 
@@ -142,6 +144,17 @@ concerns so a future `no_std + alloc` core is realistic.
   a future core crate.
 - `scripts/stable_release_gate.sh check` passes.
 - crates.io publish dry run passes.
+
+### Implementation Notes
+
+- Public enum variant lists use `ALL` slices rather than array constants with
+  duplicated lengths.
+- `from_byte` helpers derive variants from `ALL.len()` for hash algorithms,
+  avatar kinds, backgrounds, and output formats.
+- Tests cover parser/display drift and byte-to-variant behavior for public
+  enums.
+- Raster and SVG rendering now share an internal render plan before output
+  encoding.
 
 ## 0.9.0: `hashavatar-core` Experiment
 

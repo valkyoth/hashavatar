@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.8.0
+
+- Bumped the crate to `0.8.0`.
+- Added an internal render plan boundary shared by raster rendering, SVG
+  rendering, and encoding entry points.
+- Changed public enum `ALL` lists to slices so variant lists no longer carry
+  duplicated manual array lengths.
+- Added `from_byte` helpers for `AvatarHashAlgorithm`, `AvatarKind`,
+  `AvatarBackground`, and `AvatarOutputFormat`.
+- Added tests that fail if public enum `ALL` lists drift from parser/display
+  behavior.
+- Documented the future `no_std + alloc` core boundary and the dependencies
+  that currently belong outside it.
+
 ## 0.7.0
 
 - Bumped the crate to `0.7.0`.

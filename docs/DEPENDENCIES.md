@@ -54,3 +54,27 @@ Dependency changes should be reviewed for:
   --all-features` before release.
 
 `scripts/validate-dependencies.sh` enforces the current direct dependency allowlist.
+
+## Future Core Boundary
+
+`0.8.0` starts preparing the code for a possible future `no_std + alloc`
+deterministic core, but the published crate still requires `std`.
+
+Dependencies that belong outside a future core crate:
+
+- `image`, because it provides raster buffers and encoders.
+- `palette`, unless color conversion is replaced or isolated behind a small
+  core color type.
+- `rand`, unless procedural variation is moved to a deterministic byte-schedule
+  that does not require an RNG dependency.
+
+Dependencies that can plausibly remain in or behind a future core boundary:
+
+- `sha2` for default identity hashing, subject to its active `no_std` support.
+- `zeroize` for clearing derived identity material.
+- `subtle` for constant-time identity digest comparison.
+- optional `blake3`, if the feature keeps its own platform acceleration and
+  dependency policy acceptable.
+
+`xxhash-rust` should stay optional and outside security-sensitive guidance
+because XXH3-128 is non-cryptographic.

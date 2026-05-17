@@ -6,7 +6,7 @@ The crate starts conservative: validated avatar dimensions, bounded identity inp
 
 ## Current Status
 
-The current development version is `0.7.0`.
+The current development version is `0.8.0`.
 
 Implemented now:
 
@@ -14,6 +14,8 @@ Implemented now:
 - Deterministic avatars derived from SHA-512 identity hashes by default.
 - Optional BLAKE3 and XXH3-128 identity derivation behind explicit Cargo
   features.
+- Public enum variant lists use single-source `ALL` slices and byte-to-variant
+  helpers for deterministic option derivation.
 - Namespace-aware identity derivation for tenant isolation and visual rollouts.
 - Length-prefixed hash components to avoid delimiter ambiguity.
 - Avatar families: `cat`, `dog`, `robot`, `fox`, `alien`, `monster`, `ghost`, `slime`, `bird`, `wizard`, `skull`, `paws`, `planet`, `rocket`, `mushroom`, `cactus`, `frog`, `panda`, `cupcake`, `pizza`, `icecream`, `octopus`, and `knight`.
@@ -41,7 +43,7 @@ Planned or intentionally external:
 | License | `MIT OR Apache-2.0` |
 | MSRV | Rust `1.95.0` |
 | Crate shape | Library only |
-| Runtime dependencies | `image`, `palette`, `rand`, `sha2`; optional `blake3`, `xxhash-rust` |
+| Runtime dependencies | `image`, `palette`, `rand`, `sha2`, `subtle`, `zeroize`; optional `blake3`, `xxhash-rust` |
 | Unsafe policy | `#![forbid(unsafe_code)]` |
 | Filesystem policy | No public path-writing APIs |
 | Dimension limits | `64..=2048` pixels per side |
@@ -53,22 +55,23 @@ Planned or intentionally external:
 
 Security-control details live in [docs/SECURITY_CONTROLS.md](docs/SECURITY_CONTROLS.md). Dependency policy lives in [docs/DEPENDENCIES.md](docs/DEPENDENCIES.md). Panic policy lives in [docs/PANIC_POLICY.md](docs/PANIC_POLICY.md).
 
-Future version planning for core-boundary preparation, possible
-`no_std + alloc` support, visual layers, and 1.0 stabilization lives in
-[docs/VERSION_PLAN.md](docs/VERSION_PLAN.md).
+Future version planning for possible `no_std + alloc` support, visual layers,
+and 1.0 stabilization lives in [docs/VERSION_PLAN.md](docs/VERSION_PLAN.md).
+`0.8.0` prepares the internal boundary for a future core crate, but `no_std`
+is not a public support contract yet.
 
 ## Install
 
 ```toml
 [dependencies]
-hashavatar = "0.7.0"
+hashavatar = "0.8.0"
 ```
 
 Optional identity hash algorithms are disabled by default:
 
 ```toml
 [dependencies]
-hashavatar = { version = "0.7.0", features = ["blake3", "xxh3"] }
+hashavatar = { version = "0.8.0", features = ["blake3", "xxh3"] }
 ```
 
 For a local checkout:
@@ -167,6 +170,24 @@ assert!(!bytes.is_empty());
 
 Use namespaces when the same user identifier must not collide visually across tenants, products, or style-version rollouts.
 
+## Example: Deterministic Options From Bytes
+
+```rust
+use hashavatar::{AvatarBackground, AvatarKind, AvatarOptions};
+
+let digest_bytes = [42_u8, 199_u8];
+let options = AvatarOptions::new(
+    AvatarKind::from_byte(digest_bytes[0]),
+    AvatarBackground::from_byte(digest_bytes[1]),
+);
+
+assert!(AvatarKind::ALL.contains(&options.kind));
+assert!(AvatarBackground::ALL.contains(&options.background));
+```
+
+The `from_byte` helpers use each enum's `ALL` slice, so new public variants do
+not require duplicated modulo constants in caller code.
+
 ## Example: Optional Hash Algorithm
 
 ```rust
@@ -205,7 +226,7 @@ cryptographic boundary.
 
 ```toml
 [dependencies]
-hashavatar = { version = "0.7.0", features = ["blake3"] }
+hashavatar = { version = "0.8.0", features = ["blake3"] }
 ```
 
 ```rust
@@ -233,7 +254,7 @@ assert!(svg.contains("alien avatar"));
 
 ```toml
 [dependencies]
-hashavatar = { version = "0.7.0", features = ["xxh3"] }
+hashavatar = { version = "0.8.0", features = ["xxh3"] }
 ```
 
 ```rust

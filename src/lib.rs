@@ -841,16 +841,20 @@ pub enum AvatarHashAlgorithm {
 
 impl AvatarHashAlgorithm {
     #[cfg(all(feature = "blake3", feature = "xxh3"))]
-    pub const ALL: [Self; 3] = [Self::Sha512, Self::Blake3, Self::Xxh3_128];
+    pub const ALL: &'static [Self] = &[Self::Sha512, Self::Blake3, Self::Xxh3_128];
 
     #[cfg(all(feature = "blake3", not(feature = "xxh3")))]
-    pub const ALL: [Self; 2] = [Self::Sha512, Self::Blake3];
+    pub const ALL: &'static [Self] = &[Self::Sha512, Self::Blake3];
 
     #[cfg(all(not(feature = "blake3"), feature = "xxh3"))]
-    pub const ALL: [Self; 2] = [Self::Sha512, Self::Xxh3_128];
+    pub const ALL: &'static [Self] = &[Self::Sha512, Self::Xxh3_128];
 
     #[cfg(all(not(feature = "blake3"), not(feature = "xxh3")))]
-    pub const ALL: [Self; 1] = [Self::Sha512];
+    pub const ALL: &'static [Self] = &[Self::Sha512];
+
+    pub fn from_byte(value: u8) -> Self {
+        Self::ALL[usize::from(value) % Self::ALL.len()]
+    }
 
     pub const fn as_str(self) -> &'static str {
         match self {
@@ -1184,7 +1188,11 @@ pub enum AvatarOutputFormat {
 }
 
 impl AvatarOutputFormat {
-    pub const ALL: [Self; 4] = [Self::WebP, Self::Png, Self::Jpeg, Self::Gif];
+    pub const ALL: &'static [Self] = &[Self::WebP, Self::Png, Self::Jpeg, Self::Gif];
+
+    pub fn from_byte(value: u8) -> Self {
+        Self::ALL[usize::from(value) % Self::ALL.len()]
+    }
 
     pub const fn as_str(self) -> &'static str {
         match self {
@@ -1273,7 +1281,7 @@ pub enum AvatarKind {
 }
 
 impl AvatarKind {
-    pub const ALL: [Self; 23] = [
+    pub const ALL: &'static [Self] = &[
         Self::Cat,
         Self::Dog,
         Self::Robot,
@@ -1298,6 +1306,10 @@ impl AvatarKind {
         Self::Octopus,
         Self::Knight,
     ];
+
+    pub fn from_byte(value: u8) -> Self {
+        Self::ALL[usize::from(value) % Self::ALL.len()]
+    }
 
     pub const fn as_str(self) -> &'static str {
         match self {
@@ -1390,7 +1402,7 @@ pub enum AvatarBackground {
 }
 
 impl AvatarBackground {
-    pub const ALL: [Self; 6] = [
+    pub const ALL: &'static [Self] = &[
         Self::Themed,
         Self::White,
         Self::Black,
@@ -1398,6 +1410,10 @@ impl AvatarBackground {
         Self::Light,
         Self::Transparent,
     ];
+
+    pub fn from_byte(value: u8) -> Self {
+        Self::ALL[usize::from(value) % Self::ALL.len()]
+    }
 
     pub const fn as_str(self) -> &'static str {
         match self {
@@ -1651,6 +1667,262 @@ pub fn encode_avatar_with_identity_options<T: AsRef<[u8]>>(
     encode_rgba_image(&image, format)
 }
 
+#[derive(Clone, Debug)]
+struct AvatarRenderPlan {
+    spec: AvatarSpec,
+    identity: AvatarIdentity,
+    options: AvatarOptions,
+}
+
+impl AvatarRenderPlan {
+    fn new<T: AsRef<[u8]>>(
+        spec: AvatarSpec,
+        identity_options: AvatarIdentityOptions<'_>,
+        id: T,
+        options: AvatarOptions,
+    ) -> Result<Self, AvatarRenderError> {
+        spec.validate()?;
+        let identity = AvatarIdentity::new_with_options(identity_options, id)?;
+        Ok(Self {
+            spec,
+            identity,
+            options,
+        })
+    }
+
+    fn render_rgba(&self) -> Result<RgbaImage, AvatarSpecError> {
+        match self.options.kind {
+            AvatarKind::Cat => render_cat_avatar_for_identity_with_background(
+                self.spec,
+                &self.identity,
+                self.options.background,
+            ),
+            AvatarKind::Dog => {
+                render_dog_avatar_for_identity(self.spec, &self.identity, self.options.background)
+            }
+            AvatarKind::Robot => {
+                render_robot_avatar_for_identity(self.spec, &self.identity, self.options.background)
+            }
+            AvatarKind::Fox => {
+                render_fox_avatar_for_identity(self.spec, &self.identity, self.options.background)
+            }
+            AvatarKind::Alien => {
+                render_alien_avatar_for_identity(self.spec, &self.identity, self.options.background)
+            }
+            AvatarKind::Monster => render_monster_avatar_for_identity(
+                self.spec,
+                &self.identity,
+                self.options.background,
+            ),
+            AvatarKind::Ghost => {
+                render_ghost_avatar_for_identity(self.spec, &self.identity, self.options.background)
+            }
+            AvatarKind::Slime => {
+                render_slime_avatar_for_identity(self.spec, &self.identity, self.options.background)
+            }
+            AvatarKind::Bird => {
+                render_bird_avatar_for_identity(self.spec, &self.identity, self.options.background)
+            }
+            AvatarKind::Wizard => render_wizard_avatar_for_identity(
+                self.spec,
+                &self.identity,
+                self.options.background,
+            ),
+            AvatarKind::Skull => {
+                render_skull_avatar_for_identity(self.spec, &self.identity, self.options.background)
+            }
+            AvatarKind::Paws => {
+                render_paws_avatar_for_identity(self.spec, &self.identity, self.options.background)
+            }
+            AvatarKind::Planet => render_planet_avatar_for_identity(
+                self.spec,
+                &self.identity,
+                self.options.background,
+            ),
+            AvatarKind::Rocket => render_rocket_avatar_for_identity(
+                self.spec,
+                &self.identity,
+                self.options.background,
+            ),
+            AvatarKind::Mushroom => render_mushroom_avatar_for_identity(
+                self.spec,
+                &self.identity,
+                self.options.background,
+            ),
+            AvatarKind::Cactus => render_cactus_avatar_for_identity(
+                self.spec,
+                &self.identity,
+                self.options.background,
+            ),
+            AvatarKind::Frog => {
+                render_frog_avatar_for_identity(self.spec, &self.identity, self.options.background)
+            }
+            AvatarKind::Panda => {
+                render_panda_avatar_for_identity(self.spec, &self.identity, self.options.background)
+            }
+            AvatarKind::Cupcake => render_cupcake_avatar_for_identity(
+                self.spec,
+                &self.identity,
+                self.options.background,
+            ),
+            AvatarKind::Pizza => {
+                render_pizza_avatar_for_identity(self.spec, &self.identity, self.options.background)
+            }
+            AvatarKind::Icecream => render_icecream_avatar_for_identity(
+                self.spec,
+                &self.identity,
+                self.options.background,
+            ),
+            AvatarKind::Octopus => render_octopus_avatar_for_identity(
+                self.spec,
+                &self.identity,
+                self.options.background,
+            ),
+            AvatarKind::Knight => render_knight_avatar_for_identity(
+                self.spec,
+                &self.identity,
+                self.options.background,
+            ),
+        }
+    }
+
+    fn svg_background_color(&self) -> Color {
+        match self.options.background {
+            AvatarBackground::Themed => match self.options.kind {
+                AvatarKind::Cat => {
+                    hsl_to_color(28.0 + self.identity.unit_f32(2) * 40.0, 0.25, 0.92)
+                }
+                AvatarKind::Dog => {
+                    hsl_to_color(200.0 + self.identity.unit_f32(3) * 60.0, 0.20, 0.92)
+                }
+                AvatarKind::Robot => {
+                    hsl_to_color(220.0 + self.identity.unit_f32(4) * 50.0, 0.18, 0.93)
+                }
+                AvatarKind::Fox => {
+                    hsl_to_color(18.0 + self.identity.unit_f32(5) * 30.0, 0.28, 0.93)
+                }
+                AvatarKind::Alien => {
+                    hsl_to_color(260.0 + self.identity.unit_f32(6) * 60.0, 0.20, 0.93)
+                }
+                AvatarKind::Monster => {
+                    hsl_to_color(300.0 + self.identity.unit_f32(7) * 45.0, 0.24, 0.92)
+                }
+                AvatarKind::Ghost => {
+                    hsl_to_color(220.0 + self.identity.unit_f32(8) * 35.0, 0.18, 0.95)
+                }
+                AvatarKind::Slime => {
+                    hsl_to_color(120.0 + self.identity.unit_f32(9) * 70.0, 0.24, 0.92)
+                }
+                AvatarKind::Bird => {
+                    hsl_to_color(180.0 + self.identity.unit_f32(10) * 40.0, 0.22, 0.93)
+                }
+                AvatarKind::Wizard => {
+                    hsl_to_color(250.0 + self.identity.unit_f32(11) * 40.0, 0.24, 0.92)
+                }
+                AvatarKind::Skull => {
+                    hsl_to_color(210.0 + self.identity.unit_f32(12) * 20.0, 0.08, 0.94)
+                }
+                AvatarKind::Paws => {
+                    hsl_to_color(28.0 + self.identity.unit_f32(13) * 30.0, 0.22, 0.94)
+                }
+                AvatarKind::Planet => {
+                    hsl_to_color(215.0 + self.identity.unit_f32(14) * 90.0, 0.24, 0.91)
+                }
+                AvatarKind::Rocket => {
+                    hsl_to_color(205.0 + self.identity.unit_f32(15) * 70.0, 0.22, 0.92)
+                }
+                AvatarKind::Mushroom => {
+                    hsl_to_color(18.0 + self.identity.unit_f32(16) * 35.0, 0.20, 0.93)
+                }
+                AvatarKind::Cactus => {
+                    hsl_to_color(80.0 + self.identity.unit_f32(17) * 55.0, 0.20, 0.92)
+                }
+                AvatarKind::Frog => {
+                    hsl_to_color(95.0 + self.identity.unit_f32(18) * 65.0, 0.23, 0.92)
+                }
+                AvatarKind::Panda => {
+                    hsl_to_color(200.0 + self.identity.unit_f32(19) * 45.0, 0.08, 0.94)
+                }
+                AvatarKind::Cupcake => {
+                    hsl_to_color(320.0 + self.identity.unit_f32(20) * 45.0, 0.22, 0.94)
+                }
+                AvatarKind::Pizza => {
+                    hsl_to_color(36.0 + self.identity.unit_f32(21) * 30.0, 0.24, 0.93)
+                }
+                AvatarKind::Icecream => {
+                    hsl_to_color(190.0 + self.identity.unit_f32(22) * 95.0, 0.18, 0.94)
+                }
+                AvatarKind::Octopus => {
+                    hsl_to_color(185.0 + self.identity.unit_f32(23) * 70.0, 0.22, 0.92)
+                }
+                AvatarKind::Knight => {
+                    hsl_to_color(215.0 + self.identity.unit_f32(24) * 30.0, 0.12, 0.92)
+                }
+            },
+            AvatarBackground::White => Color::rgb(255, 255, 255),
+            AvatarBackground::Black => Color::rgb(0, 0, 0),
+            AvatarBackground::Dark => Color::rgb(17, 24, 39),
+            AvatarBackground::Light => Color::rgb(248, 250, 247),
+            AvatarBackground::Transparent => Color::rgba(255, 255, 255, 0),
+        }
+    }
+
+    fn render_svg_body(&self) -> String {
+        match self.options.kind {
+            AvatarKind::Cat => render_cat_svg(self.spec, &self.identity),
+            AvatarKind::Dog => render_dog_svg(self.spec, &self.identity),
+            AvatarKind::Robot => render_robot_svg(self.spec, &self.identity),
+            AvatarKind::Fox => render_fox_svg(self.spec, &self.identity),
+            AvatarKind::Alien => render_alien_svg(self.spec, &self.identity),
+            AvatarKind::Monster => render_monster_svg(self.spec, &self.identity),
+            AvatarKind::Ghost => render_ghost_svg(self.spec, &self.identity),
+            AvatarKind::Slime => render_slime_svg(self.spec, &self.identity),
+            AvatarKind::Bird => render_bird_svg(self.spec, &self.identity),
+            AvatarKind::Wizard => render_wizard_svg(self.spec, &self.identity),
+            AvatarKind::Skull => render_skull_svg(self.spec, &self.identity),
+            AvatarKind::Paws => render_paws_svg(self.spec, &self.identity),
+            AvatarKind::Planet => render_planet_svg(self.spec, &self.identity),
+            AvatarKind::Rocket => render_rocket_svg(self.spec, &self.identity),
+            AvatarKind::Mushroom => render_mushroom_svg(self.spec, &self.identity),
+            AvatarKind::Cactus => render_cactus_svg(self.spec, &self.identity),
+            AvatarKind::Frog => render_frog_svg(self.spec, &self.identity),
+            AvatarKind::Panda => render_panda_svg(self.spec, &self.identity),
+            AvatarKind::Cupcake => render_cupcake_svg(self.spec, &self.identity),
+            AvatarKind::Pizza => render_pizza_svg(self.spec, &self.identity),
+            AvatarKind::Icecream => render_icecream_svg(self.spec, &self.identity),
+            AvatarKind::Octopus => render_octopus_svg(self.spec, &self.identity),
+            AvatarKind::Knight => render_knight_svg(self.spec, &self.identity),
+        }
+    }
+
+    fn render_svg(&self) -> String {
+        let background = match self.options.background {
+            AvatarBackground::Transparent => String::new(),
+            AvatarBackground::Themed
+            | AvatarBackground::White
+            | AvatarBackground::Black
+            | AvatarBackground::Dark
+            | AvatarBackground::Light => {
+                format!(
+                    r#"<rect width="100%" height="100%" fill="{}"/>"#,
+                    color_hex(self.svg_background_color())
+                )
+            }
+        };
+
+        format!(
+            r#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {w} {h}" width="{w}" height="{h}" role="img" aria-label="{label} avatar">{background}{body}</svg>"#,
+            w = self.spec.width,
+            h = self.spec.height,
+            label = self.options.kind.as_str(),
+            background = background,
+            body = self.render_svg_body(),
+        )
+        .replace('\n', "")
+        .replace("  ", "")
+    }
+}
+
 /// Render an avatar image directly without encoding it.
 pub fn render_avatar_for_id<T: AsRef<[u8]>>(
     spec: AvatarSpec,
@@ -1680,56 +1952,9 @@ pub fn render_avatar_with_identity_options<T: AsRef<[u8]>>(
     id: T,
     options: AvatarOptions,
 ) -> Result<RgbaImage, AvatarRenderError> {
-    spec.validate()?;
-    let identity = AvatarIdentity::new_with_options(identity_options, id)?;
-    let image = match options.kind {
-        AvatarKind::Cat => {
-            render_cat_avatar_for_identity_with_background(spec, &identity, options.background)
-        }
-        AvatarKind::Dog => render_dog_avatar_for_identity(spec, &identity, options.background),
-        AvatarKind::Robot => render_robot_avatar_for_identity(spec, &identity, options.background),
-        AvatarKind::Fox => render_fox_avatar_for_identity(spec, &identity, options.background),
-        AvatarKind::Alien => render_alien_avatar_for_identity(spec, &identity, options.background),
-        AvatarKind::Monster => {
-            render_monster_avatar_for_identity(spec, &identity, options.background)
-        }
-        AvatarKind::Ghost => render_ghost_avatar_for_identity(spec, &identity, options.background),
-        AvatarKind::Slime => render_slime_avatar_for_identity(spec, &identity, options.background),
-        AvatarKind::Bird => render_bird_avatar_for_identity(spec, &identity, options.background),
-        AvatarKind::Wizard => {
-            render_wizard_avatar_for_identity(spec, &identity, options.background)
-        }
-        AvatarKind::Skull => render_skull_avatar_for_identity(spec, &identity, options.background),
-        AvatarKind::Paws => render_paws_avatar_for_identity(spec, &identity, options.background),
-        AvatarKind::Planet => {
-            render_planet_avatar_for_identity(spec, &identity, options.background)
-        }
-        AvatarKind::Rocket => {
-            render_rocket_avatar_for_identity(spec, &identity, options.background)
-        }
-        AvatarKind::Mushroom => {
-            render_mushroom_avatar_for_identity(spec, &identity, options.background)
-        }
-        AvatarKind::Cactus => {
-            render_cactus_avatar_for_identity(spec, &identity, options.background)
-        }
-        AvatarKind::Frog => render_frog_avatar_for_identity(spec, &identity, options.background),
-        AvatarKind::Panda => render_panda_avatar_for_identity(spec, &identity, options.background),
-        AvatarKind::Cupcake => {
-            render_cupcake_avatar_for_identity(spec, &identity, options.background)
-        }
-        AvatarKind::Pizza => render_pizza_avatar_for_identity(spec, &identity, options.background),
-        AvatarKind::Icecream => {
-            render_icecream_avatar_for_identity(spec, &identity, options.background)
-        }
-        AvatarKind::Octopus => {
-            render_octopus_avatar_for_identity(spec, &identity, options.background)
-        }
-        AvatarKind::Knight => {
-            render_knight_avatar_for_identity(spec, &identity, options.background)
-        }
-    }?;
-    Ok(image)
+    AvatarRenderPlan::new(spec, identity_options, id, options)?
+        .render_rgba()
+        .map_err(AvatarRenderError::from)
 }
 
 /// Render an avatar as a compact SVG string.
@@ -1761,91 +1986,7 @@ pub fn render_avatar_svg_with_identity_options<T: AsRef<[u8]>>(
     id: T,
     options: AvatarOptions,
 ) -> Result<String, AvatarRenderError> {
-    spec.validate()?;
-    let identity = AvatarIdentity::new_with_options(identity_options, id)?;
-    let bg = match options.background {
-        AvatarBackground::Themed => match options.kind {
-            AvatarKind::Cat => hsl_to_color(28.0 + identity.unit_f32(2) * 40.0, 0.25, 0.92),
-            AvatarKind::Dog => hsl_to_color(200.0 + identity.unit_f32(3) * 60.0, 0.20, 0.92),
-            AvatarKind::Robot => hsl_to_color(220.0 + identity.unit_f32(4) * 50.0, 0.18, 0.93),
-            AvatarKind::Fox => hsl_to_color(18.0 + identity.unit_f32(5) * 30.0, 0.28, 0.93),
-            AvatarKind::Alien => hsl_to_color(260.0 + identity.unit_f32(6) * 60.0, 0.20, 0.93),
-            AvatarKind::Monster => hsl_to_color(300.0 + identity.unit_f32(7) * 45.0, 0.24, 0.92),
-            AvatarKind::Ghost => hsl_to_color(220.0 + identity.unit_f32(8) * 35.0, 0.18, 0.95),
-            AvatarKind::Slime => hsl_to_color(120.0 + identity.unit_f32(9) * 70.0, 0.24, 0.92),
-            AvatarKind::Bird => hsl_to_color(180.0 + identity.unit_f32(10) * 40.0, 0.22, 0.93),
-            AvatarKind::Wizard => hsl_to_color(250.0 + identity.unit_f32(11) * 40.0, 0.24, 0.92),
-            AvatarKind::Skull => hsl_to_color(210.0 + identity.unit_f32(12) * 20.0, 0.08, 0.94),
-            AvatarKind::Paws => hsl_to_color(28.0 + identity.unit_f32(13) * 30.0, 0.22, 0.94),
-            AvatarKind::Planet => hsl_to_color(215.0 + identity.unit_f32(14) * 90.0, 0.24, 0.91),
-            AvatarKind::Rocket => hsl_to_color(205.0 + identity.unit_f32(15) * 70.0, 0.22, 0.92),
-            AvatarKind::Mushroom => hsl_to_color(18.0 + identity.unit_f32(16) * 35.0, 0.20, 0.93),
-            AvatarKind::Cactus => hsl_to_color(80.0 + identity.unit_f32(17) * 55.0, 0.20, 0.92),
-            AvatarKind::Frog => hsl_to_color(95.0 + identity.unit_f32(18) * 65.0, 0.23, 0.92),
-            AvatarKind::Panda => hsl_to_color(200.0 + identity.unit_f32(19) * 45.0, 0.08, 0.94),
-            AvatarKind::Cupcake => hsl_to_color(320.0 + identity.unit_f32(20) * 45.0, 0.22, 0.94),
-            AvatarKind::Pizza => hsl_to_color(36.0 + identity.unit_f32(21) * 30.0, 0.24, 0.93),
-            AvatarKind::Icecream => hsl_to_color(190.0 + identity.unit_f32(22) * 95.0, 0.18, 0.94),
-            AvatarKind::Octopus => hsl_to_color(185.0 + identity.unit_f32(23) * 70.0, 0.22, 0.92),
-            AvatarKind::Knight => hsl_to_color(215.0 + identity.unit_f32(24) * 30.0, 0.12, 0.92),
-        },
-        AvatarBackground::White => Color::rgb(255, 255, 255),
-        AvatarBackground::Black => Color::rgb(0, 0, 0),
-        AvatarBackground::Dark => Color::rgb(17, 24, 39),
-        AvatarBackground::Light => Color::rgb(248, 250, 247),
-        AvatarBackground::Transparent => Color::rgba(255, 255, 255, 0),
-    };
-
-    let body = match options.kind {
-        AvatarKind::Cat => render_cat_svg(spec, &identity),
-        AvatarKind::Dog => render_dog_svg(spec, &identity),
-        AvatarKind::Robot => render_robot_svg(spec, &identity),
-        AvatarKind::Fox => render_fox_svg(spec, &identity),
-        AvatarKind::Alien => render_alien_svg(spec, &identity),
-        AvatarKind::Monster => render_monster_svg(spec, &identity),
-        AvatarKind::Ghost => render_ghost_svg(spec, &identity),
-        AvatarKind::Slime => render_slime_svg(spec, &identity),
-        AvatarKind::Bird => render_bird_svg(spec, &identity),
-        AvatarKind::Wizard => render_wizard_svg(spec, &identity),
-        AvatarKind::Skull => render_skull_svg(spec, &identity),
-        AvatarKind::Paws => render_paws_svg(spec, &identity),
-        AvatarKind::Planet => render_planet_svg(spec, &identity),
-        AvatarKind::Rocket => render_rocket_svg(spec, &identity),
-        AvatarKind::Mushroom => render_mushroom_svg(spec, &identity),
-        AvatarKind::Cactus => render_cactus_svg(spec, &identity),
-        AvatarKind::Frog => render_frog_svg(spec, &identity),
-        AvatarKind::Panda => render_panda_svg(spec, &identity),
-        AvatarKind::Cupcake => render_cupcake_svg(spec, &identity),
-        AvatarKind::Pizza => render_pizza_svg(spec, &identity),
-        AvatarKind::Icecream => render_icecream_svg(spec, &identity),
-        AvatarKind::Octopus => render_octopus_svg(spec, &identity),
-        AvatarKind::Knight => render_knight_svg(spec, &identity),
-    };
-
-    let background = match options.background {
-        AvatarBackground::Transparent => String::new(),
-        AvatarBackground::Themed
-        | AvatarBackground::White
-        | AvatarBackground::Black
-        | AvatarBackground::Dark
-        | AvatarBackground::Light => {
-            format!(
-                r#"<rect width="100%" height="100%" fill="{}"/>"#,
-                color_hex(bg)
-            )
-        }
-    };
-
-    Ok(format!(
-        r#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {w} {h}" width="{w}" height="{h}" role="img" aria-label="{label} avatar">{background}{body}</svg>"#,
-        w = spec.width,
-        h = spec.height,
-        label = options.kind.as_str(),
-        background = background,
-        body = body,
-    )
-    .replace('\n', "")
-    .replace("  ", ""))
+    Ok(AvatarRenderPlan::new(spec, identity_options, id, options)?.render_svg())
 }
 
 /// Render a cat face avatar into an RGBA image.
@@ -6557,7 +6698,7 @@ mod tests {
 
     #[test]
     fn hash_algorithm_parser_round_trips_enabled_algorithms() {
-        for algorithm in AvatarHashAlgorithm::ALL {
+        for &algorithm in AvatarHashAlgorithm::ALL {
             assert_eq!(
                 algorithm.as_str().parse::<AvatarHashAlgorithm>().ok(),
                 Some(algorithm)
@@ -6568,7 +6709,7 @@ mod tests {
     #[test]
     fn oversized_identity_is_rejected_for_every_enabled_hash_algorithm() {
         let too_long = vec![b'a'; MAX_AVATAR_ID_BYTES + 1];
-        for algorithm in AvatarHashAlgorithm::ALL {
+        for &algorithm in AvatarHashAlgorithm::ALL {
             let error = AvatarIdentity::new_with_options(
                 AvatarIdentityOptions::new(AvatarNamespace::default(), algorithm),
                 &too_long,
@@ -6583,8 +6724,8 @@ mod tests {
 
     #[test]
     fn enabled_hash_algorithms_have_separate_identity_domains() {
-        for left in AvatarHashAlgorithm::ALL {
-            for right in AvatarHashAlgorithm::ALL {
+        for &left in AvatarHashAlgorithm::ALL {
+            for &right in AvatarHashAlgorithm::ALL {
                 if left == right {
                     continue;
                 }
@@ -6937,21 +7078,110 @@ mod tests {
 
     #[test]
     fn parser_round_trip_supports_public_enums() {
-        for kind in AvatarKind::ALL {
+        for &kind in AvatarKind::ALL {
             assert_eq!(kind.as_str().parse::<AvatarKind>().ok(), Some(kind));
+            assert_eq!(kind.to_string(), kind.as_str());
         }
-        for background in AvatarBackground::ALL {
+        for &background in AvatarBackground::ALL {
             assert_eq!(
                 background.as_str().parse::<AvatarBackground>().ok(),
                 Some(background)
             );
+            assert_eq!(background.to_string(), background.as_str());
         }
-        for format in AvatarOutputFormat::ALL {
+        for &format in AvatarOutputFormat::ALL {
             assert_eq!(
                 format.as_str().parse::<AvatarOutputFormat>().ok(),
                 Some(format)
             );
+            assert_eq!(format.to_string(), format.as_str());
         }
+    }
+
+    #[test]
+    fn public_enum_variant_lists_match_documented_labels() {
+        let kind_labels: Vec<_> = AvatarKind::ALL.iter().map(|kind| kind.as_str()).collect();
+        assert_eq!(
+            kind_labels,
+            [
+                "cat", "dog", "robot", "fox", "alien", "monster", "ghost", "slime", "bird",
+                "wizard", "skull", "paws", "planet", "rocket", "mushroom", "cactus", "frog",
+                "panda", "cupcake", "pizza", "icecream", "octopus", "knight",
+            ]
+        );
+
+        let background_labels: Vec<_> = AvatarBackground::ALL
+            .iter()
+            .map(|background| background.as_str())
+            .collect();
+        assert_eq!(
+            background_labels,
+            ["themed", "white", "black", "dark", "light", "transparent"]
+        );
+
+        let format_labels: Vec<_> = AvatarOutputFormat::ALL
+            .iter()
+            .map(|format| format.as_str())
+            .collect();
+        assert_eq!(format_labels, ["webp", "png", "jpg", "gif"]);
+    }
+
+    #[test]
+    fn byte_to_public_enum_helpers_use_variant_lists() {
+        for (index, &kind) in AvatarKind::ALL.iter().enumerate() {
+            assert_eq!(AvatarKind::from_byte(index as u8), kind);
+        }
+        assert_eq!(
+            AvatarKind::from_byte(AvatarKind::ALL.len() as u8),
+            AvatarKind::ALL[0]
+        );
+
+        for (index, &background) in AvatarBackground::ALL.iter().enumerate() {
+            assert_eq!(AvatarBackground::from_byte(index as u8), background);
+        }
+        assert_eq!(
+            AvatarBackground::from_byte(AvatarBackground::ALL.len() as u8),
+            AvatarBackground::ALL[0]
+        );
+
+        for (index, &format) in AvatarOutputFormat::ALL.iter().enumerate() {
+            assert_eq!(AvatarOutputFormat::from_byte(index as u8), format);
+        }
+        assert_eq!(
+            AvatarOutputFormat::from_byte(AvatarOutputFormat::ALL.len() as u8),
+            AvatarOutputFormat::ALL[0]
+        );
+
+        for (index, &algorithm) in AvatarHashAlgorithm::ALL.iter().enumerate() {
+            assert_eq!(AvatarHashAlgorithm::from_byte(index as u8), algorithm);
+        }
+        assert_eq!(
+            AvatarHashAlgorithm::from_byte(AvatarHashAlgorithm::ALL.len() as u8),
+            AvatarHashAlgorithm::ALL[0]
+        );
+    }
+
+    #[test]
+    fn internal_render_plan_matches_direct_raster_renderer() {
+        let spec = valid_spec(96, 96, 0);
+        let options = AvatarOptions::new(AvatarKind::Robot, AvatarBackground::Dark);
+        let plan = AvatarRenderPlan::new(
+            spec,
+            AvatarIdentityOptions::default(),
+            "plan@example.com",
+            options,
+        )
+        .expect("render plan should be valid");
+        let identity = valid_identity("plan@example.com");
+        let direct = render_robot_avatar_for_identity(spec, &identity, AvatarBackground::Dark);
+
+        assert_eq!(
+            plan.render_rgba()
+                .expect("planned robot render should be valid")
+                .as_raw(),
+            direct.as_raw()
+        );
+        assert!(plan.render_svg().contains("robot avatar"));
     }
 
     #[test]
@@ -7073,7 +7303,7 @@ mod tests {
     #[test]
     fn render_avatar_for_id_supports_all_avatar_kinds() {
         let spec = valid_spec(96, 96, 0);
-        for kind in AvatarKind::ALL {
+        for &kind in AvatarKind::ALL {
             let image = render_avatar_for_id(
                 spec,
                 "integration@example.com",
@@ -7087,7 +7317,7 @@ mod tests {
     #[test]
     fn render_avatar_svg_for_id_supports_all_avatar_kinds() {
         let spec = valid_spec(96, 96, 0);
-        for kind in AvatarKind::ALL {
+        for &kind in AvatarKind::ALL {
             let svg = render_avatar_svg_for_id(
                 spec,
                 "integration@example.com",
