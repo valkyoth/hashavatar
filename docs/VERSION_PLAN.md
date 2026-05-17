@@ -326,6 +326,87 @@ than merely supported by the API.
 - `scripts/stable_release_gate.sh check` passes.
 - crates.io publish dry run passes.
 
+## 0.12.0: Variant Expansion
+
+Goal: broaden the built-in avatar and background catalog once the visual layer
+model is in place and tested.
+
+### Scope
+
+- Add new `AvatarKind` families where they can be rendered with the same
+  deterministic, asset-free approach as the existing variants.
+- Candidate animal variants:
+  - `Bear`
+  - `Monkey`
+  - `Penguin`
+  - `Dinosaur`
+  - `Unicorn`
+  - `Bat`
+  - `Turtle`
+- Candidate fantasy and sci-fi variants:
+  - `Dragon`
+  - `Ninja`
+  - `Vampire`
+  - `Cyborg`
+  - `Astronaut`
+- Candidate object variants:
+  - `Diamond`
+  - `Gemstone`
+  - `CoffeeCup`
+  - `Sword`
+  - `Shield`
+  - `Crown`
+- Add new `AvatarBackground` modes where they do not require external assets
+  or unbounded procedural work.
+- Candidate pattern backgrounds:
+  - `PolkaDot`
+  - `Striped`
+  - `Checkerboard`
+  - `Grid`
+  - `Wavy`
+- Candidate gradient backgrounds:
+  - `Sunrise`
+  - `Synthwave`
+  - `Ocean`
+- Candidate environment backgrounds:
+  - `Starry`
+  - `Pixel`
+  - `Cloudy`
+
+### Admission Policy
+
+- Each new variant must be visually distinct at small sizes such as 64x64 and
+  128x128.
+- Each new variant must work in raster and SVG output.
+- New backgrounds must be bounded, deterministic, and safe for untrusted
+  identities.
+- Pattern and environment backgrounds must not make foreground avatars hard to
+  read; use contrast tests or reviewed golden outputs where practical.
+- Variant expansion must update enum `ALL` lists, parser/display tests,
+  README examples, and release notes together.
+- Adding variants may change automatic distribution only in a documented
+  visual-output compatibility release. Services that need stable old output
+  should pin the older `style_version` until they intentionally migrate.
+
+### Finish Line
+
+`0.12.0` is done when:
+
+- The accepted `AvatarKind` and `AvatarBackground` variants are implemented in
+  both raster and SVG paths.
+- Every new public variant has `as_str`, `Display`, `FromStr`, and `ALL`
+  coverage.
+- Automatic selection uses the enum variant lists, not duplicated literal
+  counts.
+- Golden fingerprints cover representative new avatar families and
+  backgrounds.
+- Small-size visual review confirms each accepted variant is recognizable.
+- README and docs describe the expanded catalog without promising variants
+  that were rejected or deferred.
+- Release notes clearly state any deterministic output impact.
+- `scripts/stable_release_gate.sh check` passes.
+- crates.io publish dry run passes.
+
 ## 1.0.0: Stability Contract
 
 Goal: freeze a professional, security-oriented public API and rendering
@@ -336,6 +417,7 @@ contract.
 - Decide whether `hashavatar-core` is public and versioned independently.
 - Freeze default hash algorithm and default visual style version.
 - Freeze the visual layer option model.
+- Freeze the baseline avatar kind and background catalog intended for `1.0`.
 - Freeze error types and constructor behavior.
 - Define a stable policy for when visual output may change.
 - Define semver rules for adding avatar families, visual layers, hash
