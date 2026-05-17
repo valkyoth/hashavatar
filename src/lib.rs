@@ -11,8 +11,9 @@
 //!     encode_avatar_for_id,
 //! };
 //!
+//! let spec = AvatarSpec::new(256, 256, 0)?;
 //! let bytes = encode_avatar_for_id(
-//!     AvatarSpec::new(256, 256, 0),
+//!     spec,
 //!     "robot@hashavatar.app",
 //!     AvatarOutputFormat::WebP,
 //!     AvatarOptions {
@@ -20,15 +21,13 @@
 //!         background: AvatarBackground::Transparent,
 //!     },
 //! )?;
-//! # Ok::<(), image::ImageError>(())
+//! # Ok::<(), Box<dyn std::error::Error>>(())
 //! ```
 
 #![forbid(unsafe_code)]
 
-use std::fs::File;
-use std::io::{BufWriter, Cursor};
+use std::io::Cursor;
 use std::mem::swap;
-use std::path::Path;
 use std::str::FromStr;
 
 use image::codecs::gif::GifEncoder;
@@ -155,13 +154,11 @@ struct RectPosition {
 
 impl RectPosition {
     const fn of_size(self, width: u32, height: u32) -> Rect {
-        assert!(width > 0, "width must be strictly positive");
-        assert!(height > 0, "height must be strictly positive");
         Rect {
             left: self.left,
             top: self.top,
-            width,
-            height,
+            width: if width == 0 { 1 } else { width },
+            height: if height == 0 { 1 } else { height },
         }
     }
 }
@@ -599,13 +596,25 @@ fn in_bounds(image: &RgbaImage, x: i32, y: i32) -> bool {
 /// Input parameters for a generated avatar image.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct AvatarSpec {
-    pub width: u32,
-    pub height: u32,
-    pub seed: u64,
+    width: u32,
+    height: u32,
+    seed: u64,
 }
 
 impl AvatarSpec {
-    pub const fn new(width: u32, height: u32, seed: u64) -> Self {
+    pub const fn new(width: u32, height: u32, seed: u64) -> Result<Self, AvatarSpecError> {
+        if Self::dimensions_are_supported(width, height) {
+            Ok(Self {
+                width,
+                height,
+                seed,
+            })
+        } else {
+            Err(AvatarSpecError { width, height })
+        }
+    }
+
+    const fn new_unchecked(width: u32, height: u32, seed: u64) -> Self {
         Self {
             width,
             height,
@@ -613,36 +622,60 @@ impl AvatarSpec {
         }
     }
 
+    pub const fn width(self) -> u32 {
+        self.width
+    }
+
+    pub const fn height(self) -> u32 {
+        self.height
+    }
+
+    pub const fn seed(self) -> u64 {
+        self.seed
+    }
+
     pub const fn is_supported(self) -> bool {
-        self.width >= MIN_AVATAR_DIMENSION
-            && self.height >= MIN_AVATAR_DIMENSION
-            && self.width <= MAX_AVATAR_DIMENSION
-            && self.height <= MAX_AVATAR_DIMENSION
+        Self::dimensions_are_supported(self.width, self.height)
+    }
+
+    const fn dimensions_are_supported(width: u32, height: u32) -> bool {
+        width >= MIN_AVATAR_DIMENSION
+            && height >= MIN_AVATAR_DIMENSION
+            && width <= MAX_AVATAR_DIMENSION
+            && height <= MAX_AVATAR_DIMENSION
     }
 
     pub fn validate(self) -> Result<(), AvatarSpecError> {
         if self.is_supported() {
             Ok(())
         } else {
-            Err(AvatarSpecError { spec: self })
+            Err(AvatarSpecError {
+                width: self.width,
+                height: self.height,
+            })
         }
     }
 }
 
 impl Default for AvatarSpec {
     fn default() -> Self {
-        Self::new(256, 256, 1)
+        Self::new_unchecked(256, 256, 1)
     }
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct AvatarSpecError {
-    spec: AvatarSpec,
+    width: u32,
+    height: u32,
 }
 
 impl AvatarSpecError {
-    pub const fn spec(self) -> AvatarSpec {
-        self.spec
+    pub const fn width(self) -> u32 {
+        self.width
+    }
+
+    pub const fn height(self) -> u32 {
+        self.height
     }
 }
 
@@ -651,7 +684,7 @@ impl std::fmt::Display for AvatarSpecError {
         write!(
             f,
             "avatar dimensions must be between {MIN_AVATAR_DIMENSION} and {MAX_AVATAR_DIMENSION} pixels per side, got {}x{}",
-            self.spec.width, self.spec.height
+            self.width, self.height
         )
     }
 }
@@ -1130,32 +1163,9 @@ pub fn encode_avatar<R: AvatarRenderer>(
     encode_rgba_image(&image, format)
 }
 
-/// Render and write an avatar to disk.
-pub fn export_avatar<R: AvatarRenderer, P: AsRef<Path>>(
-    renderer: &R,
-    spec: AvatarSpec,
-    format: AvatarOutputFormat,
-    path: P,
-) -> ImageResult<()> {
-    validate_image_avatar_spec(spec)?;
-    let image = renderer
-        .render(spec)
-        .map_err(avatar_spec_error_to_image_error)?;
-    write_rgba_image(&image, format, path)
-}
-
 /// Render and encode a cat avatar into memory.
 pub fn encode_cat_avatar(spec: AvatarSpec, format: AvatarOutputFormat) -> ImageResult<Vec<u8>> {
     encode_avatar(&CatAvatar, spec, format)
-}
-
-/// Render and write a cat avatar to disk.
-pub fn export_cat_avatar<P: AsRef<Path>>(
-    spec: AvatarSpec,
-    format: AvatarOutputFormat,
-    path: P,
-) -> ImageResult<()> {
-    export_avatar(&CatAvatar, spec, format, path)
 }
 
 /// Render and encode a cat avatar for a stable identity string.
@@ -1166,17 +1176,6 @@ pub fn encode_cat_avatar_for_id<T: AsRef<[u8]>>(
 ) -> ImageResult<Vec<u8>> {
     let renderer = HashedCatAvatar::new(id);
     encode_avatar(&renderer, spec, format)
-}
-
-/// Render and write a cat avatar for a stable identity string.
-pub fn export_cat_avatar_for_id<T: AsRef<[u8]>, P: AsRef<Path>>(
-    spec: AvatarSpec,
-    id: T,
-    format: AvatarOutputFormat,
-    path: P,
-) -> ImageResult<()> {
-    let renderer = HashedCatAvatar::new(id);
-    export_avatar(&renderer, spec, format, path)
 }
 
 pub fn encode_avatar_for_id<T: AsRef<[u8]>>(
@@ -1366,29 +1365,6 @@ pub fn render_avatar_svg_for_namespace<T: AsRef<[u8]>>(
     )
     .replace('\n', "")
     .replace("  ", ""))
-}
-
-pub fn export_avatar_svg_for_id<T: AsRef<[u8]>, P: AsRef<Path>>(
-    spec: AvatarSpec,
-    id: T,
-    options: AvatarOptions,
-    path: P,
-) -> std::io::Result<()> {
-    let svg = render_avatar_svg_for_id(spec, id, options)
-        .map_err(|error| std::io::Error::new(std::io::ErrorKind::InvalidInput, error))?;
-    std::fs::write(path, svg)
-}
-
-pub fn export_avatar_svg_for_namespace<T: AsRef<[u8]>, P: AsRef<Path>>(
-    spec: AvatarSpec,
-    namespace: AvatarNamespace<'_>,
-    id: T,
-    options: AvatarOptions,
-    path: P,
-) -> std::io::Result<()> {
-    let svg = render_avatar_svg_for_namespace(spec, namespace, id, options)
-        .map_err(|error| std::io::Error::new(std::io::ErrorKind::InvalidInput, error))?;
-    std::fs::write(path, svg)
 }
 
 /// Render a cat face avatar into an RGBA image.
@@ -5868,16 +5844,6 @@ fn encode_rgba_image(image: &RgbaImage, format: AvatarOutputFormat) -> ImageResu
     Ok(bytes)
 }
 
-fn write_rgba_image<P: AsRef<Path>>(
-    image: &RgbaImage,
-    format: AvatarOutputFormat,
-    path: P,
-) -> ImageResult<()> {
-    let file = File::create(path).map_err(image::ImageError::IoError)?;
-    let writer = BufWriter::new(file);
-    encode_into_writer(image, format, writer)
-}
-
 fn encode_into_writer<W: std::io::Write>(
     image: &RgbaImage,
     format: AvatarOutputFormat,
@@ -5934,6 +5900,10 @@ fn rgba_to_rgb_over_white(image: &RgbaImage) -> Vec<u8> {
 mod tests {
     use super::*;
     use image::ImageFormat;
+
+    fn valid_spec(width: u32, height: u32, seed: u64) -> AvatarSpec {
+        AvatarSpec::new(width, height, seed).expect("test avatar spec should be valid")
+    }
 
     fn render_avatar_for_id<T: AsRef<[u8]>>(
         spec: AvatarSpec,
@@ -6017,7 +5987,7 @@ mod tests {
 
     #[test]
     fn cat_avatar_is_deterministic_for_a_seed() {
-        let spec = AvatarSpec::new(256, 256, 42);
+        let spec = valid_spec(256, 256, 42);
         let left = render_cat_avatar(spec);
         let right = render_cat_avatar(spec);
 
@@ -6026,7 +5996,7 @@ mod tests {
 
     #[test]
     fn cat_avatar_uses_requested_dimensions() {
-        let image = render_cat_avatar(AvatarSpec::new(192, 160, 7));
+        let image = render_cat_avatar(valid_spec(192, 160, 7));
 
         assert_eq!(image.width(), 192);
         assert_eq!(image.height(), 160);
@@ -6034,7 +6004,7 @@ mod tests {
 
     #[test]
     fn cat_avatar_has_non_background_pixels() {
-        let spec = AvatarSpec::new(128, 128, 3);
+        let spec = valid_spec(128, 128, 3);
         let image = render_cat_avatar(spec);
         let background = image.get_pixel(0, 0);
 
@@ -6078,30 +6048,8 @@ mod tests {
     }
 
     #[test]
-    fn public_renderers_return_errors_for_invalid_specs() {
-        let spec = AvatarSpec::new(0, 256, 0);
-        let options = AvatarOptions::new(AvatarKind::Cat, AvatarBackground::Themed);
-        let identity = AvatarIdentity::new("invalid-spec@example.com");
-
-        assert!(super::render_avatar_for_id(spec, "invalid-spec@example.com", options).is_err());
-        assert!(
-            super::render_avatar_svg_for_id(spec, "invalid-spec@example.com", options).is_err()
-        );
-        assert!(super::render_cat_avatar(spec).is_err());
-        assert!(super::render_cat_avatar_for_identity(spec, &identity).is_err());
-        assert!(
-            super::render_cat_avatar_for_identity_with_background(
-                spec,
-                &identity,
-                AvatarBackground::Themed,
-            )
-            .is_err()
-        );
-    }
-
-    #[test]
     fn hashed_cat_avatar_is_deterministic_for_same_id() {
-        let spec = AvatarSpec::new(192, 192, 0);
+        let spec = valid_spec(192, 192, 0);
         let left = render_cat_avatar_for_identity(spec, &AvatarIdentity::new("alice@example.com"));
         let right = render_cat_avatar_for_identity(spec, &AvatarIdentity::new("alice@example.com"));
 
@@ -6110,7 +6058,7 @@ mod tests {
 
     #[test]
     fn hashed_cat_avatar_changes_for_different_ids() {
-        let spec = AvatarSpec::new(192, 192, 0);
+        let spec = valid_spec(192, 192, 0);
         let left = render_cat_avatar_for_identity(spec, &AvatarIdentity::new("alice@example.com"));
         let right = render_cat_avatar_for_identity(spec, &AvatarIdentity::new("bob@example.com"));
 
@@ -6119,7 +6067,7 @@ mod tests {
 
     #[test]
     fn cat_avatar_webp_export_round_trips() {
-        let bytes = encode_cat_avatar(AvatarSpec::new(128, 128, 11), AvatarOutputFormat::WebP)
+        let bytes = encode_cat_avatar(valid_spec(128, 128, 11), AvatarOutputFormat::WebP)
             .expect("webp encoding should succeed");
         let decoded = image::load_from_memory_with_format(&bytes, ImageFormat::WebP)
             .expect("webp should decode");
@@ -6130,7 +6078,7 @@ mod tests {
 
     #[test]
     fn cat_avatar_png_export_round_trips() {
-        let bytes = encode_cat_avatar(AvatarSpec::new(96, 96, 99), AvatarOutputFormat::Png)
+        let bytes = encode_cat_avatar(valid_spec(96, 96, 99), AvatarOutputFormat::Png)
             .expect("png encoding should succeed");
         let decoded = image::load_from_memory_with_format(&bytes, ImageFormat::Png)
             .expect("png should decode");
@@ -6141,7 +6089,7 @@ mod tests {
 
     #[test]
     fn cat_avatar_jpeg_export_round_trips() {
-        let bytes = encode_cat_avatar(AvatarSpec::new(96, 96, 99), AvatarOutputFormat::Jpeg)
+        let bytes = encode_cat_avatar(valid_spec(96, 96, 99), AvatarOutputFormat::Jpeg)
             .expect("jpeg encoding should succeed");
         let decoded = image::load_from_memory_with_format(&bytes, ImageFormat::Jpeg)
             .expect("jpeg should decode");
@@ -6152,7 +6100,7 @@ mod tests {
 
     #[test]
     fn cat_avatar_gif_export_round_trips() {
-        let bytes = encode_cat_avatar(AvatarSpec::new(96, 96, 99), AvatarOutputFormat::Gif)
+        let bytes = encode_cat_avatar(valid_spec(96, 96, 99), AvatarOutputFormat::Gif)
             .expect("gif encoding should succeed");
         let decoded = image::load_from_memory_with_format(&bytes, ImageFormat::Gif)
             .expect("gif should decode");
@@ -6164,7 +6112,7 @@ mod tests {
     #[test]
     fn jpeg_export_flattens_transparency_over_white() {
         let bytes = encode_avatar_for_id(
-            AvatarSpec::new(96, 96, 0),
+            valid_spec(96, 96, 0),
             "cat@hashavatar.app",
             AvatarOutputFormat::Jpeg,
             AvatarOptions::new(AvatarKind::Cat, AvatarBackground::Transparent),
@@ -6186,7 +6134,7 @@ mod tests {
     #[test]
     fn hashed_cat_avatar_webp_export_round_trips() {
         let bytes = encode_cat_avatar_for_id(
-            AvatarSpec::new(128, 128, 0),
+            valid_spec(128, 128, 0),
             "alice@example.com",
             AvatarOutputFormat::WebP,
         )
@@ -6201,7 +6149,7 @@ mod tests {
     #[test]
     fn white_background_mode_renders_white_corner() {
         let image = render_cat_avatar_for_identity_with_background(
-            AvatarSpec::new(128, 128, 0),
+            valid_spec(128, 128, 0),
             &AvatarIdentity::new("alice@example.com"),
             AvatarBackground::White,
         );
@@ -6217,7 +6165,7 @@ mod tests {
             (AvatarBackground::Light, Rgba([248, 250, 247, 255])),
         ] {
             let image = render_cat_avatar_for_identity_with_background(
-                AvatarSpec::new(128, 128, 0),
+                valid_spec(128, 128, 0),
                 &AvatarIdentity::new("cat@hashavatar.app"),
                 background,
             );
@@ -6229,7 +6177,7 @@ mod tests {
     #[test]
     fn transparent_background_mode_renders_clear_corner() {
         let image = render_cat_avatar_for_identity_with_background(
-            AvatarSpec::new(128, 128, 0),
+            valid_spec(128, 128, 0),
             &AvatarIdentity::new("cat@hashavatar.app"),
             AvatarBackground::Transparent,
         );
@@ -6239,7 +6187,7 @@ mod tests {
 
     #[test]
     fn dog_and_robot_variants_generate_distinct_images() {
-        let spec = AvatarSpec::new(128, 128, 0);
+        let spec = valid_spec(128, 128, 0);
         let id = AvatarIdentity::new("alice@example.com");
         let dog = render_dog_avatar_for_identity(spec, &id, AvatarBackground::Themed);
         let robot = render_robot_avatar_for_identity(spec, &id, AvatarBackground::Themed);
@@ -6249,7 +6197,7 @@ mod tests {
 
     #[test]
     fn monster_variant_is_distinct_from_alien() {
-        let spec = AvatarSpec::new(128, 128, 0);
+        let spec = valid_spec(128, 128, 0);
         let id = AvatarIdentity::new("alice@example.com");
         let alien = render_alien_avatar_for_identity(spec, &id, AvatarBackground::Themed);
         let monster = render_monster_avatar_for_identity(spec, &id, AvatarBackground::Themed);
@@ -6259,7 +6207,7 @@ mod tests {
 
     #[test]
     fn paws_variant_is_distinct_from_cat() {
-        let spec = AvatarSpec::new(128, 128, 0);
+        let spec = valid_spec(128, 128, 0);
         let id = AvatarIdentity::new("alice@example.com");
         let cat =
             render_cat_avatar_for_identity_with_background(spec, &id, AvatarBackground::Themed);
@@ -6271,7 +6219,7 @@ mod tests {
     #[test]
     fn generic_avatar_encoder_supports_robot_and_white_background() {
         let bytes = encode_avatar_for_id(
-            AvatarSpec::new(96, 96, 0),
+            valid_spec(96, 96, 0),
             "robot@example.com",
             AvatarOutputFormat::WebP,
             AvatarOptions {
@@ -6290,7 +6238,7 @@ mod tests {
     #[test]
     fn svg_export_contains_svg_root_and_kind_label() {
         let svg = render_avatar_svg_for_id(
-            AvatarSpec::new(128, 128, 0),
+            valid_spec(128, 128, 0),
             "vector@example.com",
             AvatarOptions::new(AvatarKind::Fox, AvatarBackground::White),
         );
@@ -6302,7 +6250,7 @@ mod tests {
     #[test]
     fn svg_output_is_minimal_and_safe() {
         let svg = render_avatar_svg_for_id(
-            AvatarSpec::new(256, 256, 0),
+            valid_spec(256, 256, 0),
             "ghost@example.com",
             AvatarOptions::new(AvatarKind::Ghost, AvatarBackground::Themed),
         );
@@ -6315,7 +6263,7 @@ mod tests {
     #[test]
     fn transparent_svg_output_has_no_background_rect() {
         let svg = render_avatar_svg_for_id(
-            AvatarSpec::new(128, 128, 0),
+            valid_spec(128, 128, 0),
             "cat@hashavatar.app",
             AvatarOptions::new(AvatarKind::Cat, AvatarBackground::Transparent),
         );
@@ -6327,7 +6275,7 @@ mod tests {
     #[test]
     fn dark_svg_output_has_background_rect() {
         let svg = render_avatar_svg_for_id(
-            AvatarSpec::new(128, 128, 0),
+            valid_spec(128, 128, 0),
             "cat@hashavatar.app",
             AvatarOptions::new(AvatarKind::Cat, AvatarBackground::Dark),
         );
@@ -6356,10 +6304,16 @@ mod tests {
 
     #[test]
     fn avatar_spec_validation_rejects_resource_extremes() {
-        assert!(AvatarSpec::new(MIN_AVATAR_DIMENSION, MIN_AVATAR_DIMENSION, 0).is_supported());
-        assert!(AvatarSpec::new(MAX_AVATAR_DIMENSION, MAX_AVATAR_DIMENSION, 0).is_supported());
-        assert!(!AvatarSpec::new(MIN_AVATAR_DIMENSION - 1, 256, 0).is_supported());
-        assert!(!AvatarSpec::new(256, MAX_AVATAR_DIMENSION + 1, 0).is_supported());
+        assert!(AvatarSpec::new(MIN_AVATAR_DIMENSION, MIN_AVATAR_DIMENSION, 0).is_ok());
+        assert!(AvatarSpec::new(MAX_AVATAR_DIMENSION, MAX_AVATAR_DIMENSION, 0).is_ok());
+
+        let too_small = AvatarSpec::new(MIN_AVATAR_DIMENSION - 1, 256, 0)
+            .expect_err("undersized width should be rejected");
+        let too_large = AvatarSpec::new(256, MAX_AVATAR_DIMENSION + 1, 0)
+            .expect_err("oversized height should be rejected");
+
+        assert_eq!(too_small.width(), MIN_AVATAR_DIMENSION - 1);
+        assert_eq!(too_large.height(), MAX_AVATAR_DIMENSION + 1);
     }
 
     #[test]
@@ -6376,20 +6330,16 @@ mod tests {
     }
 
     #[test]
-    fn encoder_returns_limit_error_for_oversized_specs() {
-        let result = encode_avatar_for_id(
-            AvatarSpec::new(MAX_AVATAR_DIMENSION + 1, 256, 0),
-            "oversized@example.com",
-            AvatarOutputFormat::WebP,
-            AvatarOptions::new(AvatarKind::Cat, AvatarBackground::White),
-        );
+    fn rect_size_builder_clamps_zero_dimensions() {
+        let rect = Rect::at(4, 8).of_size(0, 0);
 
-        assert!(matches!(result, Err(ImageError::Limits(_))));
+        assert_eq!(rect.width(), 1);
+        assert_eq!(rect.height(), 1);
     }
 
     #[test]
     fn render_avatar_for_id_supports_all_avatar_kinds() {
-        let spec = AvatarSpec::new(96, 96, 0);
+        let spec = valid_spec(96, 96, 0);
         for kind in AvatarKind::ALL {
             let image = render_avatar_for_id(
                 spec,
@@ -6403,7 +6353,7 @@ mod tests {
 
     #[test]
     fn render_avatar_svg_for_id_supports_all_avatar_kinds() {
-        let spec = AvatarSpec::new(96, 96, 0);
+        let spec = valid_spec(96, 96, 0);
         for kind in AvatarKind::ALL {
             let svg = render_avatar_svg_for_id(
                 spec,
@@ -6418,7 +6368,7 @@ mod tests {
 
     #[test]
     fn lower_variation_presets_change_for_different_identities() {
-        let spec = AvatarSpec::new(128, 128, 0);
+        let spec = valid_spec(128, 128, 0);
         for kind in [
             AvatarKind::Ghost,
             AvatarKind::Slime,
@@ -6446,7 +6396,7 @@ mod tests {
 
     #[test]
     fn lower_variation_svg_presets_change_for_different_identities() {
-        let spec = AvatarSpec::new(128, 128, 0);
+        let spec = valid_spec(128, 128, 0);
         for kind in [
             AvatarKind::Ghost,
             AvatarKind::Slime,
@@ -6471,11 +6421,8 @@ mod tests {
     #[test]
     fn visual_fingerprints_are_stable() {
         for (label, options) in regression_scenarios() {
-            let image = render_avatar_for_id(
-                AvatarSpec::new(128, 128, 0),
-                "snapshot@example.com",
-                options,
-            );
+            let image =
+                render_avatar_for_id(valid_spec(128, 128, 0), "snapshot@example.com", options);
             let fingerprint = image_fingerprint(&image);
             let expected =
                 regression_fingerprint_for(label).expect("missing golden regression fingerprint");
@@ -6576,11 +6523,8 @@ mod tests {
                 AvatarOptions::new(AvatarKind::Knight, AvatarBackground::Themed),
             ),
         ] {
-            let image = render_avatar_for_id(
-                AvatarSpec::new(128, 128, 0),
-                "snapshot@example.com",
-                options,
-            );
+            let image =
+                render_avatar_for_id(valid_spec(128, 128, 0), "snapshot@example.com", options);
             println!("{label}: {}", image_fingerprint(&image));
         }
     }

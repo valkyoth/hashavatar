@@ -12,7 +12,7 @@ check_file() {
         /^[[:space:]]*\/\/[!\/]/ {
             next
         }
-        /panic!\(|unreachable!\(|\.unwrap\(|\.expect\(/ {
+        /assert!\(|panic!\(|unreachable!\(|\.unwrap\(|\.expect\(/ {
             allowed = 0
             if ($0 ~ /unreachable!\("SVG is handled outside AvatarOutputFormat"\)/) {
                 allowed = 1

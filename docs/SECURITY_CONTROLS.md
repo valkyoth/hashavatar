@@ -5,10 +5,12 @@
 ## Current Controls
 
 - The library uses `#![forbid(unsafe_code)]`.
+- `AvatarSpec` has private fields and validates dimensions at construction.
 - Public raster/SVG dimensions are bounded by `MIN_AVATAR_DIMENSION` and `MAX_AVATAR_DIMENSION`.
 - Image-generation APIs return typed errors for unsupported dimensions before allocating or encoding raster output.
+- The crate exposes in-memory encoding and rendering APIs, but no public filesystem path-writing helpers.
 - Namespace identity hashing length-prefixes every component, so tenant and style-version values cannot collide through embedded separator bytes.
-- Internal rectangle edge helpers use saturating arithmetic.
+- Internal rectangle helpers use saturating or clamping arithmetic.
 - The SVG renderer emits generated shape markup from structured numeric values rather than from caller-provided SVG fragments.
 - Golden fingerprint tests protect deterministic rendering output.
 - The crate package excludes fuzz harnesses and generated build output.

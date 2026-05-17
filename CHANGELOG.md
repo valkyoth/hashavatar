@@ -10,8 +10,10 @@
 - Added fuzz harness coverage for arbitrary avatar identities, families, backgrounds, SVG rendering, and PNG encoding
 - Added release security documentation for dependency policy, panic policy, release gates, and crate security controls
 - Changed public render APIs and `AvatarRenderer::render` to return `Result<_, AvatarSpecError>` for invalid dimensions instead of panicking
+- Changed `AvatarSpec::new` to validate dimensions at construction and made `AvatarSpec` fields private
+- Removed public path-writing export helpers so the crate does not provide filesystem APIs that can be wired to untrusted paths
 - Changed namespace identity hashing to length-prefix tenant, style version, and input components, preventing embedded NUL separator ambiguity
-- Hardened internal rectangle edge arithmetic with saturating operations
+- Hardened internal rectangle arithmetic with saturating and clamping operations
 
 ## 0.5.0
 

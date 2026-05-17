@@ -9,7 +9,7 @@ It is designed as a code-only alternative to asset-pack-based avatar systems: th
 - Deterministic avatars derived from `SHA-512`
 - Multiple avatar families: `cat`, `dog`, `robot`, `fox`, `alien`, `monster`, `ghost`, `slime`, `bird`, `wizard`, `skull`, `paws`, `planet`, `rocket`, `mushroom`, `cactus`, `frog`, `panda`, `cupcake`, `pizza`, `icecream`, `octopus`, `knight`
 - Multiple background modes: `themed`, `white`, `black`, `dark`, `light`, `transparent`
-- Export paths for `WebP`, `PNG`, `JPEG`, `GIF`, and `SVG`
+- In-memory encoding for `WebP`, `PNG`, `JPEG`, `GIF`, plus SVG string rendering
 - Namespace-aware identity hashing for multi-tenant or versioned rollouts
 - Public API suitable for web apps, services, and batch jobs
 - Built-in dimension validation for internet-facing avatar endpoints
@@ -74,14 +74,15 @@ use hashavatar::{
     encode_avatar_for_id,
 };
 
+let spec = AvatarSpec::new(256, 256, 0)?;
 let bytes = encode_avatar_for_id(
-    AvatarSpec::new(256, 256, 0),
+    spec,
     "robot@hashavatar.app",
     AvatarOutputFormat::WebP,
     AvatarOptions::new(AvatarKind::Robot, AvatarBackground::Transparent),
 )?;
 
-# Ok::<(), image::ImageError>(())
+# Ok::<(), Box<dyn std::error::Error>>(())
 ```
 
 This returns encoded image bytes ready to:
@@ -98,14 +99,15 @@ use hashavatar::{
     encode_avatar_for_id,
 };
 
+let spec = AvatarSpec::new(256, 256, 0)?;
 let png = encode_avatar_for_id(
-    AvatarSpec::new(256, 256, 0),
+    spec,
     "dog@hashavatar.app",
     AvatarOutputFormat::Png,
     AvatarOptions::new(AvatarKind::Dog, AvatarBackground::Themed),
 )?;
 
-# Ok::<(), image::ImageError>(())
+# Ok::<(), Box<dyn std::error::Error>>(())
 ```
 
 ### Render To SVG
@@ -115,15 +117,16 @@ use hashavatar::{
     AvatarBackground, AvatarKind, AvatarOptions, AvatarSpec, render_avatar_svg_for_id,
 };
 
+let spec = AvatarSpec::new(256, 256, 0)?;
 let svg = render_avatar_svg_for_id(
-    AvatarSpec::new(256, 256, 0),
+    spec,
     "alien@hashavatar.app",
     AvatarOptions::new(AvatarKind::Alien, AvatarBackground::Transparent),
 )?;
 
 assert!(svg.starts_with("<svg "));
 
-# Ok::<(), hashavatar::AvatarSpecError>(())
+# Ok::<(), Box<dyn std::error::Error>>(())
 ```
 
 This is useful when you want:
@@ -141,8 +144,9 @@ use hashavatar::{
     AvatarBackground, AvatarKind, AvatarOptions, AvatarSpec, render_avatar_for_id,
 };
 
+let spec = AvatarSpec::new(256, 256, 0)?;
 let image = render_avatar_for_id(
-    AvatarSpec::new(256, 256, 0),
+    spec,
     "fox@hashavatar.app",
     AvatarOptions::new(AvatarKind::Fox, AvatarBackground::Themed),
 )?;
@@ -150,7 +154,7 @@ let image = render_avatar_for_id(
 assert_eq!(image.width(), 256);
 assert_eq!(image.height(), 256);
 
-# Ok::<(), hashavatar::AvatarSpecError>(())
+# Ok::<(), Box<dyn std::error::Error>>(())
 ```
 
 ## Recommended Integration Patterns
@@ -172,13 +176,15 @@ use hashavatar::{
     encode_avatar_for_id,
 };
 
-fn generate_avatar_bytes(user_id: &str) -> Result<Vec<u8>, image::ImageError> {
+fn generate_avatar_bytes(user_id: &str) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
+    let spec = AvatarSpec::new(256, 256, 0)?;
     encode_avatar_for_id(
-        AvatarSpec::new(256, 256, 0),
+        spec,
         user_id,
         AvatarOutputFormat::WebP,
         AvatarOptions::new(AvatarKind::Cat, AvatarBackground::Transparent),
     )
+    .map_err(Into::into)
 }
 ```
 
@@ -271,12 +277,11 @@ Use `render_avatar_svg_for_id(...)` when you need vector output.
 
 Important public entry points:
 
-- `AvatarSpec::new(width, height, seed)`
+- `AvatarSpec::new(width, height, seed) -> Result<AvatarSpec, AvatarSpecError>`
 - `AvatarOptions::new(kind, background)`
 - `encode_avatar_for_id(...)`
 - `render_avatar_for_id(...)`
 - `render_avatar_svg_for_id(...)`
-- `export_avatar_svg_for_id(...)`
 
 If you need lower-level control, the crate also exposes identity-specific renderer functions for certain families.
 

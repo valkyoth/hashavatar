@@ -10,7 +10,9 @@
 - Pointed web/API usage to the separate `hashavatar-api` project
 - Added crate-focused security policy checks and release gates
 - Added a fuzz harness for arbitrary avatar identities, families, backgrounds, SVG rendering, and PNG encoding
+- Changed `AvatarSpec::new` to validate dimensions at construction and made spec fields private
 - Changed public render APIs to return `Result<_, AvatarSpecError>` for invalid dimensions instead of panicking
+- Removed public path-writing export helpers; callers should write encoded bytes or SVG strings through their own storage boundary
 - Changed namespace identity hashing to length-prefix components, preventing separator ambiguity from embedded NUL bytes
 
 ## Why This Changed
@@ -19,7 +21,8 @@ The public HTTP API and demo website already live in `hashavatar-api`. Keeping a
 
 ## Compatibility
 
-- This is a breaking API release for callers using direct render functions or custom `AvatarRenderer` implementations. Those APIs now return `Result`.
+- This is a breaking API release for callers constructing `AvatarSpec`, using direct render functions, using custom `AvatarRenderer` implementations, or relying on the removed path-writing export helpers.
+- `AvatarSpec::new(...)` now returns `Result<AvatarSpec, AvatarSpecError>`.
 - Namespace-based identities intentionally produce new deterministic fingerprints because the hash input format was hardened.
 - Existing deterministic fingerprints remain covered by updated golden regression tests.
 - Users embedding the library should only see a smaller dependency graph.
@@ -29,8 +32,10 @@ The public HTTP API and demo website already live in `hashavatar-api`. Keeping a
 ## Security And Quality
 
 - `src/lib.rs` now forbids unsafe code.
+- `AvatarSpec` dimensions are validated before a spec value can be constructed through the public API.
+- The crate no longer writes to caller-provided filesystem paths.
 - Public render APIs reject invalid dimensions without panicking.
 - Namespace identity hashing is no longer delimiter-ambiguous when tenant or style version strings contain embedded NUL bytes.
-- Rectangle edge helpers use saturating arithmetic.
+- Rectangle helpers use saturating and clamping arithmetic.
 - `scripts/checks.sh` now validates release metadata, package contents, dependency scope, unsafe boundaries, reviewed panic-like sites, docs, fuzz harness compilation, dependency licenses, and RustSec advisories.
 - `scripts/stable_release_gate.sh` adds publish dry-run, reproducibility, and optional SBOM generation for release validation.
