@@ -6,12 +6,14 @@ The crate starts conservative: validated avatar dimensions, bounded identity inp
 
 ## Current Status
 
-The current development version is `0.6.0`.
+The current development version is `0.7.0`.
 
 Implemented now:
 
 - Pure library crate; no bundled demo server and no CLI binary.
-- Deterministic avatars derived from SHA-512 identity hashes.
+- Deterministic avatars derived from SHA-512 identity hashes by default.
+- Optional BLAKE3 and XXH3-128 identity derivation behind explicit Cargo
+  features.
 - Namespace-aware identity derivation for tenant isolation and visual rollouts.
 - Length-prefixed hash components to avoid delimiter ambiguity.
 - Avatar families: `cat`, `dog`, `robot`, `fox`, `alien`, `monster`, `ghost`, `slime`, `bird`, `wizard`, `skull`, `paws`, `planet`, `rocket`, `mushroom`, `cactus`, `frog`, `panda`, `cupcake`, `pizza`, `icecream`, `octopus`, and `knight`.
@@ -39,13 +41,13 @@ Planned or intentionally external:
 | License | `MIT OR Apache-2.0` |
 | MSRV | Rust `1.95.0` |
 | Crate shape | Library only |
-| Runtime dependencies | `image`, `palette`, `rand`, `sha2` |
+| Runtime dependencies | `image`, `palette`, `rand`, `sha2`; optional `blake3`, `xxhash-rust` |
 | Unsafe policy | `#![forbid(unsafe_code)]` |
 | Filesystem policy | No public path-writing APIs |
 | Dimension limits | `64..=2048` pixels per side |
 | Identity limits | 1024 bytes per identity input |
 | Namespace limits | 128 bytes per tenant/style-version component |
-| Hashing posture | SHA-512 with length-prefixed domain, namespace, style, and identity components |
+| Hashing posture | SHA-512 default with length-prefixed domain, namespace, style, and identity components; optional BLAKE3 and non-cryptographic XXH3-128 |
 | SVG posture | Generated numeric markup only; caller input is not inserted into SVG fragments |
 | Release evidence | fmt, clippy, tests, docs, deny, audit, fuzz harness compile, package check, SBOM, reproducibility |
 
@@ -59,7 +61,14 @@ possible `no_std + alloc` core lives in
 
 ```toml
 [dependencies]
-hashavatar = "0.6.0"
+hashavatar = "0.7.0"
+```
+
+Optional identity hash algorithms are disabled by default:
+
+```toml
+[dependencies]
+hashavatar = { version = "0.7.0", features = ["blake3", "xxh3"] }
 ```
 
 For a local checkout:
@@ -158,6 +167,39 @@ assert!(!bytes.is_empty());
 
 Use namespaces when the same user identifier must not collide visually across tenants, products, or style-version rollouts.
 
+## Example: Optional Hash Algorithm
+
+```rust
+use hashavatar::{
+    AvatarBackground, AvatarHashAlgorithm, AvatarIdentityOptions, AvatarKind,
+    AvatarNamespace, AvatarOptions, AvatarSpec, render_avatar_with_identity_options,
+};
+
+let namespace = AvatarNamespace::new("customer-a", "v3")?;
+let identity_options = AvatarIdentityOptions::new(
+    namespace,
+    AvatarHashAlgorithm::Sha512,
+);
+let spec = AvatarSpec::new(128, 128, 0)?;
+
+let image = render_avatar_with_identity_options(
+    spec,
+    identity_options,
+    "user-123",
+    AvatarOptions::new(AvatarKind::Robot, AvatarBackground::Themed),
+)?;
+
+assert_eq!(image.width(), 128);
+
+# Ok::<(), Box<dyn std::error::Error>>(())
+```
+
+`AvatarHashAlgorithm::Sha512` is always available and preserves the default
+stable identity behavior. `AvatarHashAlgorithm::Blake3` is available with the
+`blake3` feature. `AvatarHashAlgorithm::Xxh3_128` is available with the `xxh3`
+feature and is non-cryptographic; use it only for non-adversarial identity
+distribution.
+
 ## Example: Raw Image Buffer
 
 ```rust
@@ -205,14 +247,18 @@ Important public entry points:
 
 - `AvatarSpec::new(width, height, seed) -> Result<AvatarSpec, AvatarSpecError>`
 - `AvatarIdentity::new(input) -> Result<AvatarIdentity, AvatarIdentityError>`
+- `AvatarIdentity::new_with_options(options, input) -> Result<AvatarIdentity, AvatarIdentityError>`
+- `AvatarIdentityOptions::new(namespace, algorithm)`
 - `AvatarNamespace::new(tenant, style_version) -> Result<AvatarNamespace, AvatarIdentityError>`
 - `AvatarOptions::new(kind, background)`
 - `encode_avatar_for_id(...)`
 - `encode_avatar_for_namespace(...)`
 - `render_avatar_for_id(...)`
 - `render_avatar_for_namespace(...)`
+- `render_avatar_with_identity_options(...)`
 - `render_avatar_svg_for_id(...)`
 - `render_avatar_svg_for_namespace(...)`
+- `render_avatar_svg_with_identity_options(...)`
 
 Lower-level identity-specific renderers are available for callers that want direct control over a specific avatar family.
 
@@ -233,10 +279,10 @@ AVIF and JPEG XL are not exposed because they add dependency or encoder maturity
 The output is deterministic for the tuple:
 
 ```text
-namespace tenant + namespace style version + identity bytes + avatar kind + background + dimensions + seed
+identity hash algorithm + namespace tenant + namespace style version + identity bytes + avatar kind + background + dimensions + seed
 ```
 
-This makes the crate suitable for stable CDN-backed avatar URLs and golden regression tests. Namespace hashing uses length-prefixed components, so embedded separator bytes cannot create tenant/style-version ambiguity.
+This makes the crate suitable for stable CDN-backed avatar URLs and golden regression tests. Namespace hashing uses length-prefixed components, so embedded separator bytes cannot create tenant/style-version ambiguity. The default SHA-512 path keeps the pre-0.7 identity preimage stable; non-default algorithms are domain-separated.
 
 ## Testing And Release Evidence
 

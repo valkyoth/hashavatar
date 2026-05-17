@@ -5,7 +5,7 @@ metadata="$(
     cargo metadata --no-deps --format-version 1
 )"
 
-for dependency in image palette rand sha2; do
+for dependency in blake3 image palette rand sha2 xxhash-rust; do
     case "$metadata" in
         *'"name":"'"$dependency"'"'*)
             ;;

@@ -68,6 +68,11 @@ pub const MAX_AVATAR_ID_BYTES: usize = 1024;
 /// Largest supported namespace component in bytes.
 pub const MAX_AVATAR_NAMESPACE_COMPONENT_BYTES: usize = 128;
 
+const HASH_DOMAIN: &[u8] = b"hashavatar";
+const HASH_DOMAIN_ALGORITHM_COMPONENT: &[u8] = b"identity-hash";
+#[cfg(feature = "xxh3")]
+const HASH_XOF_CHUNK_COMPONENT: &[u8] = b"digest-chunk";
+
 /// RGBA color helper for concise shape drawing.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct Color(pub [u8; 4]);
@@ -814,7 +819,106 @@ impl std::error::Error for AvatarRenderError {
     }
 }
 
-/// A stable avatar identity derived from a SHA-512 digest.
+/// Identity hash algorithm used to derive an avatar genome.
+///
+/// SHA-512 is always available and remains the default. Additional algorithms
+/// are available only when their Cargo features are enabled.
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub enum AvatarHashAlgorithm {
+    #[default]
+    Sha512,
+    #[cfg(feature = "blake3")]
+    Blake3,
+    #[cfg(feature = "xxh3")]
+    Xxh3_128,
+}
+
+impl AvatarHashAlgorithm {
+    #[cfg(all(feature = "blake3", feature = "xxh3"))]
+    pub const ALL: [Self; 3] = [Self::Sha512, Self::Blake3, Self::Xxh3_128];
+
+    #[cfg(all(feature = "blake3", not(feature = "xxh3")))]
+    pub const ALL: [Self; 2] = [Self::Sha512, Self::Blake3];
+
+    #[cfg(all(not(feature = "blake3"), feature = "xxh3"))]
+    pub const ALL: [Self; 2] = [Self::Sha512, Self::Xxh3_128];
+
+    #[cfg(all(not(feature = "blake3"), not(feature = "xxh3")))]
+    pub const ALL: [Self; 1] = [Self::Sha512];
+
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Sha512 => "sha512",
+            #[cfg(feature = "blake3")]
+            Self::Blake3 => "blake3",
+            #[cfg(feature = "xxh3")]
+            Self::Xxh3_128 => "xxh3-128",
+        }
+    }
+
+    const fn domain_label(self) -> &'static [u8] {
+        match self {
+            Self::Sha512 => b"sha512",
+            #[cfg(feature = "blake3")]
+            Self::Blake3 => b"blake3",
+            #[cfg(feature = "xxh3")]
+            Self::Xxh3_128 => b"xxh3-128",
+        }
+    }
+}
+
+impl FromStr for AvatarHashAlgorithm {
+    type Err = &'static str;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s.trim().to_ascii_lowercase().as_str() {
+            "sha512" | "sha-512" => Ok(Self::Sha512),
+            #[cfg(feature = "blake3")]
+            "blake3" => Ok(Self::Blake3),
+            #[cfg(feature = "xxh3")]
+            "xxh3" | "xxh3-128" | "xxh3_128" => Ok(Self::Xxh3_128),
+            _ => Err("unsupported avatar hash algorithm"),
+        }
+    }
+}
+
+impl std::fmt::Display for AvatarHashAlgorithm {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(self.as_str())
+    }
+}
+
+/// Options for deriving a stable avatar identity.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct AvatarIdentityOptions<'a> {
+    namespace: AvatarNamespace<'a>,
+    algorithm: AvatarHashAlgorithm,
+}
+
+impl<'a> AvatarIdentityOptions<'a> {
+    pub const fn new(namespace: AvatarNamespace<'a>, algorithm: AvatarHashAlgorithm) -> Self {
+        Self {
+            namespace,
+            algorithm,
+        }
+    }
+
+    pub const fn namespace(self) -> AvatarNamespace<'a> {
+        self.namespace
+    }
+
+    pub const fn algorithm(self) -> AvatarHashAlgorithm {
+        self.algorithm
+    }
+}
+
+impl Default for AvatarIdentityOptions<'static> {
+    fn default() -> Self {
+        Self::new(AvatarNamespace::DEFAULT, AvatarHashAlgorithm::Sha512)
+    }
+}
+
+/// A stable avatar identity derived from a fixed 64-byte digest.
 ///
 /// This is intended for Robohash-style uniqueness: the same input always maps
 /// to the same visual genome, while different inputs produce different shape
@@ -833,6 +937,16 @@ impl AvatarIdentity {
         namespace: AvatarNamespace<'_>,
         input: T,
     ) -> Result<Self, AvatarIdentityError> {
+        Self::new_with_options(
+            AvatarIdentityOptions::new(namespace, AvatarHashAlgorithm::Sha512),
+            input,
+        )
+    }
+
+    pub fn new_with_options<T: AsRef<[u8]>>(
+        options: AvatarIdentityOptions<'_>,
+        input: T,
+    ) -> Result<Self, AvatarIdentityError> {
         let input = input.as_ref();
         validate_identity_component(
             AvatarIdentityComponent::Input,
@@ -841,25 +955,21 @@ impl AvatarIdentity {
         )?;
         validate_identity_component(
             AvatarIdentityComponent::Tenant,
-            namespace.tenant.len(),
+            options.namespace.tenant.len(),
             MAX_AVATAR_NAMESPACE_COMPONENT_BYTES,
         )?;
         validate_identity_component(
             AvatarIdentityComponent::StyleVersion,
-            namespace.style_version.len(),
+            options.namespace.style_version.len(),
             MAX_AVATAR_NAMESPACE_COMPONENT_BYTES,
         )?;
-        Ok(Self::new_unchecked(namespace, input))
+        Ok(Self::new_unchecked(options, input))
     }
 
-    fn new_unchecked(namespace: AvatarNamespace<'_>, input: &[u8]) -> Self {
-        let mut hasher = Sha512::new();
-        update_hash_component(&mut hasher, b"hashavatar");
-        update_hash_component(&mut hasher, namespace.tenant.as_bytes());
-        update_hash_component(&mut hasher, namespace.style_version.as_bytes());
-        update_hash_component(&mut hasher, input);
-        let digest: [u8; 64] = hasher.finalize().into();
-        Self { digest }
+    fn new_unchecked(options: AvatarIdentityOptions<'_>, input: &[u8]) -> Self {
+        Self {
+            digest: derive_identity_digest(options, input),
+        }
     }
 
     pub const fn as_digest(&self) -> &[u8; 64] {
@@ -897,9 +1007,84 @@ fn validate_identity_component(
     }
 }
 
-fn update_hash_component(hasher: &mut Sha512, bytes: &[u8]) {
-    hasher.update((bytes.len() as u64).to_le_bytes());
-    hasher.update(bytes);
+fn derive_identity_digest(options: AvatarIdentityOptions<'_>, input: &[u8]) -> [u8; 64] {
+    let preimage = identity_hash_preimage(options, input);
+    match options.algorithm {
+        AvatarHashAlgorithm::Sha512 => sha512_digest(&preimage),
+        #[cfg(feature = "blake3")]
+        AvatarHashAlgorithm::Blake3 => blake3_digest(&preimage),
+        #[cfg(feature = "xxh3")]
+        AvatarHashAlgorithm::Xxh3_128 => xxh3_128_digest(&preimage),
+    }
+}
+
+fn identity_hash_preimage(options: AvatarIdentityOptions<'_>, input: &[u8]) -> Vec<u8> {
+    let algorithm_overhead = if options.algorithm == AvatarHashAlgorithm::Sha512 {
+        0
+    } else {
+        length_prefixed_component_size(HASH_DOMAIN_ALGORITHM_COMPONENT)
+            + length_prefixed_component_size(options.algorithm.domain_label())
+    };
+    let mut preimage = Vec::with_capacity(
+        length_prefixed_component_size(HASH_DOMAIN)
+            + algorithm_overhead
+            + length_prefixed_component_size(options.namespace.tenant.as_bytes())
+            + length_prefixed_component_size(options.namespace.style_version.as_bytes())
+            + length_prefixed_component_size(input),
+    );
+
+    update_hash_input_component(&mut preimage, HASH_DOMAIN);
+    if options.algorithm != AvatarHashAlgorithm::Sha512 {
+        update_hash_input_component(&mut preimage, HASH_DOMAIN_ALGORITHM_COMPONENT);
+        update_hash_input_component(&mut preimage, options.algorithm.domain_label());
+    }
+    update_hash_input_component(&mut preimage, options.namespace.tenant.as_bytes());
+    update_hash_input_component(&mut preimage, options.namespace.style_version.as_bytes());
+    update_hash_input_component(&mut preimage, input);
+    preimage
+}
+
+const fn length_prefixed_component_size(bytes: &[u8]) -> usize {
+    std::mem::size_of::<u64>() + bytes.len()
+}
+
+fn update_hash_input_component(preimage: &mut Vec<u8>, bytes: &[u8]) {
+    preimage.extend_from_slice(&(bytes.len() as u64).to_le_bytes());
+    preimage.extend_from_slice(bytes);
+}
+
+fn sha512_digest(preimage: &[u8]) -> [u8; 64] {
+    let mut hasher = Sha512::new();
+    hasher.update(preimage);
+    hasher.finalize().into()
+}
+
+#[cfg(feature = "blake3")]
+fn blake3_digest(preimage: &[u8]) -> [u8; 64] {
+    let mut hasher = blake3::Hasher::new();
+    hasher.update(preimage);
+    let mut digest = [0u8; 64];
+    hasher.finalize_xof().fill(&mut digest);
+    digest
+}
+
+#[cfg(feature = "xxh3")]
+fn xxh3_128_digest(preimage: &[u8]) -> [u8; 64] {
+    let mut digest = [0u8; 64];
+    for chunk in 0..4 {
+        let mut chunk_input = Vec::with_capacity(
+            preimage.len()
+                + length_prefixed_component_size(HASH_XOF_CHUNK_COMPONENT)
+                + length_prefixed_component_size(&[chunk as u8]),
+        );
+        chunk_input.extend_from_slice(preimage);
+        update_hash_input_component(&mut chunk_input, HASH_XOF_CHUNK_COMPONENT);
+        update_hash_input_component(&mut chunk_input, &[chunk as u8]);
+        let chunk_digest = xxhash_rust::xxh3::xxh3_128(&chunk_input).to_le_bytes();
+        let offset = chunk * chunk_digest.len();
+        digest[offset..offset + chunk_digest.len()].copy_from_slice(&chunk_digest);
+    }
+    digest
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -909,6 +1094,11 @@ pub struct AvatarNamespace<'a> {
 }
 
 impl<'a> AvatarNamespace<'a> {
+    pub const DEFAULT: Self = Self {
+        tenant: "public",
+        style_version: "v2",
+    };
+
     pub fn new(tenant: &'a str, style_version: &'a str) -> Result<Self, AvatarIdentityError> {
         validate_identity_component(
             AvatarIdentityComponent::Tenant,
@@ -937,10 +1127,7 @@ impl<'a> AvatarNamespace<'a> {
 
 impl Default for AvatarNamespace<'_> {
     fn default() -> Self {
-        Self {
-            tenant: "public",
-            style_version: "v2",
-        }
+        Self::DEFAULT
     }
 }
 
@@ -1239,7 +1426,7 @@ impl AvatarRenderer for CatAvatar {
     }
 }
 
-/// Cat-face avatar renderer driven by a SHA-512 identity.
+/// Cat-face avatar renderer driven by a stable identity digest.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct HashedCatAvatar {
     identity: AvatarIdentity,
@@ -1256,6 +1443,15 @@ impl HashedCatAvatar {
     ) -> Result<Self, AvatarIdentityError> {
         Ok(Self {
             identity: AvatarIdentity::new_with_namespace(namespace, input)?,
+        })
+    }
+
+    pub fn new_with_identity_options<T: AsRef<[u8]>>(
+        options: AvatarIdentityOptions<'_>,
+        input: T,
+    ) -> Result<Self, AvatarIdentityError> {
+        Ok(Self {
+            identity: AvatarIdentity::new_with_options(options, input)?,
         })
     }
 
@@ -1294,6 +1490,17 @@ impl HashedDogAvatar {
             background,
         })
     }
+
+    pub fn new_with_identity_options<T: AsRef<[u8]>>(
+        options: AvatarIdentityOptions<'_>,
+        input: T,
+        background: AvatarBackground,
+    ) -> Result<Self, AvatarIdentityError> {
+        Ok(Self {
+            identity: AvatarIdentity::new_with_options(options, input)?,
+            background,
+        })
+    }
 }
 
 impl AvatarRenderer for HashedDogAvatar {
@@ -1323,6 +1530,17 @@ impl HashedRobotAvatar {
     ) -> Result<Self, AvatarIdentityError> {
         Ok(Self {
             identity: AvatarIdentity::new_with_namespace(namespace, input)?,
+            background,
+        })
+    }
+
+    pub fn new_with_identity_options<T: AsRef<[u8]>>(
+        options: AvatarIdentityOptions<'_>,
+        input: T,
+        background: AvatarBackground,
+    ) -> Result<Self, AvatarIdentityError> {
+        Ok(Self {
+            identity: AvatarIdentity::new_with_options(options, input)?,
             background,
         })
     }
@@ -1378,7 +1596,23 @@ pub fn encode_avatar_for_namespace<T: AsRef<[u8]>>(
     format: AvatarOutputFormat,
     options: AvatarOptions,
 ) -> ImageResult<Vec<u8>> {
-    let image = render_avatar_for_namespace(spec, namespace, id, options)
+    encode_avatar_with_identity_options(
+        spec,
+        AvatarIdentityOptions::new(namespace, AvatarHashAlgorithm::Sha512),
+        id,
+        format,
+        options,
+    )
+}
+
+pub fn encode_avatar_with_identity_options<T: AsRef<[u8]>>(
+    spec: AvatarSpec,
+    identity_options: AvatarIdentityOptions<'_>,
+    id: T,
+    format: AvatarOutputFormat,
+    options: AvatarOptions,
+) -> ImageResult<Vec<u8>> {
+    let image = render_avatar_with_identity_options(spec, identity_options, id, options)
         .map_err(avatar_render_error_to_image_error)?;
     encode_rgba_image(&image, format)
 }
@@ -1398,8 +1632,22 @@ pub fn render_avatar_for_namespace<T: AsRef<[u8]>>(
     id: T,
     options: AvatarOptions,
 ) -> Result<RgbaImage, AvatarRenderError> {
+    render_avatar_with_identity_options(
+        spec,
+        AvatarIdentityOptions::new(namespace, AvatarHashAlgorithm::Sha512),
+        id,
+        options,
+    )
+}
+
+pub fn render_avatar_with_identity_options<T: AsRef<[u8]>>(
+    spec: AvatarSpec,
+    identity_options: AvatarIdentityOptions<'_>,
+    id: T,
+    options: AvatarOptions,
+) -> Result<RgbaImage, AvatarRenderError> {
     spec.validate()?;
-    let identity = AvatarIdentity::new_with_namespace(namespace, id)?;
+    let identity = AvatarIdentity::new_with_options(identity_options, id)?;
     let image = match options.kind {
         AvatarKind::Cat => {
             render_cat_avatar_for_identity_with_background(spec, &identity, options.background)
@@ -1465,8 +1713,22 @@ pub fn render_avatar_svg_for_namespace<T: AsRef<[u8]>>(
     id: T,
     options: AvatarOptions,
 ) -> Result<String, AvatarRenderError> {
+    render_avatar_svg_with_identity_options(
+        spec,
+        AvatarIdentityOptions::new(namespace, AvatarHashAlgorithm::Sha512),
+        id,
+        options,
+    )
+}
+
+pub fn render_avatar_svg_with_identity_options<T: AsRef<[u8]>>(
+    spec: AvatarSpec,
+    identity_options: AvatarIdentityOptions<'_>,
+    id: T,
+    options: AvatarOptions,
+) -> Result<String, AvatarRenderError> {
     spec.validate()?;
-    let identity = AvatarIdentity::new_with_namespace(namespace, id)?;
+    let identity = AvatarIdentity::new_with_options(identity_options, id)?;
     let bg = match options.background {
         AvatarBackground::Themed => match options.kind {
             AvatarKind::Cat => hsl_to_color(28.0 + identity.unit_f32(2) * 40.0, 0.25, 0.92),
@@ -1556,7 +1818,7 @@ pub fn render_avatar_svg_for_namespace<T: AsRef<[u8]>>(
 pub fn render_cat_avatar(spec: AvatarSpec) -> Result<RgbaImage, AvatarSpecError> {
     spec.validate()?;
     let seed = spec.seed.to_le_bytes();
-    let identity = AvatarIdentity::new_unchecked(AvatarNamespace::default(), &seed);
+    let identity = AvatarIdentity::new_unchecked(AvatarIdentityOptions::default(), &seed);
     Ok(render_cat_avatar_with_identity(
         spec,
         &identity,
@@ -1564,7 +1826,7 @@ pub fn render_cat_avatar(spec: AvatarSpec) -> Result<RgbaImage, AvatarSpecError>
     ))
 }
 
-/// Render a cat face avatar from a SHA-512-backed identity.
+/// Render a cat face avatar from a stable identity digest.
 pub fn render_cat_avatar_for_identity(
     spec: AvatarSpec,
     identity: &AvatarIdentity,
@@ -6218,6 +6480,104 @@ mod tests {
 
         assert_eq!(identity.as_digest().len(), 64);
         assert_ne!(identity.seed(), 0);
+    }
+
+    #[test]
+    fn default_identity_options_match_sha512_namespace_constructor() {
+        let namespace = valid_namespace("tenant-a", "v2");
+        let default = AvatarIdentity::new_with_namespace(namespace, "alice@example.com")
+            .expect("sha512 identity should be valid");
+        let explicit = AvatarIdentity::new_with_options(
+            AvatarIdentityOptions::new(namespace, AvatarHashAlgorithm::Sha512),
+            "alice@example.com",
+        )
+        .expect("explicit sha512 identity should be valid");
+
+        assert_eq!(default.as_digest(), explicit.as_digest());
+    }
+
+    #[test]
+    fn hash_algorithm_parser_round_trips_enabled_algorithms() {
+        for algorithm in AvatarHashAlgorithm::ALL {
+            assert_eq!(
+                algorithm.as_str().parse::<AvatarHashAlgorithm>().ok(),
+                Some(algorithm)
+            );
+        }
+    }
+
+    #[test]
+    fn oversized_identity_is_rejected_for_every_enabled_hash_algorithm() {
+        let too_long = vec![b'a'; MAX_AVATAR_ID_BYTES + 1];
+        for algorithm in AvatarHashAlgorithm::ALL {
+            let error = AvatarIdentity::new_with_options(
+                AvatarIdentityOptions::new(AvatarNamespace::default(), algorithm),
+                &too_long,
+            )
+            .expect_err("oversized identity should fail");
+
+            assert_eq!(error.component(), AvatarIdentityComponent::Input);
+            assert_eq!(error.length(), MAX_AVATAR_ID_BYTES + 1);
+            assert_eq!(error.max(), MAX_AVATAR_ID_BYTES);
+        }
+    }
+
+    #[test]
+    fn enabled_hash_algorithms_have_separate_identity_domains() {
+        for left in AvatarHashAlgorithm::ALL {
+            for right in AvatarHashAlgorithm::ALL {
+                if left == right {
+                    continue;
+                }
+
+                let left_identity = AvatarIdentity::new_with_options(
+                    AvatarIdentityOptions::new(AvatarNamespace::default(), left),
+                    "alice@example.com",
+                )
+                .expect("left identity should be valid");
+                let right_identity = AvatarIdentity::new_with_options(
+                    AvatarIdentityOptions::new(AvatarNamespace::default(), right),
+                    "alice@example.com",
+                )
+                .expect("right identity should be valid");
+
+                assert_ne!(
+                    left_identity.as_digest(),
+                    right_identity.as_digest(),
+                    "{left} and {right} must use separate domains"
+                );
+            }
+        }
+    }
+
+    #[cfg(feature = "blake3")]
+    #[test]
+    fn blake3_identity_mode_renders_avatar() {
+        let image = render_avatar_with_identity_options(
+            valid_spec(96, 96, 0),
+            AvatarIdentityOptions::new(AvatarNamespace::default(), AvatarHashAlgorithm::Blake3),
+            "alice@example.com",
+            AvatarOptions::new(AvatarKind::Robot, AvatarBackground::Themed),
+        )
+        .expect("blake3-backed avatar should render");
+
+        assert_eq!(image.width(), 96);
+        assert_eq!(image.height(), 96);
+    }
+
+    #[cfg(feature = "xxh3")]
+    #[test]
+    fn xxh3_identity_mode_renders_avatar() {
+        let image = render_avatar_with_identity_options(
+            valid_spec(96, 96, 0),
+            AvatarIdentityOptions::new(AvatarNamespace::default(), AvatarHashAlgorithm::Xxh3_128),
+            "alice@example.com",
+            AvatarOptions::new(AvatarKind::Robot, AvatarBackground::Themed),
+        )
+        .expect("xxh3-backed avatar should render");
+
+        assert_eq!(image.width(), 96);
+        assert_eq!(image.height(), 96);
     }
 
     #[test]

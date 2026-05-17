@@ -6,6 +6,12 @@
 - `palette` for color conversion
 - `rand` for deterministic seeded variation
 - `sha2` for identity hashing
+- optional `blake3` for BLAKE3 identity hashing when the `blake3` feature is enabled
+- optional `xxhash-rust` for XXH3-128 identity distribution when the `xxh3` feature is enabled
+
+`sha2` remains the default identity dependency. `blake3` and `xxhash-rust` are
+explicit opt-in dependencies so default users keep the smaller conservative
+dependency graph.
 
 The crate must not depend on web frameworks, async runtimes, network clients, or service infrastructure. Those concerns belong in `hashavatar-api`.
 
@@ -32,5 +38,15 @@ Dependency changes should be reviewed for:
   `cargo audit`, `cargo deny check`, and `cargo outdated` when available.
 - New optional dependencies must be justified in README/docs and covered by
   tests for their enabled feature path.
+
+## Optional Hash Dependencies
+
+- `blake3` is admitted for callers that want BLAKE3 identity derivation and
+  dependency-provided SIMD support where the crate and platform provide it.
+- `xxhash-rust` is admitted only for non-cryptographic XXH3-128 identity
+  distribution. Do not present XXH3-128 as an adversarial collision-resistant
+  identity hash.
+- Optional hash dependency features must be tested with `cargo test
+  --all-features` before release.
 
 `scripts/validate-dependencies.sh` enforces the current direct dependency allowlist.

@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.7.0
+
+- Bumped the crate to `0.7.0` development.
+- Added `AvatarHashAlgorithm` and `AvatarIdentityOptions`.
+- Kept SHA-512 as the default identity hash and preserved the existing default identity preimage.
+- Added optional BLAKE3 identity derivation behind the `blake3` Cargo feature.
+- Added optional XXH3-128 identity derivation behind the `xxh3` Cargo feature.
+- Added domain separation for non-default hash algorithms.
+- Added generic render/encode/SVG entry points that accept identity hash options.
+- Added tests for feature-gated hash modes, algorithm separation, parser round-trips, and oversized identity rejection across enabled algorithms.
+- Documented the optional hash algorithms, dependency posture, and the non-cryptographic status of XXH3-128.
+
 ## 0.6.0
 
 - Removed the bundled demo web server from the crate

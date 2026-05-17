@@ -12,6 +12,11 @@
 - Image-generation APIs return typed errors for unsupported dimensions before allocating or encoding raster output.
 - The crate exposes in-memory encoding and rendering APIs, but no public filesystem path-writing helpers.
 - Namespace identity hashing length-prefixes every component, so tenant and style-version values cannot collide through embedded separator bytes.
+- SHA-512 remains the default identity hash. Optional hash algorithms are
+  domain-separated from the default path.
+- BLAKE3 support is available only through the explicit `blake3` feature.
+- XXH3-128 support is available only through the explicit `xxh3` feature and
+  is documented as non-cryptographic.
 - Internal rectangle helpers use saturating or clamping arithmetic.
 - The SVG renderer emits generated shape markup from structured numeric values rather than from caller-provided SVG fragments.
 - Golden fingerprint tests protect deterministic rendering output.
