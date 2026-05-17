@@ -11,8 +11,14 @@ release without letting exploratory work blur into the release criteria.
 - Do not add custom unsafe SIMD code to this crate.
 - Use vetted dependencies for optimized algorithms when they have a clear
   security and maintenance story.
+- Prefer latest compatible stable crate releases; check crates.io, docs.rs,
+  upstream repositories, and RustSec advisories before adding or upgrading
+  dependencies.
 - Keep web/API concerns in `hashavatar-api`; keep this crate focused on
   reusable avatar generation.
+- Treat self-testing as part of implementation, not a follow-up task.
+- Keep GitHub CodeQL on the repository default setup unless there is a
+  documented reason to move to advanced setup.
 - Treat visual-output changes as compatibility events and document them in
   release notes.
 - Derive enum-based choices from a single variant list instead of hard-coded

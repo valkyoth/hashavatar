@@ -17,6 +17,17 @@
 - Golden fingerprint tests protect deterministic rendering output.
 - The crate package excludes fuzz harnesses and generated build output.
 - `scripts/checks.sh` runs formatting, metadata, dependency, unsafe-boundary, panic-policy, tests, `cargo deny`, and `cargo audit`.
+- Dependency additions and upgrades are expected to use current upstream
+  documentation and latest compatible crate releases unless an older version is
+  explicitly justified.
+- GitHub CodeQL should use the repository's default setup. Do not add an
+  advanced CodeQL workflow while default setup is active.
+
+## Testing Standard
+
+Every code change that alters behavior should include focused tests for the new
+logic or a clear explanation for why existing tests cover it. Security changes
+must include regression tests whenever the behavior can be tested locally.
 
 ## Service Boundary
 
