@@ -23,6 +23,8 @@
 //! # Ok::<(), image::ImageError>(())
 //! ```
 
+#![forbid(unsafe_code)]
+
 use std::fs::File;
 use std::io::{BufWriter, Cursor};
 use std::mem::swap;
@@ -114,11 +116,13 @@ impl Rect {
     }
 
     fn right(self) -> i32 {
-        self.left + i32::try_from(self.width).expect("rectangle width should fit i32") - 1
+        let width_offset = self.width.saturating_sub(1).min(i32::MAX as u32) as i32;
+        self.left.saturating_add(width_offset)
     }
 
     fn bottom(self) -> i32 {
-        self.top + i32::try_from(self.height).expect("rectangle height should fit i32") - 1
+        let height_offset = self.height.saturating_sub(1).min(i32::MAX as u32) as i32;
+        self.top.saturating_add(height_offset)
     }
 
     const fn width(self) -> u32 {
@@ -654,18 +658,12 @@ impl std::fmt::Display for AvatarSpecError {
 
 impl std::error::Error for AvatarSpecError {}
 
-fn assert_supported_avatar_spec(spec: AvatarSpec) {
-    spec.validate().expect("unsupported avatar dimensions");
-}
-
 fn validate_image_avatar_spec(spec: AvatarSpec) -> ImageResult<()> {
-    spec.validate()
-        .map_err(|_| ImageError::Limits(LimitError::from_kind(LimitErrorKind::DimensionError)))
+    spec.validate().map_err(avatar_spec_error_to_image_error)
 }
 
-fn validate_io_avatar_spec(spec: AvatarSpec) -> std::io::Result<()> {
-    spec.validate()
-        .map_err(|error| std::io::Error::new(std::io::ErrorKind::InvalidInput, error))
+fn avatar_spec_error_to_image_error(_: AvatarSpecError) -> ImageError {
+    ImageError::Limits(LimitError::from_kind(LimitErrorKind::DimensionError))
 }
 
 /// A stable avatar identity derived from a SHA-512 digest.
@@ -685,13 +683,10 @@ impl AvatarIdentity {
 
     pub fn new_with_namespace<T: AsRef<[u8]>>(namespace: AvatarNamespace<'_>, input: T) -> Self {
         let mut hasher = Sha512::new();
-        hasher.update(b"hashavatar");
-        hasher.update([0]);
-        hasher.update(namespace.tenant.as_bytes());
-        hasher.update([0]);
-        hasher.update(namespace.style_version.as_bytes());
-        hasher.update([0]);
-        hasher.update(input.as_ref());
+        update_hash_component(&mut hasher, b"hashavatar");
+        update_hash_component(&mut hasher, namespace.tenant.as_bytes());
+        update_hash_component(&mut hasher, namespace.style_version.as_bytes());
+        update_hash_component(&mut hasher, input.as_ref());
         let digest: [u8; 64] = hasher.finalize().into();
         Self { digest }
     }
@@ -713,6 +708,11 @@ impl AvatarIdentity {
     fn unit_f32(&self, index: usize) -> f32 {
         self.byte(index) as f32 / 255.0
     }
+}
+
+fn update_hash_component(hasher: &mut Sha512, bytes: &[u8]) {
+    hasher.update((bytes.len() as u64).to_le_bytes());
+    hasher.update(bytes);
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -738,7 +738,7 @@ impl Default for AvatarNamespace<'_> {
 
 /// Trait for renderers that can draw reusable avatar styles onto an image buffer.
 pub trait AvatarRenderer {
-    fn render(&self, spec: AvatarSpec) -> RgbaImage;
+    fn render(&self, spec: AvatarSpec) -> Result<RgbaImage, AvatarSpecError>;
 }
 
 /// Export formats for encoded avatar assets.
@@ -1026,7 +1026,7 @@ impl AvatarOptions {
 pub struct CatAvatar;
 
 impl AvatarRenderer for CatAvatar {
-    fn render(&self, spec: AvatarSpec) -> RgbaImage {
+    fn render(&self, spec: AvatarSpec) -> Result<RgbaImage, AvatarSpecError> {
         render_cat_avatar(spec)
     }
 }
@@ -1054,7 +1054,7 @@ impl HashedCatAvatar {
 }
 
 impl AvatarRenderer for HashedCatAvatar {
-    fn render(&self, spec: AvatarSpec) -> RgbaImage {
+    fn render(&self, spec: AvatarSpec) -> Result<RgbaImage, AvatarSpecError> {
         render_cat_avatar_for_identity(spec, &self.identity)
     }
 }
@@ -1083,7 +1083,7 @@ impl HashedDogAvatar {
 }
 
 impl AvatarRenderer for HashedDogAvatar {
-    fn render(&self, spec: AvatarSpec) -> RgbaImage {
+    fn render(&self, spec: AvatarSpec) -> Result<RgbaImage, AvatarSpecError> {
         render_dog_avatar_for_identity(spec, &self.identity, self.background)
     }
 }
@@ -1112,7 +1112,7 @@ impl HashedRobotAvatar {
 }
 
 impl AvatarRenderer for HashedRobotAvatar {
-    fn render(&self, spec: AvatarSpec) -> RgbaImage {
+    fn render(&self, spec: AvatarSpec) -> Result<RgbaImage, AvatarSpecError> {
         render_robot_avatar_for_identity(spec, &self.identity, self.background)
     }
 }
@@ -1124,7 +1124,9 @@ pub fn encode_avatar<R: AvatarRenderer>(
     format: AvatarOutputFormat,
 ) -> ImageResult<Vec<u8>> {
     validate_image_avatar_spec(spec)?;
-    let image = renderer.render(spec);
+    let image = renderer
+        .render(spec)
+        .map_err(avatar_spec_error_to_image_error)?;
     encode_rgba_image(&image, format)
 }
 
@@ -1136,7 +1138,9 @@ pub fn export_avatar<R: AvatarRenderer, P: AsRef<Path>>(
     path: P,
 ) -> ImageResult<()> {
     validate_image_avatar_spec(spec)?;
-    let image = renderer.render(spec);
+    let image = renderer
+        .render(spec)
+        .map_err(avatar_spec_error_to_image_error)?;
     write_rgba_image(&image, format, path)
 }
 
@@ -1191,103 +1195,9 @@ pub fn encode_avatar_for_namespace<T: AsRef<[u8]>>(
     format: AvatarOutputFormat,
     options: AvatarOptions,
 ) -> ImageResult<Vec<u8>> {
-    validate_image_avatar_spec(spec)?;
-    let identity = AvatarIdentity::new_with_namespace(namespace, id);
-    match options.kind {
-        AvatarKind::Cat => {
-            let image =
-                render_cat_avatar_for_identity_with_background(spec, &identity, options.background);
-            encode_rgba_image(&image, format)
-        }
-        AvatarKind::Dog => encode_rgba_image(
-            &render_dog_avatar_for_identity(spec, &identity, options.background),
-            format,
-        ),
-        AvatarKind::Robot => encode_rgba_image(
-            &render_robot_avatar_for_identity(spec, &identity, options.background),
-            format,
-        ),
-        AvatarKind::Fox => encode_rgba_image(
-            &render_fox_avatar_for_identity(spec, &identity, options.background),
-            format,
-        ),
-        AvatarKind::Alien => encode_rgba_image(
-            &render_alien_avatar_for_identity(spec, &identity, options.background),
-            format,
-        ),
-        AvatarKind::Monster => encode_rgba_image(
-            &render_monster_avatar_for_identity(spec, &identity, options.background),
-            format,
-        ),
-        AvatarKind::Ghost => encode_rgba_image(
-            &render_ghost_avatar_for_identity(spec, &identity, options.background),
-            format,
-        ),
-        AvatarKind::Slime => encode_rgba_image(
-            &render_slime_avatar_for_identity(spec, &identity, options.background),
-            format,
-        ),
-        AvatarKind::Bird => encode_rgba_image(
-            &render_bird_avatar_for_identity(spec, &identity, options.background),
-            format,
-        ),
-        AvatarKind::Wizard => encode_rgba_image(
-            &render_wizard_avatar_for_identity(spec, &identity, options.background),
-            format,
-        ),
-        AvatarKind::Skull => encode_rgba_image(
-            &render_skull_avatar_for_identity(spec, &identity, options.background),
-            format,
-        ),
-        AvatarKind::Paws => encode_rgba_image(
-            &render_paws_avatar_for_identity(spec, &identity, options.background),
-            format,
-        ),
-        AvatarKind::Planet => encode_rgba_image(
-            &render_planet_avatar_for_identity(spec, &identity, options.background),
-            format,
-        ),
-        AvatarKind::Rocket => encode_rgba_image(
-            &render_rocket_avatar_for_identity(spec, &identity, options.background),
-            format,
-        ),
-        AvatarKind::Mushroom => encode_rgba_image(
-            &render_mushroom_avatar_for_identity(spec, &identity, options.background),
-            format,
-        ),
-        AvatarKind::Cactus => encode_rgba_image(
-            &render_cactus_avatar_for_identity(spec, &identity, options.background),
-            format,
-        ),
-        AvatarKind::Frog => encode_rgba_image(
-            &render_frog_avatar_for_identity(spec, &identity, options.background),
-            format,
-        ),
-        AvatarKind::Panda => encode_rgba_image(
-            &render_panda_avatar_for_identity(spec, &identity, options.background),
-            format,
-        ),
-        AvatarKind::Cupcake => encode_rgba_image(
-            &render_cupcake_avatar_for_identity(spec, &identity, options.background),
-            format,
-        ),
-        AvatarKind::Pizza => encode_rgba_image(
-            &render_pizza_avatar_for_identity(spec, &identity, options.background),
-            format,
-        ),
-        AvatarKind::Icecream => encode_rgba_image(
-            &render_icecream_avatar_for_identity(spec, &identity, options.background),
-            format,
-        ),
-        AvatarKind::Octopus => encode_rgba_image(
-            &render_octopus_avatar_for_identity(spec, &identity, options.background),
-            format,
-        ),
-        AvatarKind::Knight => encode_rgba_image(
-            &render_knight_avatar_for_identity(spec, &identity, options.background),
-            format,
-        ),
-    }
+    let image = render_avatar_for_namespace(spec, namespace, id, options)
+        .map_err(avatar_spec_error_to_image_error)?;
+    encode_rgba_image(&image, format)
 }
 
 /// Render an avatar image directly without encoding it.
@@ -1295,7 +1205,7 @@ pub fn render_avatar_for_id<T: AsRef<[u8]>>(
     spec: AvatarSpec,
     id: T,
     options: AvatarOptions,
-) -> RgbaImage {
+) -> Result<RgbaImage, AvatarSpecError> {
     render_avatar_for_namespace(spec, AvatarNamespace::default(), id, options)
 }
 
@@ -1304,8 +1214,8 @@ pub fn render_avatar_for_namespace<T: AsRef<[u8]>>(
     namespace: AvatarNamespace<'_>,
     id: T,
     options: AvatarOptions,
-) -> RgbaImage {
-    assert_supported_avatar_spec(spec);
+) -> Result<RgbaImage, AvatarSpecError> {
+    spec.validate()?;
     let identity = AvatarIdentity::new_with_namespace(namespace, id);
     match options.kind {
         AvatarKind::Cat => {
@@ -1361,7 +1271,7 @@ pub fn render_avatar_svg_for_id<T: AsRef<[u8]>>(
     spec: AvatarSpec,
     id: T,
     options: AvatarOptions,
-) -> String {
+) -> Result<String, AvatarSpecError> {
     render_avatar_svg_for_namespace(spec, AvatarNamespace::default(), id, options)
 }
 
@@ -1370,8 +1280,8 @@ pub fn render_avatar_svg_for_namespace<T: AsRef<[u8]>>(
     namespace: AvatarNamespace<'_>,
     id: T,
     options: AvatarOptions,
-) -> String {
-    assert_supported_avatar_spec(spec);
+) -> Result<String, AvatarSpecError> {
+    spec.validate()?;
     let identity = AvatarIdentity::new_with_namespace(namespace, id);
     let bg = match options.background {
         AvatarBackground::Themed => match options.kind {
@@ -1446,7 +1356,7 @@ pub fn render_avatar_svg_for_namespace<T: AsRef<[u8]>>(
         }
     };
 
-    format!(
+    Ok(format!(
         r#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {w} {h}" width="{w}" height="{h}" role="img" aria-label="{label} avatar">{background}{body}</svg>"#,
         w = spec.width,
         h = spec.height,
@@ -1455,7 +1365,7 @@ pub fn render_avatar_svg_for_namespace<T: AsRef<[u8]>>(
         body = body,
     )
     .replace('\n', "")
-    .replace("  ", "")
+    .replace("  ", ""))
 }
 
 pub fn export_avatar_svg_for_id<T: AsRef<[u8]>, P: AsRef<Path>>(
@@ -1464,8 +1374,9 @@ pub fn export_avatar_svg_for_id<T: AsRef<[u8]>, P: AsRef<Path>>(
     options: AvatarOptions,
     path: P,
 ) -> std::io::Result<()> {
-    validate_io_avatar_spec(spec)?;
-    std::fs::write(path, render_avatar_svg_for_id(spec, id, options))
+    let svg = render_avatar_svg_for_id(spec, id, options)
+        .map_err(|error| std::io::Error::new(std::io::ErrorKind::InvalidInput, error))?;
+    std::fs::write(path, svg)
 }
 
 pub fn export_avatar_svg_for_namespace<T: AsRef<[u8]>, P: AsRef<Path>>(
@@ -1475,33 +1386,42 @@ pub fn export_avatar_svg_for_namespace<T: AsRef<[u8]>, P: AsRef<Path>>(
     options: AvatarOptions,
     path: P,
 ) -> std::io::Result<()> {
-    validate_io_avatar_spec(spec)?;
-    std::fs::write(
-        path,
-        render_avatar_svg_for_namespace(spec, namespace, id, options),
-    )
+    let svg = render_avatar_svg_for_namespace(spec, namespace, id, options)
+        .map_err(|error| std::io::Error::new(std::io::ErrorKind::InvalidInput, error))?;
+    std::fs::write(path, svg)
 }
 
 /// Render a cat face avatar into an RGBA image.
-pub fn render_cat_avatar(spec: AvatarSpec) -> RgbaImage {
-    assert_supported_avatar_spec(spec);
+pub fn render_cat_avatar(spec: AvatarSpec) -> Result<RgbaImage, AvatarSpecError> {
+    spec.validate()?;
     let identity = AvatarIdentity::new(spec.seed.to_le_bytes());
-    render_cat_avatar_with_identity(spec, &identity, AvatarBackground::Themed)
+    Ok(render_cat_avatar_with_identity(
+        spec,
+        &identity,
+        AvatarBackground::Themed,
+    ))
 }
 
 /// Render a cat face avatar from a SHA-512-backed identity.
-pub fn render_cat_avatar_for_identity(spec: AvatarSpec, identity: &AvatarIdentity) -> RgbaImage {
-    assert_supported_avatar_spec(spec);
-    render_cat_avatar_with_identity(spec, identity, AvatarBackground::Themed)
+pub fn render_cat_avatar_for_identity(
+    spec: AvatarSpec,
+    identity: &AvatarIdentity,
+) -> Result<RgbaImage, AvatarSpecError> {
+    spec.validate()?;
+    Ok(render_cat_avatar_with_identity(
+        spec,
+        identity,
+        AvatarBackground::Themed,
+    ))
 }
 
 pub fn render_cat_avatar_for_identity_with_background(
     spec: AvatarSpec,
     identity: &AvatarIdentity,
     background: AvatarBackground,
-) -> RgbaImage {
-    assert_supported_avatar_spec(spec);
-    render_cat_avatar_with_identity(spec, identity, background)
+) -> Result<RgbaImage, AvatarSpecError> {
+    spec.validate()?;
+    Ok(render_cat_avatar_with_identity(spec, identity, background))
 }
 
 fn render_cat_avatar_with_identity(
@@ -1624,8 +1544,8 @@ pub fn render_dog_avatar_for_identity(
     spec: AvatarSpec,
     identity: &AvatarIdentity,
     background: AvatarBackground,
-) -> RgbaImage {
-    assert_supported_avatar_spec(spec);
+) -> Result<RgbaImage, AvatarSpecError> {
+    spec.validate()?;
 
     let mut image =
         ImageBuffer::from_pixel(spec.width, spec.height, Color::rgb(255, 255, 255).into());
@@ -1762,15 +1682,15 @@ pub fn render_dog_avatar_for_identity(
         );
     }
 
-    image
+    Ok(image)
 }
 
 pub fn render_robot_avatar_for_identity(
     spec: AvatarSpec,
     identity: &AvatarIdentity,
     background: AvatarBackground,
-) -> RgbaImage {
-    assert_supported_avatar_spec(spec);
+) -> Result<RgbaImage, AvatarSpecError> {
+    spec.validate()?;
 
     let width = spec.width as i32;
     let height = spec.height as i32;
@@ -1899,15 +1819,15 @@ pub fn render_robot_avatar_for_identity(
         (head_w as f32 * 0.035) as i32,
         trim.into(),
     );
-    image
+    Ok(image)
 }
 
 pub fn render_fox_avatar_for_identity(
     spec: AvatarSpec,
     identity: &AvatarIdentity,
     background: AvatarBackground,
-) -> RgbaImage {
-    assert_supported_avatar_spec(spec);
+) -> Result<RgbaImage, AvatarSpecError> {
+    spec.validate()?;
 
     let width = spec.width as i32;
     let height = spec.height as i32;
@@ -2030,15 +1950,15 @@ pub fn render_fox_avatar_for_identity(
         nose,
         0.45,
     );
-    image
+    Ok(image)
 }
 
 pub fn render_alien_avatar_for_identity(
     spec: AvatarSpec,
     identity: &AvatarIdentity,
     background: AvatarBackground,
-) -> RgbaImage {
-    assert_supported_avatar_spec(spec);
+) -> Result<RgbaImage, AvatarSpecError> {
+    spec.validate()?;
 
     let width = spec.width as i32;
     let height = spec.height as i32;
@@ -2103,15 +2023,15 @@ pub fn render_alien_avatar_for_identity(
             shade.into(),
         );
     }
-    image
+    Ok(image)
 }
 
 pub fn render_monster_avatar_for_identity(
     spec: AvatarSpec,
     identity: &AvatarIdentity,
     background: AvatarBackground,
-) -> RgbaImage {
-    assert_supported_avatar_spec(spec);
+) -> Result<RgbaImage, AvatarSpecError> {
+    spec.validate()?;
 
     let width = spec.width as i32;
     let height = spec.height as i32;
@@ -2400,7 +2320,7 @@ pub fn render_monster_avatar_for_identity(
         }
     }
 
-    image
+    Ok(image)
 }
 
 #[derive(Clone, Copy)]
@@ -2539,8 +2459,8 @@ pub fn render_ghost_avatar_for_identity(
     spec: AvatarSpec,
     identity: &AvatarIdentity,
     background: AvatarBackground,
-) -> RgbaImage {
-    assert_supported_avatar_spec(spec);
+) -> Result<RgbaImage, AvatarSpecError> {
+    spec.validate()?;
     let width = spec.width as i32;
     let height = spec.height as i32;
     let head_rx = (width as f32 * (0.19 + identity.unit_f32(3) * 0.08)) as i32;
@@ -2660,15 +2580,15 @@ pub fn render_ghost_avatar_for_identity(
         _ => CreatureMouthStyle::Flat,
     };
     draw_creature_mouth(&mut image, layout, mouth_style, shade);
-    image
+    Ok(image)
 }
 
 pub fn render_slime_avatar_for_identity(
     spec: AvatarSpec,
     identity: &AvatarIdentity,
     background: AvatarBackground,
-) -> RgbaImage {
-    assert_supported_avatar_spec(spec);
+) -> Result<RgbaImage, AvatarSpecError> {
+    spec.validate()?;
     let width = spec.width as i32;
     let height = spec.height as i32;
     let head_rx = (width as f32 * (0.20 + identity.unit_f32(6) * 0.10)) as i32;
@@ -2766,15 +2686,15 @@ pub fn render_slime_avatar_for_identity(
         _ => CreatureMouthStyle::Fang,
     };
     draw_creature_mouth(&mut image, layout, mouth_style, dark);
-    image
+    Ok(image)
 }
 
 pub fn render_bird_avatar_for_identity(
     spec: AvatarSpec,
     identity: &AvatarIdentity,
     background: AvatarBackground,
-) -> RgbaImage {
-    assert_supported_avatar_spec(spec);
+) -> Result<RgbaImage, AvatarSpecError> {
+    spec.validate()?;
     let width = spec.width as i32;
     let height = spec.height as i32;
     let layout = FaceLayout {
@@ -2866,15 +2786,15 @@ pub fn render_bird_avatar_for_identity(
         Color::rgb(255, 255, 255),
         Color::rgb(28, 24, 34),
     );
-    image
+    Ok(image)
 }
 
 pub fn render_wizard_avatar_for_identity(
     spec: AvatarSpec,
     identity: &AvatarIdentity,
     background: AvatarBackground,
-) -> RgbaImage {
-    assert_supported_avatar_spec(spec);
+) -> Result<RgbaImage, AvatarSpecError> {
+    spec.validate()?;
     let width = spec.width as i32;
     let height = spec.height as i32;
     let head_rx = (width as f32 * (0.16 + identity.unit_f32(15) * 0.06)) as i32;
@@ -3032,15 +2952,15 @@ pub fn render_wizard_avatar_for_identity(
         (layout.head_rx / 6).max(3),
         hat_band.into(),
     );
-    image
+    Ok(image)
 }
 
 pub fn render_skull_avatar_for_identity(
     spec: AvatarSpec,
     identity: &AvatarIdentity,
     background: AvatarBackground,
-) -> RgbaImage {
-    assert_supported_avatar_spec(spec);
+) -> Result<RgbaImage, AvatarSpecError> {
+    spec.validate()?;
     let width = spec.width as i32;
     let height = spec.height as i32;
     let head_rx = (width as f32 * (0.18 + identity.unit_f32(17) * 0.07)) as i32;
@@ -3180,7 +3100,7 @@ pub fn render_skull_avatar_for_identity(
         ),
         crack.into(),
     );
-    image
+    Ok(image)
 }
 
 /// Render a ringed planet avatar from a stable identity.
@@ -3188,8 +3108,8 @@ pub fn render_planet_avatar_for_identity(
     spec: AvatarSpec,
     identity: &AvatarIdentity,
     background: AvatarBackground,
-) -> RgbaImage {
-    assert_supported_avatar_spec(spec);
+) -> Result<RgbaImage, AvatarSpecError> {
+    spec.validate()?;
     let width = spec.width as i32;
     let height = spec.height as i32;
     let center_x = width / 2;
@@ -3258,7 +3178,7 @@ pub fn render_planet_avatar_for_identity(
             .of_size((ring_rx * 2) as u32, (ring_ry / 3).max(1) as u32),
         Color::rgba(ring.0[0], ring.0[1], ring.0[2], 190).into(),
     );
-    image
+    Ok(image)
 }
 
 /// Render a rocket avatar from a stable identity.
@@ -3266,8 +3186,8 @@ pub fn render_rocket_avatar_for_identity(
     spec: AvatarSpec,
     identity: &AvatarIdentity,
     background: AvatarBackground,
-) -> RgbaImage {
-    assert_supported_avatar_spec(spec);
+) -> Result<RgbaImage, AvatarSpecError> {
+    spec.validate()?;
     let width = spec.width as i32;
     let height = spec.height as i32;
     let center_x = width / 2;
@@ -3365,7 +3285,7 @@ pub fn render_rocket_avatar_for_identity(
         ],
         flame.into(),
     );
-    image
+    Ok(image)
 }
 
 /// Render a mushroom avatar from a stable identity.
@@ -3373,8 +3293,8 @@ pub fn render_mushroom_avatar_for_identity(
     spec: AvatarSpec,
     identity: &AvatarIdentity,
     background: AvatarBackground,
-) -> RgbaImage {
-    assert_supported_avatar_spec(spec);
+) -> Result<RgbaImage, AvatarSpecError> {
+    spec.validate()?;
     let width = spec.width as i32;
     let height = spec.height as i32;
     let center_x = width / 2;
@@ -3433,7 +3353,7 @@ pub fn render_mushroom_avatar_for_identity(
             Color::rgba(255, 246, 230, 230).into(),
         );
     }
-    image
+    Ok(image)
 }
 
 /// Render a cactus avatar from a stable identity.
@@ -3441,8 +3361,8 @@ pub fn render_cactus_avatar_for_identity(
     spec: AvatarSpec,
     identity: &AvatarIdentity,
     background: AvatarBackground,
-) -> RgbaImage {
-    assert_supported_avatar_spec(spec);
+) -> Result<RgbaImage, AvatarSpecError> {
+    spec.validate()?;
     let width = spec.width as i32;
     let height = spec.height as i32;
     let center_x = width / 2;
@@ -3536,7 +3456,7 @@ pub fn render_cactus_avatar_for_identity(
             flower.into(),
         );
     }
-    image
+    Ok(image)
 }
 
 /// Render a frog avatar from a stable identity.
@@ -3544,8 +3464,8 @@ pub fn render_frog_avatar_for_identity(
     spec: AvatarSpec,
     identity: &AvatarIdentity,
     background: AvatarBackground,
-) -> RgbaImage {
-    assert_supported_avatar_spec(spec);
+) -> Result<RgbaImage, AvatarSpecError> {
+    spec.validate()?;
     let width = spec.width as i32;
     let height = spec.height as i32;
     let center_x = width / 2;
@@ -3645,7 +3565,7 @@ pub fn render_frog_avatar_for_identity(
             dark.into(),
         );
     }
-    image
+    Ok(image)
 }
 
 /// Render a panda avatar from a stable identity.
@@ -3653,8 +3573,8 @@ pub fn render_panda_avatar_for_identity(
     spec: AvatarSpec,
     identity: &AvatarIdentity,
     background: AvatarBackground,
-) -> RgbaImage {
-    assert_supported_avatar_spec(spec);
+) -> Result<RgbaImage, AvatarSpecError> {
+    spec.validate()?;
     let width = spec.width as i32;
     let height = spec.height as i32;
     let center_x = width / 2;
@@ -3740,7 +3660,7 @@ pub fn render_panda_avatar_for_identity(
         black,
         0.45,
     );
-    image
+    Ok(image)
 }
 
 /// Render a cupcake avatar from a stable identity.
@@ -3748,8 +3668,8 @@ pub fn render_cupcake_avatar_for_identity(
     spec: AvatarSpec,
     identity: &AvatarIdentity,
     background: AvatarBackground,
-) -> RgbaImage {
-    assert_supported_avatar_spec(spec);
+) -> Result<RgbaImage, AvatarSpecError> {
+    spec.validate()?;
     let width = spec.width as i32;
     let height = spec.height as i32;
     let center_x = width / 2;
@@ -3829,7 +3749,7 @@ pub fn render_cupcake_avatar_for_identity(
             cherry.into(),
         );
     }
-    image
+    Ok(image)
 }
 
 /// Render a pizza-slice avatar from a stable identity.
@@ -3837,8 +3757,8 @@ pub fn render_pizza_avatar_for_identity(
     spec: AvatarSpec,
     identity: &AvatarIdentity,
     background: AvatarBackground,
-) -> RgbaImage {
-    assert_supported_avatar_spec(spec);
+) -> Result<RgbaImage, AvatarSpecError> {
+    spec.validate()?;
     let width = spec.width as i32;
     let height = spec.height as i32;
     let center_x = width / 2;
@@ -3910,7 +3830,7 @@ pub fn render_pizza_avatar_for_identity(
             topping.into(),
         );
     }
-    image
+    Ok(image)
 }
 
 /// Render an ice cream cone avatar from a stable identity.
@@ -3918,8 +3838,8 @@ pub fn render_icecream_avatar_for_identity(
     spec: AvatarSpec,
     identity: &AvatarIdentity,
     background: AvatarBackground,
-) -> RgbaImage {
-    assert_supported_avatar_spec(spec);
+) -> Result<RgbaImage, AvatarSpecError> {
+    spec.validate()?;
     let width = spec.width as i32;
     let height = spec.height as i32;
     let center_x = width / 2;
@@ -3994,7 +3914,7 @@ pub fn render_icecream_avatar_for_identity(
             waffle.into(),
         );
     }
-    image
+    Ok(image)
 }
 
 /// Render an octopus avatar from a stable identity.
@@ -4002,8 +3922,8 @@ pub fn render_octopus_avatar_for_identity(
     spec: AvatarSpec,
     identity: &AvatarIdentity,
     background: AvatarBackground,
-) -> RgbaImage {
-    assert_supported_avatar_spec(spec);
+) -> Result<RgbaImage, AvatarSpecError> {
+    spec.validate()?;
     let width = spec.width as i32;
     let height = spec.height as i32;
     let center_x = width / 2;
@@ -4075,7 +3995,7 @@ pub fn render_octopus_avatar_for_identity(
         mouth,
         shade,
     );
-    image
+    Ok(image)
 }
 
 /// Render a knight helmet avatar from a stable identity.
@@ -4083,8 +4003,8 @@ pub fn render_knight_avatar_for_identity(
     spec: AvatarSpec,
     identity: &AvatarIdentity,
     background: AvatarBackground,
-) -> RgbaImage {
-    assert_supported_avatar_spec(spec);
+) -> Result<RgbaImage, AvatarSpecError> {
+    spec.validate()?;
     let width = spec.width as i32;
     let height = spec.height as i32;
     let center_x = width / 2;
@@ -4149,15 +4069,15 @@ pub fn render_knight_avatar_for_identity(
             plume.into(),
         );
     }
-    image
+    Ok(image)
 }
 
 pub fn render_paws_avatar_for_identity(
     spec: AvatarSpec,
     identity: &AvatarIdentity,
     background: AvatarBackground,
-) -> RgbaImage {
-    assert_supported_avatar_spec(spec);
+) -> Result<RgbaImage, AvatarSpecError> {
+    spec.validate()?;
 
     let width = spec.width as i32;
     let height = spec.height as i32;
@@ -4231,7 +4151,7 @@ pub fn render_paws_avatar_for_identity(
         );
     }
 
-    image
+    Ok(image)
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -6015,6 +5935,86 @@ mod tests {
     use super::*;
     use image::ImageFormat;
 
+    fn render_avatar_for_id<T: AsRef<[u8]>>(
+        spec: AvatarSpec,
+        id: T,
+        options: AvatarOptions,
+    ) -> RgbaImage {
+        super::render_avatar_for_id(spec, id, options).expect("valid avatar spec should render")
+    }
+
+    fn render_avatar_svg_for_id<T: AsRef<[u8]>>(
+        spec: AvatarSpec,
+        id: T,
+        options: AvatarOptions,
+    ) -> String {
+        super::render_avatar_svg_for_id(spec, id, options)
+            .expect("valid avatar spec should render as svg")
+    }
+
+    fn render_cat_avatar(spec: AvatarSpec) -> RgbaImage {
+        super::render_cat_avatar(spec).expect("valid avatar spec should render")
+    }
+
+    fn render_cat_avatar_for_identity(spec: AvatarSpec, identity: &AvatarIdentity) -> RgbaImage {
+        super::render_cat_avatar_for_identity(spec, identity)
+            .expect("valid avatar spec should render")
+    }
+
+    fn render_cat_avatar_for_identity_with_background(
+        spec: AvatarSpec,
+        identity: &AvatarIdentity,
+        background: AvatarBackground,
+    ) -> RgbaImage {
+        super::render_cat_avatar_for_identity_with_background(spec, identity, background)
+            .expect("valid avatar spec should render")
+    }
+
+    fn render_dog_avatar_for_identity(
+        spec: AvatarSpec,
+        identity: &AvatarIdentity,
+        background: AvatarBackground,
+    ) -> RgbaImage {
+        super::render_dog_avatar_for_identity(spec, identity, background)
+            .expect("valid avatar spec should render")
+    }
+
+    fn render_robot_avatar_for_identity(
+        spec: AvatarSpec,
+        identity: &AvatarIdentity,
+        background: AvatarBackground,
+    ) -> RgbaImage {
+        super::render_robot_avatar_for_identity(spec, identity, background)
+            .expect("valid avatar spec should render")
+    }
+
+    fn render_alien_avatar_for_identity(
+        spec: AvatarSpec,
+        identity: &AvatarIdentity,
+        background: AvatarBackground,
+    ) -> RgbaImage {
+        super::render_alien_avatar_for_identity(spec, identity, background)
+            .expect("valid avatar spec should render")
+    }
+
+    fn render_monster_avatar_for_identity(
+        spec: AvatarSpec,
+        identity: &AvatarIdentity,
+        background: AvatarBackground,
+    ) -> RgbaImage {
+        super::render_monster_avatar_for_identity(spec, identity, background)
+            .expect("valid avatar spec should render")
+    }
+
+    fn render_paws_avatar_for_identity(
+        spec: AvatarSpec,
+        identity: &AvatarIdentity,
+        background: AvatarBackground,
+    ) -> RgbaImage {
+        super::render_paws_avatar_for_identity(spec, identity, background)
+            .expect("valid avatar spec should render")
+    }
+
     #[test]
     fn cat_avatar_is_deterministic_for_a_seed() {
         let spec = AvatarSpec::new(256, 256, 42);
@@ -6061,6 +6061,42 @@ mod tests {
         );
 
         assert_ne!(left.as_digest(), right.as_digest());
+    }
+
+    #[test]
+    fn namespace_hashing_is_not_ambiguous_with_nul_bytes() {
+        let left = AvatarIdentity::new_with_namespace(
+            AvatarNamespace::new("tenant\0v2", "v1"),
+            "alice@example.com",
+        );
+        let right = AvatarIdentity::new_with_namespace(
+            AvatarNamespace::new("tenant", "v2\0v1"),
+            "alice@example.com",
+        );
+
+        assert_ne!(left.as_digest(), right.as_digest());
+    }
+
+    #[test]
+    fn public_renderers_return_errors_for_invalid_specs() {
+        let spec = AvatarSpec::new(0, 256, 0);
+        let options = AvatarOptions::new(AvatarKind::Cat, AvatarBackground::Themed);
+        let identity = AvatarIdentity::new("invalid-spec@example.com");
+
+        assert!(super::render_avatar_for_id(spec, "invalid-spec@example.com", options).is_err());
+        assert!(
+            super::render_avatar_svg_for_id(spec, "invalid-spec@example.com", options).is_err()
+        );
+        assert!(super::render_cat_avatar(spec).is_err());
+        assert!(super::render_cat_avatar_for_identity(spec, &identity).is_err());
+        assert!(
+            super::render_cat_avatar_for_identity_with_background(
+                spec,
+                &identity,
+                AvatarBackground::Themed,
+            )
+            .is_err()
+        );
     }
 
     #[test]
@@ -6324,6 +6360,19 @@ mod tests {
         assert!(AvatarSpec::new(MAX_AVATAR_DIMENSION, MAX_AVATAR_DIMENSION, 0).is_supported());
         assert!(!AvatarSpec::new(MIN_AVATAR_DIMENSION - 1, 256, 0).is_supported());
         assert!(!AvatarSpec::new(256, MAX_AVATAR_DIMENSION + 1, 0).is_supported());
+    }
+
+    #[test]
+    fn rect_edges_saturate_on_extreme_coordinates() {
+        let rect = Rect {
+            left: i32::MAX,
+            top: i32::MAX,
+            width: 64,
+            height: 64,
+        };
+
+        assert_eq!(rect.right(), i32::MAX);
+        assert_eq!(rect.bottom(), i32::MAX);
     }
 
     #[test]

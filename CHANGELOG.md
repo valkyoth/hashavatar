@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.6.0
+
+- Removed the bundled demo web server from the crate
+- Removed mandatory `axum` and `tokio` dependencies from the crate package
+- Removed the bundled `hashavatar-cli` binary so the package is a pure library crate
+- Pointed web/API usage to the separate `hashavatar-api` project
+- Added crate-focused security policy checks for release metadata, dependencies, unsafe code, panic-like sites, package contents, and fuzz harness compilation
+- Added fuzz harness coverage for arbitrary avatar identities, families, backgrounds, SVG rendering, and PNG encoding
+- Added release security documentation for dependency policy, panic policy, release gates, and crate security controls
+- Changed public render APIs and `AvatarRenderer::render` to return `Result<_, AvatarSpecError>` for invalid dimensions instead of panicking
+- Changed namespace identity hashing to length-prefix tenant, style version, and input components, preventing embedded NUL separator ambiguity
+- Hardened internal rectangle edge arithmetic with saturating operations
+
 ## 0.5.0
 
 - Starting with `0.5.0`, project licensing is dual `MIT OR Apache-2.0`

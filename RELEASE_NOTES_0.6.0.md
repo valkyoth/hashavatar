@@ -1,0 +1,36 @@
+# hashavatar 0.6.0
+
+`hashavatar` 0.6.0 narrows the crate back to its core purpose: reusable deterministic avatar rendering.
+
+## Highlights
+
+- Removed the bundled Axum demo web server from the crate package
+- Removed mandatory `axum` and `tokio` dependencies
+- Removed the bundled `hashavatar-cli` binary so the package is a pure library crate
+- Pointed web/API usage to the separate `hashavatar-api` project
+- Added crate-focused security policy checks and release gates
+- Added a fuzz harness for arbitrary avatar identities, families, backgrounds, SVG rendering, and PNG encoding
+- Changed public render APIs to return `Result<_, AvatarSpecError>` for invalid dimensions instead of panicking
+- Changed namespace identity hashing to length-prefix components, preventing separator ambiguity from embedded NUL bytes
+
+## Why This Changed
+
+The public HTTP API and demo website already live in `hashavatar-api`. Keeping a second demo server inside the library crate made the package heavier and pulled web-server dependencies into users that only need avatar rendering.
+
+## Compatibility
+
+- This is a breaking API release for callers using direct render functions or custom `AvatarRenderer` implementations. Those APIs now return `Result`.
+- Namespace-based identities intentionally produce new deterministic fingerprints because the hash input format was hardened.
+- Existing deterministic fingerprints remain covered by updated golden regression tests.
+- Users embedding the library should only see a smaller dependency graph.
+- Users relying on `cargo run` for the bundled demo should use `hashavatar-api` instead.
+- Users relying on `cargo run --bin hashavatar-cli` should call the library API directly or build a separate CLI wrapper.
+
+## Security And Quality
+
+- `src/lib.rs` now forbids unsafe code.
+- Public render APIs reject invalid dimensions without panicking.
+- Namespace identity hashing is no longer delimiter-ambiguous when tenant or style version strings contain embedded NUL bytes.
+- Rectangle edge helpers use saturating arithmetic.
+- `scripts/checks.sh` now validates release metadata, package contents, dependency scope, unsafe boundaries, reviewed panic-like sites, docs, fuzz harness compilation, dependency licenses, and RustSec advisories.
+- `scripts/stable_release_gate.sh` adds publish dry-run, reproducibility, and optional SBOM generation for release validation.

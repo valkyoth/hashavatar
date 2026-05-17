@@ -31,25 +31,23 @@ Repository security settings:
 - Enable private vulnerability reporting or GitHub security advisories
 
 Release title example:
-- `hashavatar v0.5.0`
+- `hashavatar v0.6.0`
 
 Release notes template:
 
 ```text
-License migration and demo server hardening.
+Crate surface cleanup.
 
 Highlights:
-- Starting with 0.5.0, project licensing is MIT OR Apache-2.0
-- LICENSE-MIT and LICENSE-APACHE are included
-- Previous EUPL license files were removed
-- Demo-server avatar encoding now runs on Tokio's blocking task pool
-- Demo responses now include defense-in-depth HTTP security headers
-- GitHub Actions are pinned to immutable commit SHAs
-- Local and GitHub checks now run through scripts/checks.sh
+- Bundled demo web server was removed from the crate package
+- Mandatory axum and tokio dependencies were removed
+- Bundled hashavatar-cli binary was removed so the package is a pure library crate
+- Web/API usage now lives in the separate hashavatar-api project
+- Crate-focused security policy checks and fuzz harness compilation were added
 
 Compatibility:
 - No avatar rendering behavior changes are intended
-- Published 0.4.x and older versions retain their original release licensing
+- Published 0.5.x and older versions retain their original package contents and licensing
 
 Licence:
 - MIT OR Apache-2.0

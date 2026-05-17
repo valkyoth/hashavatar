@@ -1,0 +1,19 @@
+[package]
+name = "hashavatar-fuzz"
+version = "0.0.0"
+edition = "2024"
+publish = false
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+hashavatar = { path = "..", version = "0.6.0" }
+libfuzzer-sys = "0.4"
+
+[[bin]]
+name = "avatar_inputs"
+path = "fuzz_targets/avatar_inputs.rs"
+test = false
+doc = false
+bench = false

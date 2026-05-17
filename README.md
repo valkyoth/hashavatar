@@ -11,7 +11,7 @@ It is designed as a code-only alternative to asset-pack-based avatar systems: th
 - Multiple background modes: `themed`, `white`, `black`, `dark`, `light`, `transparent`
 - Export paths for `WebP`, `PNG`, `JPEG`, `GIF`, and `SVG`
 - Namespace-aware identity hashing for multi-tenant or versioned rollouts
-- Public API suitable for web apps, services, CLIs, and batch jobs
+- Public API suitable for web apps, services, and batch jobs
 - Built-in dimension validation for internet-facing avatar endpoints
 
 ## Why Use It
@@ -28,7 +28,7 @@ Add the crate to your project:
 
 ```toml
 [dependencies]
-hashavatar = "0.5.0"
+hashavatar = "0.6.0"
 ```
 
 If you are using it from a local checkout:
@@ -119,9 +119,11 @@ let svg = render_avatar_svg_for_id(
     AvatarSpec::new(256, 256, 0),
     "alien@hashavatar.app",
     AvatarOptions::new(AvatarKind::Alien, AvatarBackground::Transparent),
-);
+)?;
 
 assert!(svg.starts_with("<svg "));
+
+# Ok::<(), hashavatar::AvatarSpecError>(())
 ```
 
 This is useful when you want:
@@ -143,10 +145,12 @@ let image = render_avatar_for_id(
     AvatarSpec::new(256, 256, 0),
     "fox@hashavatar.app",
     AvatarOptions::new(AvatarKind::Fox, AvatarBackground::Themed),
-);
+)?;
 
 assert_eq!(image.width(), 256);
 assert_eq!(image.height(), 256);
+
+# Ok::<(), hashavatar::AvatarSpecError>(())
 ```
 
 ## Recommended Integration Patterns
@@ -208,18 +212,6 @@ Use the crate when:
 - pre-generating avatars for users
 - backfilling a media bucket
 - generating static assets during a build or migration
-
-The repository also contains a CLI exporter:
-
-```bash
-cargo run --bin hashavatar-cli -- --id robot@hashavatar.app --kind robot --background transparent --format svg --output robot.svg
-```
-
-Batch export from a newline-delimited file:
-
-```bash
-cargo run --bin hashavatar-cli -- --input ids.txt --out-dir exports --kind fox --format webp
-```
 
 ## Choosing Settings
 
@@ -305,6 +297,14 @@ The test suite includes:
 - transparent background checks
 - visual fingerprint regression tests
 
+## What's New In 0.6.0
+
+- Removed the bundled demo web server from the crate
+- Removed mandatory `axum` and `tokio` dependencies from the crate package
+- Removed the bundled `hashavatar-cli` binary so the package is a pure library crate
+- Moved web/API usage to the separate [`hashavatar-api`](https://github.com/valkyoth/hashavatar-api) project
+- Added crate-focused security policy checks and a fuzz harness for avatar inputs
+
 ## What's New In 0.5.0
 
 - Starting with `0.5.0`, project licensing is dual `MIT OR Apache-2.0`
@@ -347,19 +347,28 @@ For a direct statement of how the visuals are produced, see:
 
 - [`PROVENANCE.md`](./PROVENANCE.md)
 
-## Local Demo
+## Web API And Demo
 
-This repository also contains a demo web app:
+The crate is focused on reusable rendering code. The public HTTP API and demo
+website live in the separate
+[`hashavatar-api`](https://github.com/valkyoth/hashavatar-api) project.
+
+## Security Checks
+
+The repository includes executable policy checks for release metadata, package
+contents, dependency scope, unsafe code, reviewed panic-like sites, fuzz harness
+compilation, dependency licenses, and RustSec advisories:
 
 ```bash
-cargo run
+scripts/checks.sh
 ```
 
-Then open:
+For more detail, see:
 
-```text
-http://127.0.0.1:3000
-```
+- [`docs/SECURITY_CONTROLS.md`](./docs/SECURITY_CONTROLS.md)
+- [`docs/DEPENDENCIES.md`](./docs/DEPENDENCIES.md)
+- [`docs/PANIC_POLICY.md`](./docs/PANIC_POLICY.md)
+- [`docs/RELEASE.md`](./docs/RELEASE.md)
 
 ## License
 
