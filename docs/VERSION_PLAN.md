@@ -179,6 +179,8 @@ Goal: publish or prepare a constrained core API that can work in
 - Replace or isolate `palette` usage if it blocks `no_std`.
 - Replace `StdRng` usage with a deterministic, small, reviewable internal
   generator or an admitted `no_std` RNG dependency.
+- Start moving critical geometry calculations toward fixed-point primitives so
+  future releases can make a stronger cross-platform determinism guarantee.
 - Keep cryptographic hashing behind dependency features that support the core
   target.
 
@@ -193,6 +195,8 @@ Goal: publish or prepare a constrained core API that can work in
 - `no_std + alloc` support is documented precisely, including what is not
   available.
 - Fuzz harnesses cover the core identity and rendering-plan boundary.
+- Fixed-point geometry blockers are identified for the rendering paths that
+  still rely on `f32` coordinates.
 - `scripts/stable_release_gate.sh check` passes.
 - crates.io publish dry run passes for every crate intended to be published.
 

@@ -93,6 +93,8 @@ license = "MIT OR Apache-2.0"
 | --- | --- |
 | Minimum width/height | `64` |
 | Maximum width/height | `2048` |
+| Maximum raster pixels | `4,194,304` |
+| Maximum raw RGBA buffer | `16,777,216` bytes |
 | Maximum identity input | `1024` bytes |
 | Maximum namespace tenant | `128` bytes |
 | Maximum namespace style version | `128` bytes |
@@ -323,7 +325,12 @@ fn avatar_response_bytes(user_id: &str, requested_size: u32) -> Result<Vec<u8>, 
 }
 ```
 
-The crate rejects unsupported sizes and oversized identities. Applications should still enforce their own routing, authentication, rate limiting, cache policy, response headers, and request body limits.
+The crate rejects unsupported sizes and oversized identities. Applications
+should still enforce their own routing, authentication, rate limiting, cache
+policy, response headers, request body limits, and concurrency limits. A single
+maximum-size raster render needs up to `MAX_AVATAR_RGBA_BYTES` raw RGBA bytes
+before encoder overhead, so public services should bound simultaneous large
+renders at the API layer.
 
 ## API Reference Summary
 
@@ -368,6 +375,12 @@ identity hash algorithm + namespace tenant + namespace style version + identity 
 
 This makes the crate suitable for stable CDN-backed avatar URLs and golden regression tests. Namespace hashing uses length-prefixed components, so embedded separator bytes cannot create tenant/style-version ambiguity. The default SHA-512 path keeps the pre-0.7 identity preimage stable; non-default algorithms are domain-separated.
 
+The renderer uses floating-point geometry internally. The project tests golden
+fingerprints on the release platform, but it does not yet claim formal
+bit-identical raster output across every CPU architecture, compiler backend,
+and optimization mode. Future core-boundary work tracks fixed-point geometry
+as the path to a stricter cross-platform determinism contract.
+
 The procedural cat renderer seeds its internal RNG from bytes `32..64` of the
 identity digest and uses the lower digest bytes for direct visual parameters.
 That keeps RNG state separate from directly observed parameter bytes. The
@@ -378,6 +391,47 @@ encoding are not constant-time: shape counts, geometry, encoded size, and SVG
 length can vary with identity digest bytes. Applications with strict side
 channel requirements should not treat avatar render timing or output size as
 secret-preserving signals.
+
+When identity values are sensitive and an API must reduce render-time
+observability, add the mitigation at the service boundary where request timing
+is controlled:
+
+```rust
+use std::time::{Duration, Instant};
+
+use hashavatar::{
+    AvatarBackground, AvatarKind, AvatarOptions, AvatarSpec, render_avatar_for_id,
+};
+
+fn render_with_min_latency(
+    id: &str,
+    target_latency: Duration,
+) -> Result<image::RgbaImage, Box<dyn std::error::Error>> {
+    let started = Instant::now();
+    let spec = AvatarSpec::new(256, 256, 0)?;
+    let result = render_avatar_for_id(
+        spec,
+        id,
+        AvatarOptions::new(AvatarKind::Monster, AvatarBackground::Themed),
+    );
+
+    let elapsed = started.elapsed();
+    if elapsed < target_latency {
+        std::thread::sleep(target_latency - elapsed);
+    }
+
+    Ok(result?)
+}
+```
+
+For public web services, prefer CDN caching and stable cache keys so repeated
+requests for the same avatar do not repeatedly expose renderer timing. In async
+servers, use an async timer rather than blocking a runtime worker thread.
+
+Encode APIs clear temporary raster buffers after encoding. Returned `Vec<u8>`
+encoded bytes and `RgbaImage` render outputs are caller-owned; applications
+with strict memory-sanitization requirements should clear those buffers after
+use.
 
 ## Testing And Release Evidence
 

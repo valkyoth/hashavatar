@@ -13,6 +13,15 @@
   behavior.
 - Documented the future `no_std + alloc` core boundary and the dependencies
   that currently belong outside it.
+- Added public raw RGBA buffer budget constants and `AvatarSpec` helpers for
+  service-level memory/concurrency controls.
+- Documented the current variable-time rendering and floating-point
+  cross-platform determinism boundaries.
+- Hardened antialiasing channel blending against non-finite or zero-total
+  weights.
+- Zeroized temporary owned raster buffers after encode APIs finish encoding.
+- Added documentation for fixed-minimum-latency API wrappers that can reduce
+  render-time side-channel observability in high-assurance deployments.
 
 ## 0.7.0
 

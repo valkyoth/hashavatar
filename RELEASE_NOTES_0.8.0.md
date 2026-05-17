@@ -15,6 +15,12 @@ adding new runtime dependencies or promising `no_std` support yet.
   - `AvatarOutputFormat::from_byte`
 - Added tests that protect public enum parser/display behavior.
 - Documented which dependencies belong outside a future `no_std + alloc` core.
+- Added raw RGBA buffer budget constants and `AvatarSpec` helpers for callers
+  that need service-level memory/concurrency controls.
+- Hardened internal antialiasing channel blending against invalid weights.
+- Zeroized temporary owned raster buffers after encode APIs finish encoding.
+- Added a fixed-minimum-latency API wrapper example for callers that need to
+  reduce render-time side-channel observability.
 
 ## Compatibility
 
@@ -32,3 +38,9 @@ adding new runtime dependencies or promising `no_std` support yet.
   byte-to-enum derivation.
 - The internal render plan keeps deterministic avatar decisions separate from
   output encoding concerns.
+- Rendering remains variable-time by design and should not be used as a
+  secret-preserving timing boundary.
+- Returned encoded bytes and images returned by render APIs are caller-owned;
+  high-assurance callers should clear those buffers after use.
+- Floating-point geometry remains a known future hardening target before the
+  project claims formal bit-identical raster output across all platforms.

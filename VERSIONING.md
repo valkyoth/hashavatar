@@ -39,3 +39,11 @@ Visual output may change when:
 ## Regression Protection
 
 The repository includes golden fingerprint regression tests. Those tests are meant to catch unintended visual changes before release.
+
+## Cross-Platform Determinism
+
+The current renderer uses floating-point geometry internally. Golden
+fingerprints protect the release platform, but `hashavatar` does not yet claim
+a formal bit-identical raster contract across every CPU architecture, compiler
+backend, and optimization mode. Future core work should move critical geometry
+to fixed-point arithmetic before making that stronger guarantee.

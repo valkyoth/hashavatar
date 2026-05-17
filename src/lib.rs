@@ -61,6 +61,20 @@ pub const MIN_AVATAR_DIMENSION: u32 = 64;
 /// before encoder overhead.
 pub const MAX_AVATAR_DIMENSION: u32 = 2048;
 
+/// Number of bytes in one RGBA8 raster pixel.
+pub const AVATAR_RGBA_BYTES_PER_PIXEL: usize = 4;
+
+/// Largest supported raster pixel count.
+pub const MAX_AVATAR_PIXELS: usize =
+    (MAX_AVATAR_DIMENSION as usize) * (MAX_AVATAR_DIMENSION as usize);
+
+/// Largest supported raw RGBA8 image buffer size before encoder overhead.
+///
+/// Services should combine this bound with their own request concurrency
+/// limits. The crate bounds each render request, but it cannot prevent process
+/// memory pressure from many concurrent maximum-size renders.
+pub const MAX_AVATAR_RGBA_BYTES: usize = MAX_AVATAR_PIXELS * AVATAR_RGBA_BYTES_PER_PIXEL;
+
 /// Largest supported identity input in bytes.
 ///
 /// This prevents applications from accidentally hashing attacker-controlled
@@ -594,15 +608,16 @@ fn interpolate(left: Rgba<u8>, right: Rgba<u8>, left_weight: f32) -> Rgba<u8> {
 }
 
 fn weighted_channel_sum(left: u8, right: u8, left_weight: f32, right_weight: f32) -> u8 {
-    let value = left as f32 * left_weight + right as f32 * right_weight;
-    if value < u8::MAX as f32 {
-        if value > u8::MIN as f32 {
-            value as u8
-        } else {
-            u8::MIN
-        }
+    let total_weight = left_weight + right_weight;
+    if !total_weight.is_finite() || total_weight <= 0.0 {
+        return u8::MIN;
+    }
+
+    let value = (left as f32 * left_weight + right as f32 * right_weight) / total_weight;
+    if value.is_finite() {
+        value.clamp(u8::MIN as f32, u8::MAX as f32) as u8
     } else {
-        u8::MAX
+        u8::MIN
     }
 }
 
@@ -655,6 +670,14 @@ impl AvatarSpec {
 
     pub const fn seed(self) -> u64 {
         self.seed
+    }
+
+    pub const fn pixel_count(self) -> usize {
+        (self.width as usize) * (self.height as usize)
+    }
+
+    pub const fn rgba_buffer_len(self) -> usize {
+        self.pixel_count() * AVATAR_RGBA_BYTES_PER_PIXEL
     }
 
     pub const fn is_supported(self) -> bool {
@@ -1612,7 +1635,7 @@ pub fn encode_avatar<R: AvatarRenderer>(
     let image = renderer
         .render(spec)
         .map_err(avatar_spec_error_to_image_error)?;
-    encode_rgba_image(&image, format)
+    encode_owned_rgba_image(image, format)
 }
 
 /// Render and encode a cat avatar into memory.
@@ -1664,7 +1687,7 @@ pub fn encode_avatar_with_identity_options<T: AsRef<[u8]>>(
 ) -> ImageResult<Vec<u8>> {
     let image = render_avatar_with_identity_options(spec, identity_options, id, options)
         .map_err(avatar_render_error_to_image_error)?;
-    encode_rgba_image(&image, format)
+    encode_owned_rgba_image(image, format)
 }
 
 #[derive(Clone, Debug)]
@@ -6471,6 +6494,16 @@ fn encode_rgba_image(image: &RgbaImage, format: AvatarOutputFormat) -> ImageResu
     Ok(bytes)
 }
 
+fn encode_owned_rgba_image(
+    mut image: RgbaImage,
+    format: AvatarOutputFormat,
+) -> ImageResult<Vec<u8>> {
+    let result = encode_rgba_image(&image, format);
+    let pixels: &mut [u8] = image.as_mut();
+    pixels.zeroize();
+    result
+}
+
 fn encode_into_writer<W: std::io::Write>(
     image: &RgbaImage,
     format: AvatarOutputFormat,
@@ -6493,13 +6526,15 @@ fn encode_into_writer<W: std::io::Write>(
                 )
         }
         AvatarOutputFormat::Jpeg => {
-            let rgb = rgba_to_rgb_over_white(image);
-            JpegEncoder::new_with_quality(writer, 92).write_image(
+            let mut rgb = rgba_to_rgb_over_white(image);
+            let result = JpegEncoder::new_with_quality(writer, 92).write_image(
                 &rgb,
                 image.width(),
                 image.height(),
                 ExtendedColorType::Rgb8,
-            )
+            );
+            rgb.zeroize();
+            result
         }
         AvatarOutputFormat::Gif => GifEncoder::new(writer).write_image(
             image.as_raw(),
@@ -7199,6 +7234,18 @@ mod tests {
     }
 
     #[test]
+    fn avatar_spec_reports_raw_rgba_buffer_budget() {
+        let spec = valid_spec(MAX_AVATAR_DIMENSION, MAX_AVATAR_DIMENSION, 0);
+
+        assert_eq!(spec.pixel_count(), MAX_AVATAR_PIXELS);
+        assert_eq!(spec.rgba_buffer_len(), MAX_AVATAR_RGBA_BYTES);
+        assert_eq!(
+            MAX_AVATAR_RGBA_BYTES,
+            2048_usize * 2048_usize * AVATAR_RGBA_BYTES_PER_PIXEL
+        );
+    }
+
+    #[test]
     fn rect_edges_saturate_on_extreme_coordinates() {
         let rect = Rect {
             left: i32::MAX,
@@ -7298,6 +7345,14 @@ mod tests {
                 10, 20, 30,
             ]
         );
+    }
+
+    #[test]
+    fn weighted_channel_sum_rejects_invalid_weights() {
+        assert_eq!(weighted_channel_sum(255, 0, 0.25, 0.75), 63);
+        assert_eq!(weighted_channel_sum(255, 0, 0.0, 0.0), 0);
+        assert_eq!(weighted_channel_sum(255, 0, f32::NAN, 1.0), 0);
+        assert_eq!(weighted_channel_sum(255, 0, f32::INFINITY, 1.0), 0);
     }
 
     #[test]
