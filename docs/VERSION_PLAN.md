@@ -326,6 +326,8 @@ overrepresented with one accessory.
 
 ## 0.11.0: Visual Layer Coverage And Polish
 
+Status: implemented in `0.11.0`.
+
 Goal: make the visual layer system feel complete across avatar families rather
 than merely supported by the API.
 

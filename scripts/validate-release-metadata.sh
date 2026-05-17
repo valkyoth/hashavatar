@@ -60,7 +60,7 @@ test -s docs/DEPENDENCIES.md
 test -s docs/PANIC_POLICY.md
 test -s docs/RELEASE.md
 test -s docs/SECURITY_CONTROLS.md
-test -s "RELEASE_NOTES_${cargo_version}.md"
+test -s "docs/release-notes/RELEASE_NOTES_${cargo_version}.md"
 
 for required_script in \
     "scripts/check_fuzz.sh" \
@@ -116,7 +116,7 @@ for required_package_file in \
     "LICENSE-APACHE" \
     "LICENSE-MIT" \
     "README.md" \
-    "RELEASE_NOTES_${cargo_version}.md" \
+    "docs/release-notes/RELEASE_NOTES_${cargo_version}.md" \
     "rust-toolchain.toml" \
     "SECURITY.md" \
     "scripts/check_fuzz.sh" \

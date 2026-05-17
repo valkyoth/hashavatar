@@ -1379,6 +1379,26 @@ impl AvatarKind {
             Self::Knight => "knight",
         }
     }
+
+    /// Returns whether this family has face anchors for accessories and
+    /// expressions.
+    ///
+    /// Families without face anchors still support canvas-level color and
+    /// frame-shape layers. Accessory and expression choices are accepted but
+    /// skipped deterministically for those families.
+    pub const fn supports_face_layers(self) -> bool {
+        !matches!(
+            self,
+            Self::Paws
+                | Self::Planet
+                | Self::Rocket
+                | Self::Mushroom
+                | Self::Cactus
+                | Self::Cupcake
+                | Self::Pizza
+                | Self::Icecream
+        )
+    }
 }
 
 impl FromStr for AvatarKind {
@@ -2403,19 +2423,28 @@ impl AvatarRenderPlan {
             }
         };
 
-        let body = format!(
-            "{}{}",
+        let content = format!(
+            "{}{}{}",
+            background,
             self.render_svg_body(),
             render_style_svg_layers(self.spec, self.style, &self.identity)
         );
+        let (clip_defs, clipped_content) =
+            render_shape_svg_clip(self.spec, self.style.shape, &content);
+        let shape_layer = render_shape_svg_layer(
+            self.spec,
+            self.style.shape,
+            style_accent_color(self.style.color, &self.identity),
+        );
 
         format!(
-            r#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {w} {h}" width="{w}" height="{h}" role="img" aria-label="{label} avatar">{background}{body}</svg>"#,
+            r#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {w} {h}" width="{w}" height="{h}" role="img" aria-label="{label} avatar">{clip_defs}{body}{shape_layer}</svg>"#,
             w = self.spec.width,
             h = self.spec.height,
             label = self.style.kind.as_str(),
-            background = background,
-            body = body,
+            clip_defs = clip_defs,
+            body = clipped_content,
+            shape_layer = shape_layer,
         )
         .replace('\n', "")
         .replace("  ", "")
@@ -3375,7 +3404,6 @@ fn render_style_svg_layers(
         style.accessory,
         accent,
     ));
-    svg.push_str(&render_shape_svg_layer(spec, style.shape, accent));
     svg
 }
 
@@ -3722,6 +3750,78 @@ fn render_shape_svg_layer(spec: AvatarSpec, shape: AvatarShape, accent: Color) -
         }
     };
     format!(r#"<g data-layer="shape-{}">{body}</g>"#, shape.as_str())
+}
+
+fn render_shape_svg_clip(spec: AvatarSpec, shape: AvatarShape, content: &str) -> (String, String) {
+    if shape == AvatarShape::Square {
+        return (String::new(), content.to_owned());
+    }
+
+    let clip_id = "hashavatar-frame-clip";
+    let clip = render_shape_svg_clip_body(spec, shape);
+    (
+        format!(r#"<defs><clipPath id="{clip_id}">{clip}</clipPath></defs>"#),
+        format!(r#"<g clip-path="url(#{clip_id})">{content}</g>"#),
+    )
+}
+
+fn render_shape_svg_clip_body(spec: AvatarSpec, shape: AvatarShape) -> String {
+    let w = spec.width as f32;
+    let h = spec.height as f32;
+    match shape {
+        AvatarShape::Square => format!(r#"<rect x="0" y="0" width="{w}" height="{h}"/>"#),
+        AvatarShape::Circle => format!(
+            r#"<ellipse cx="{cx}" cy="{cy}" rx="{rx}" ry="{ry}"/>"#,
+            cx = w / 2.0,
+            cy = h / 2.0,
+            rx = w / 2.0,
+            ry = h / 2.0,
+        ),
+        AvatarShape::Squircle => format!(
+            r#"<rect x="0" y="0" width="{w}" height="{h}" rx="{r}" ry="{r}"/>"#,
+            r = w.min(h) * 0.18,
+        ),
+        AvatarShape::Hexagon => {
+            let points = format!(
+                "{},{} {},{} {},{} {},{} {},{} {},{}",
+                w * 0.25,
+                0.0,
+                w * 0.75,
+                0.0,
+                w,
+                h * 0.5,
+                w * 0.75,
+                h,
+                w * 0.25,
+                h,
+                0.0,
+                h * 0.5
+            );
+            format!(r#"<polygon points="{points}"/>"#)
+        }
+        AvatarShape::Octagon => {
+            let points = format!(
+                "{},{} {},{} {},{} {},{} {},{} {},{} {},{} {},{}",
+                w * 0.30,
+                0.0,
+                w * 0.70,
+                0.0,
+                w,
+                h * 0.30,
+                w,
+                h * 0.70,
+                w * 0.70,
+                h,
+                w * 0.30,
+                h,
+                0.0,
+                h * 0.70,
+                0.0,
+                h * 0.30
+            );
+            format!(r#"<polygon points="{points}"/>"#)
+        }
+    }
 }
 
 /// Render a cat face avatar into an RGBA image.
@@ -8172,7 +8272,7 @@ fn render_paws_svg(spec: AvatarSpec, identity: &AvatarIdentity) -> String {
     let cx = w * 0.52;
     let cy = h * 0.60;
     format!(
-        r##"<ellipse cx="{cx}" cy="{cy}" rx="{prx}" ry="{pry}" fill="{paw}"/><ellipse cx="{cx}" cy="{py2}" rx="{padrx}" ry="{padry}" fill="{pad}"/><ellipse cx="{t1x}" cy="{ty1}" rx="{trx}" ry="{try_}" fill="{paw}"/><ellipse cx="{t2x}" cy="{ty2}" rx="{trx}" ry="{try_}" fill="{paw}"/><ellipse cx="{t3x}" cy="{ty2}" rx="{trx}" ry="{try_}" fill="{paw}"/><ellipse cx="{t4x}" cy="{ty1}" rx="{trx}" ry="{try_}" fill="{paw}"/><ellipse cx="{t1x}" cy="{ty1a}" rx="{padrx2}" ry="{padry2}" fill="{pad}"/><ellipse cx="{t2x}" cy="{ty2a}" rx="{padrx2}" ry="{padry2}" fill="{pad}"/><ellipse cx="{t3x}" cy="{ty2a}" rx="{padrx2}" ry="{pad}"/><ellipse cx="{t4x}" cy="{ty1a}" rx="{padrx2}" ry="{padry2}" fill="{pad}"/>"##,
+        r##"<ellipse cx="{cx}" cy="{cy}" rx="{prx}" ry="{pry}" fill="{paw}"/><ellipse cx="{cx}" cy="{py2}" rx="{padrx}" ry="{padry}" fill="{pad}"/><ellipse cx="{t1x}" cy="{ty1}" rx="{trx}" ry="{try_}" fill="{paw}"/><ellipse cx="{t2x}" cy="{ty2}" rx="{trx}" ry="{try_}" fill="{paw}"/><ellipse cx="{t3x}" cy="{ty2}" rx="{trx}" ry="{try_}" fill="{paw}"/><ellipse cx="{t4x}" cy="{ty1}" rx="{trx}" ry="{try_}" fill="{paw}"/><ellipse cx="{t1x}" cy="{ty1a}" rx="{padrx2}" ry="{padry2}" fill="{pad}"/><ellipse cx="{t2x}" cy="{ty2a}" rx="{padrx2}" ry="{padry2}" fill="{pad}"/><ellipse cx="{t3x}" cy="{ty2a}" rx="{padrx2}" ry="{padry2}" fill="{pad}"/><ellipse cx="{t4x}" cy="{ty1a}" rx="{padrx2}" ry="{padry2}" fill="{pad}"/>"##,
         cx = cx,
         cy = cy,
         prx = w * 0.13,
@@ -8837,6 +8937,21 @@ mod tests {
     }
 
     #[test]
+    fn svg_radius_attributes_do_not_contain_color_values() {
+        let spec = valid_spec(128, 128, 0);
+        for &kind in AvatarKind::ALL {
+            let svg = render_avatar_svg_for_id(
+                spec,
+                "svg-radius@example.com",
+                AvatarOptions::new(kind, AvatarBackground::Themed),
+            );
+
+            assert!(!svg.contains(r##"rx="#"##), "{kind}");
+            assert!(!svg.contains(r##"ry="#"##), "{kind}");
+        }
+    }
+
+    #[test]
     fn dark_svg_output_has_background_rect() {
         let svg = render_avatar_svg_for_id(
             valid_spec(128, 128, 0),
@@ -9200,6 +9315,66 @@ mod tests {
     }
 
     #[test]
+    fn avatar_kind_face_layer_support_matches_anchor_coverage() {
+        let supported = [
+            AvatarKind::Cat,
+            AvatarKind::Dog,
+            AvatarKind::Robot,
+            AvatarKind::Fox,
+            AvatarKind::Alien,
+            AvatarKind::Monster,
+            AvatarKind::Ghost,
+            AvatarKind::Slime,
+            AvatarKind::Bird,
+            AvatarKind::Wizard,
+            AvatarKind::Skull,
+            AvatarKind::Frog,
+            AvatarKind::Panda,
+            AvatarKind::Octopus,
+            AvatarKind::Knight,
+        ];
+
+        for &kind in AvatarKind::ALL {
+            assert_eq!(
+                kind.supports_face_layers(),
+                supported.contains(&kind),
+                "{kind}"
+            );
+            assert_eq!(
+                avatar_layer_anchors(kind).is_some(),
+                kind.supports_face_layers(),
+                "{kind}"
+            );
+        }
+    }
+
+    #[test]
+    fn face_layer_families_emit_accessory_and_expression_svg_layers() {
+        let spec = valid_spec(96, 96, 0);
+
+        for &kind in AvatarKind::ALL {
+            if !kind.supports_face_layers() {
+                continue;
+            }
+
+            let style = AvatarStyleOptions::new(
+                kind,
+                AvatarBackground::Themed,
+                AvatarAccessory::Eyepatch,
+                AvatarColor::Gold,
+                AvatarExpression::Winking,
+                AvatarShape::Square,
+            );
+            let image = render_avatar_style_for_id(spec, "face-layer@example.com", style);
+            assert_eq!(image.dimensions(), (96, 96), "{kind}");
+
+            let svg = render_avatar_svg_style_for_id(spec, "face-layer@example.com", style);
+            assert!(svg.contains(r#"data-layer="accessory-eyepatch""#), "{kind}");
+            assert!(svg.contains(r#"data-layer="expression-winking""#), "{kind}");
+        }
+    }
+
+    #[test]
     fn style_layers_render_for_all_baseline_variants() {
         let spec = valid_spec(96, 96, 0);
 
@@ -9275,7 +9450,11 @@ mod tests {
     #[test]
     fn unsupported_family_accessories_and_expressions_are_skipped() {
         let spec = valid_spec(128, 128, 0);
-        for kind in [AvatarKind::Paws, AvatarKind::Planet, AvatarKind::Rocket] {
+        for &kind in AvatarKind::ALL {
+            if kind.supports_face_layers() {
+                continue;
+            }
+
             let baseline_options = AvatarOptions::new(kind, AvatarBackground::Themed);
             let unsupported_style = AvatarStyleOptions::new(
                 kind,
@@ -9303,6 +9482,35 @@ mod tests {
             assert!(!svg.contains("accessory-eyepatch"), "{kind}");
             assert!(!svg.contains("expression-winking"), "{kind}");
         }
+    }
+
+    #[test]
+    fn non_square_svg_frame_shapes_clip_content() {
+        let spec = valid_spec(128, 128, 0);
+        let shaped = AvatarStyleOptions::new(
+            AvatarKind::Robot,
+            AvatarBackground::White,
+            AvatarAccessory::None,
+            AvatarColor::Default,
+            AvatarExpression::Default,
+            AvatarShape::Hexagon,
+        );
+        let svg = render_avatar_svg_style_for_id(spec, "shape-clip@example.com", shaped);
+
+        assert!(svg.contains(r#"<defs><clipPath id="hashavatar-frame-clip">"#));
+        assert!(svg.contains(r#"<g clip-path="url(#hashavatar-frame-clip)">"#));
+        assert!(svg.contains(r#"data-layer="shape-hexagon""#));
+
+        let square = render_avatar_svg_style_for_id(
+            spec,
+            "shape-clip@example.com",
+            AvatarStyleOptions::from_options(AvatarOptions::new(
+                AvatarKind::Robot,
+                AvatarBackground::White,
+            )),
+        );
+        assert!(!square.contains("clipPath"));
+        assert!(!square.contains("shape-hexagon"));
     }
 
     #[test]

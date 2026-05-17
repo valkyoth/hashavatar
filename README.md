@@ -6,7 +6,7 @@ The crate starts conservative: validated avatar dimensions, bounded identity inp
 
 ## Current Status
 
-The current development version is `0.10.0`.
+The current development version is `0.11.0`.
 
 Implemented now:
 
@@ -75,14 +75,14 @@ future release has a concrete image-generation reason to split it.
 
 ```toml
 [dependencies]
-hashavatar = "0.10.0"
+hashavatar = "0.11.0"
 ```
 
 Optional identity hash algorithms are disabled by default:
 
 ```toml
 [dependencies]
-hashavatar = { version = "0.10.0", features = ["blake3", "xxh3"] }
+hashavatar = { version = "0.11.0", features = ["blake3", "xxh3"] }
 ```
 
 For a local checkout:
@@ -130,15 +130,37 @@ in caller code.
 | `AvatarOutputFormat` | Raster encoding format | `webp`, `png`, `jpg`, `gif` |
 
 `AvatarOptions` is the stable baseline option type for callers that only need
-`kind` and `background`. `AvatarStyleOptions` carries the full 0.10.0 visual
-style tuple: `kind`, `background`, `accessory`, `color`, `expression`, and
-`shape`.
+`kind` and `background`. `AvatarStyleOptions` carries the full visual style
+tuple: `kind`, `background`, `accessory`, `color`, `expression`, and `shape`.
 
 Accessories and expressions require face anchors. Face-like families have
 calibrated anchors; non-face families such as `paws`, `planet`, and `rocket`
 skip accessory/expression layers deterministically instead of placing them at
 arbitrary canvas coordinates. Accent colors and frame shapes are canvas-level
 layers and still apply.
+
+Use `AvatarKind::supports_face_layers()` when mapping public endpoint query
+parameters. If it returns `false`, requested accessories and expressions are
+accepted but become deterministic no-ops for that family. This keeps automatic
+style derivation total while avoiding awkward combinations such as an eyepatch
+on a paw print or planet.
+
+Suggested public endpoint query mapping:
+
+| Query parameter | Rust type | Validation |
+| --- | --- | --- |
+| `kind` | `AvatarKind` | Parse with `FromStr`; reject unsupported labels. |
+| `background` | `AvatarBackground` | Parse with `FromStr`; reject unsupported labels. |
+| `accessory` | `AvatarAccessory` | Parse with `FromStr`; allow no-op fallback when `kind.supports_face_layers()` is `false`. |
+| `color` | `AvatarColor` | Parse with `FromStr`; `default` keeps the family palette. |
+| `expression` | `AvatarExpression` | Parse with `FromStr`; allow no-op fallback when `kind.supports_face_layers()` is `false`. |
+| `shape` | `AvatarShape` | Parse with `FromStr`; applied as a raster mask and SVG clip path. |
+| `format` | `AvatarOutputFormat` | Parse with `FromStr`; SVG uses the `render_avatar_svg_*` APIs. |
+| `size` | `AvatarSpec` | Construct with `AvatarSpec::new`; reject invalid dimensions. |
+
+Keep request parsing, rate limiting, authentication, and concurrency limits in
+the API service. This crate intentionally only validates rendering inputs and
+returns typed errors.
 
 ## Example: Encode WebP
 
@@ -326,7 +348,7 @@ cryptographic boundary.
 
 ```toml
 [dependencies]
-hashavatar = { version = "0.10.0", features = ["blake3"] }
+hashavatar = { version = "0.11.0", features = ["blake3"] }
 ```
 
 ```rust
@@ -354,7 +376,7 @@ assert!(svg.contains("alien avatar"));
 
 ```toml
 [dependencies]
-hashavatar = { version = "0.10.0", features = ["xxh3"] }
+hashavatar = { version = "0.11.0", features = ["xxh3"] }
 ```
 
 ```rust
@@ -558,6 +580,11 @@ and `square`, so their default visual output is unchanged in `0.10.0`.
 Some family/layer combinations are deterministic no-ops when the layer has no
 sensible anchor for that family.
 
+Frame shapes are applied as masks in raster output and as SVG clip paths in SVG
+output. Non-square shapes therefore trim the background, avatar body, color
+accent, accessory layer, and expression layer consistently before drawing the
+frame border.
+
 The renderer uses floating-point geometry internally. The project tests golden
 fingerprints on the release platform, but it does not yet claim formal
 bit-identical raster output across every CPU architecture, compiler backend,
@@ -658,7 +685,8 @@ The crate is focused on reusable rendering code. The public HTTP API and demo we
 
 ## Changelog
 
-See [CHANGELOG.md](CHANGELOG.md) and the release note files for version-by-version details.
+See [CHANGELOG.md](CHANGELOG.md) and [docs/release-notes](docs/release-notes)
+for version-by-version details.
 
 ## License
 

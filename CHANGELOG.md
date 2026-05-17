@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.11.0
+
+- Bumped the crate to `0.11.0`.
+- Added explicit `AvatarKind::supports_face_layers()` guidance for families
+  that can place accessories and expressions.
+- Made non-square SVG frame shapes clip the background, avatar body, accent,
+  accessory, and expression content so SVG behavior matches raster masking.
+- Fixed malformed Paws-family SVG output where one toe-pad ellipse wrote a
+  color value into its `ry` radius attribute.
+- Expanded tests for face-layer support, deterministic fallback behavior, and
+  SVG frame clipping.
+
 ## 0.10.0
 
 - Bumped the crate to `0.10.0`.
