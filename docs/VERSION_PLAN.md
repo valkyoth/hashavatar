@@ -158,6 +158,8 @@ concerns so a future `no_std + alloc` core is realistic.
 
 ## 0.9.0: `hashavatar-core` Experiment
 
+Status: implemented in `0.9.0`.
+
 Goal: publish or prepare a constrained core API that can work in
 `no_std + alloc` environments without image encoders.
 
@@ -199,6 +201,20 @@ Goal: publish or prepare a constrained core API that can work in
   still rely on `f32` coordinates.
 - `scripts/stable_release_gate.sh check` passes.
 - crates.io publish dry run passes for every crate intended to be published.
+
+### Implementation Notes
+
+- `hashavatar-core` is a workspace crate with `#![no_std]` and `alloc`.
+- The core crate owns bounded specs, identity and namespace validation,
+  identity hashing, public option enums, and structured render-plan
+  construction.
+- The main crate keeps image buffers, raster/SVG rendering, encoders, and
+  service-boundary concerns.
+- The main crate's generic render-plan path constructs the core plan first and
+  renders from the core-derived identity digest.
+- `palette`, `image`, `StdRng`, and current `f32` geometry remain outside the
+  core boundary. Fixed-point geometry remains a blocker before the project can
+  claim bit-identical raster output across every target.
 
 ## 0.10.0: Visual Layer Model
 

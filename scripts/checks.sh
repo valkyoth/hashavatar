@@ -21,12 +21,15 @@ scripts/validate-panic-policy.sh
 
 echo "checks: build"
 cargo check
+cargo check -p hashavatar-core --no-default-features
 
 echo "checks: lint"
 cargo clippy --all-targets -- -D warnings
+cargo clippy -p hashavatar-core --no-default-features -- -D warnings
 
 echo "checks: tests"
 cargo test
+cargo test -p hashavatar-core --no-default-features
 
 echo "checks: docs"
 cargo doc --no-deps

@@ -701,6 +701,11 @@ impl AvatarSpec {
             })
         }
     }
+
+    fn to_core(self) -> Result<hashavatar_core::AvatarSpec, AvatarSpecError> {
+        hashavatar_core::AvatarSpec::new(self.width, self.height, self.seed)
+            .map_err(AvatarSpecError::from)
+    }
 }
 
 impl Default for AvatarSpec {
@@ -736,6 +741,15 @@ impl std::fmt::Display for AvatarSpecError {
 }
 
 impl std::error::Error for AvatarSpecError {}
+
+impl From<hashavatar_core::AvatarSpecError> for AvatarSpecError {
+    fn from(error: hashavatar_core::AvatarSpecError) -> Self {
+        Self {
+            width: error.width(),
+            height: error.height(),
+        }
+    }
+}
 
 fn validate_image_avatar_spec(spec: AvatarSpec) -> ImageResult<()> {
     spec.validate().map_err(avatar_spec_error_to_image_error)
@@ -812,6 +826,22 @@ impl std::fmt::Display for AvatarIdentityError {
 
 impl std::error::Error for AvatarIdentityError {}
 
+impl From<hashavatar_core::AvatarIdentityError> for AvatarIdentityError {
+    fn from(error: hashavatar_core::AvatarIdentityError) -> Self {
+        Self {
+            component: match error.component() {
+                hashavatar_core::AvatarIdentityComponent::Input => AvatarIdentityComponent::Input,
+                hashavatar_core::AvatarIdentityComponent::Tenant => AvatarIdentityComponent::Tenant,
+                hashavatar_core::AvatarIdentityComponent::StyleVersion => {
+                    AvatarIdentityComponent::StyleVersion
+                }
+            },
+            length: error.length(),
+            max: error.max(),
+        }
+    }
+}
+
 #[derive(Debug)]
 pub enum AvatarRenderError {
     Spec(AvatarSpecError),
@@ -827,6 +857,15 @@ impl From<AvatarSpecError> for AvatarRenderError {
 impl From<AvatarIdentityError> for AvatarRenderError {
     fn from(error: AvatarIdentityError) -> Self {
         Self::Identity(error)
+    }
+}
+
+impl From<hashavatar_core::AvatarRenderError> for AvatarRenderError {
+    fn from(error: hashavatar_core::AvatarRenderError) -> Self {
+        match error {
+            hashavatar_core::AvatarRenderError::Spec(error) => Self::Spec(error.into()),
+            hashavatar_core::AvatarRenderError::Identity(error) => Self::Identity(error.into()),
+        }
     }
 }
 
@@ -898,6 +937,16 @@ impl AvatarHashAlgorithm {
             Self::Xxh3_128 => b"xxh3-128",
         }
     }
+
+    const fn to_core(self) -> hashavatar_core::AvatarHashAlgorithm {
+        match self {
+            Self::Sha512 => hashavatar_core::AvatarHashAlgorithm::Sha512,
+            #[cfg(feature = "blake3")]
+            Self::Blake3 => hashavatar_core::AvatarHashAlgorithm::Blake3,
+            #[cfg(feature = "xxh3")]
+            Self::Xxh3_128 => hashavatar_core::AvatarHashAlgorithm::Xxh3_128,
+        }
+    }
 }
 
 impl FromStr for AvatarHashAlgorithm {
@@ -942,6 +991,13 @@ impl<'a> AvatarIdentityOptions<'a> {
 
     pub const fn algorithm(self) -> AvatarHashAlgorithm {
         self.algorithm
+    }
+
+    fn to_core(self) -> hashavatar_core::AvatarIdentityOptions<'a> {
+        hashavatar_core::AvatarIdentityOptions::new(
+            self.namespace.to_core(),
+            self.algorithm.to_core(),
+        )
     }
 }
 
@@ -1002,6 +1058,12 @@ impl AvatarIdentity {
     fn new_unchecked(options: AvatarIdentityOptions<'_>, input: &[u8]) -> Self {
         Self {
             digest: derive_identity_digest(options, input),
+        }
+    }
+
+    fn from_core(identity: &hashavatar_core::AvatarIdentity) -> Self {
+        Self {
+            digest: *identity.as_digest(),
         }
     }
 
@@ -1184,6 +1246,10 @@ impl<'a> AvatarNamespace<'a> {
     pub const fn style_version(self) -> &'a str {
         self.style_version
     }
+
+    const fn to_core(self) -> hashavatar_core::AvatarNamespace<'a> {
+        hashavatar_core::AvatarNamespace::new_unchecked(self.tenant, self.style_version)
+    }
 }
 
 impl Default for AvatarNamespace<'_> {
@@ -1361,6 +1427,34 @@ impl AvatarKind {
             Self::Knight => "knight",
         }
     }
+
+    const fn to_core(self) -> hashavatar_core::AvatarKind {
+        match self {
+            Self::Cat => hashavatar_core::AvatarKind::Cat,
+            Self::Dog => hashavatar_core::AvatarKind::Dog,
+            Self::Robot => hashavatar_core::AvatarKind::Robot,
+            Self::Fox => hashavatar_core::AvatarKind::Fox,
+            Self::Alien => hashavatar_core::AvatarKind::Alien,
+            Self::Monster => hashavatar_core::AvatarKind::Monster,
+            Self::Ghost => hashavatar_core::AvatarKind::Ghost,
+            Self::Slime => hashavatar_core::AvatarKind::Slime,
+            Self::Bird => hashavatar_core::AvatarKind::Bird,
+            Self::Wizard => hashavatar_core::AvatarKind::Wizard,
+            Self::Skull => hashavatar_core::AvatarKind::Skull,
+            Self::Paws => hashavatar_core::AvatarKind::Paws,
+            Self::Planet => hashavatar_core::AvatarKind::Planet,
+            Self::Rocket => hashavatar_core::AvatarKind::Rocket,
+            Self::Mushroom => hashavatar_core::AvatarKind::Mushroom,
+            Self::Cactus => hashavatar_core::AvatarKind::Cactus,
+            Self::Frog => hashavatar_core::AvatarKind::Frog,
+            Self::Panda => hashavatar_core::AvatarKind::Panda,
+            Self::Cupcake => hashavatar_core::AvatarKind::Cupcake,
+            Self::Pizza => hashavatar_core::AvatarKind::Pizza,
+            Self::Icecream => hashavatar_core::AvatarKind::Icecream,
+            Self::Octopus => hashavatar_core::AvatarKind::Octopus,
+            Self::Knight => hashavatar_core::AvatarKind::Knight,
+        }
+    }
 }
 
 impl FromStr for AvatarKind {
@@ -1448,6 +1542,17 @@ impl AvatarBackground {
             Self::Transparent => "transparent",
         }
     }
+
+    const fn to_core(self) -> hashavatar_core::AvatarBackground {
+        match self {
+            Self::Themed => hashavatar_core::AvatarBackground::Themed,
+            Self::White => hashavatar_core::AvatarBackground::White,
+            Self::Black => hashavatar_core::AvatarBackground::Black,
+            Self::Dark => hashavatar_core::AvatarBackground::Dark,
+            Self::Light => hashavatar_core::AvatarBackground::Light,
+            Self::Transparent => hashavatar_core::AvatarBackground::Transparent,
+        }
+    }
 }
 
 impl FromStr for AvatarBackground {
@@ -1481,6 +1586,10 @@ pub struct AvatarOptions {
 impl AvatarOptions {
     pub const fn new(kind: AvatarKind, background: AvatarBackground) -> Self {
         Self { kind, background }
+    }
+
+    const fn to_core(self) -> hashavatar_core::AvatarOptions {
+        hashavatar_core::AvatarOptions::new(self.kind.to_core(), self.background.to_core())
     }
 }
 
@@ -1704,8 +1813,13 @@ impl AvatarRenderPlan {
         id: T,
         options: AvatarOptions,
     ) -> Result<Self, AvatarRenderError> {
-        spec.validate()?;
-        let identity = AvatarIdentity::new_with_options(identity_options, id)?;
+        let core_plan = hashavatar_core::AvatarRenderPlan::new(
+            spec.to_core()?,
+            identity_options.to_core(),
+            id,
+            options.to_core(),
+        )?;
+        let identity = AvatarIdentity::from_core(core_plan.identity());
         Ok(Self {
             spec,
             identity,
@@ -6729,6 +6843,26 @@ mod tests {
         .expect("explicit sha512 identity should be valid");
 
         assert_eq!(default.as_digest(), explicit.as_digest());
+    }
+
+    #[test]
+    fn main_identity_matches_core_identity() {
+        let namespace = valid_namespace("tenant-a", "v2");
+        let main = AvatarIdentity::new_with_options(
+            AvatarIdentityOptions::new(namespace, AvatarHashAlgorithm::Sha512),
+            "alice@example.com",
+        )
+        .expect("main identity should be valid");
+        let core = hashavatar_core::AvatarIdentity::new_with_options(
+            hashavatar_core::AvatarIdentityOptions::new(
+                namespace.to_core(),
+                AvatarHashAlgorithm::Sha512.to_core(),
+            ),
+            "alice@example.com",
+        )
+        .expect("core identity should be valid");
+
+        assert_eq!(main.as_digest(), core.as_digest());
     }
 
     #[test]

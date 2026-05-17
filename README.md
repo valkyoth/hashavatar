@@ -6,7 +6,7 @@ The crate starts conservative: validated avatar dimensions, bounded identity inp
 
 ## Current Status
 
-The current development version is `0.8.0`.
+The current development version is `0.9.0`.
 
 Implemented now:
 
@@ -14,6 +14,8 @@ Implemented now:
 - Deterministic avatars derived from SHA-512 identity hashes by default.
 - Optional BLAKE3 and XXH3-128 identity derivation behind explicit Cargo
   features.
+- `hashavatar-core` provides the `no_std + alloc` deterministic spec,
+  identity, option, and render-plan boundary.
 - Public enum variant lists use single-source `ALL` slices and byte-to-variant
   helpers for deterministic option derivation.
 - Namespace-aware identity derivation for tenant isolation and visual rollouts.
@@ -43,7 +45,7 @@ Planned or intentionally external:
 | License | `MIT OR Apache-2.0` |
 | MSRV | Rust `1.95.0` |
 | Crate shape | Library only |
-| Runtime dependencies | `image`, `palette`, `rand`, `sha2`, `subtle`, `zeroize`; optional `blake3`, `xxhash-rust` |
+| Runtime dependencies | `hashavatar-core`, `image`, `palette`, `rand`, `sha2`, `subtle`, `zeroize`; optional `blake3`, `xxhash-rust` |
 | Unsafe policy | `#![forbid(unsafe_code)]` |
 | Filesystem policy | No public path-writing APIs |
 | Dimension limits | `64..=2048` pixels per side |
@@ -55,23 +57,23 @@ Planned or intentionally external:
 
 Security-control details live in [docs/SECURITY_CONTROLS.md](docs/SECURITY_CONTROLS.md). Dependency policy lives in [docs/DEPENDENCIES.md](docs/DEPENDENCIES.md). Panic policy lives in [docs/PANIC_POLICY.md](docs/PANIC_POLICY.md).
 
-Future version planning for possible `no_std + alloc` support, visual layers,
-and 1.0 stabilization lives in [docs/VERSION_PLAN.md](docs/VERSION_PLAN.md).
-`0.8.0` prepares the internal boundary for a future core crate, but `no_std`
-is not a public support contract yet.
+Future version planning for visual layers and 1.0 stabilization lives in
+[docs/VERSION_PLAN.md](docs/VERSION_PLAN.md). `0.9.0` adds the
+`hashavatar-core` crate for deterministic `no_std + alloc` planning, while
+raster/SVG rendering and encoders remain in `hashavatar`.
 
 ## Install
 
 ```toml
 [dependencies]
-hashavatar = "0.8.0"
+hashavatar = "0.9.0"
 ```
 
 Optional identity hash algorithms are disabled by default:
 
 ```toml
 [dependencies]
-hashavatar = { version = "0.8.0", features = ["blake3", "xxh3"] }
+hashavatar = { version = "0.9.0", features = ["blake3", "xxh3"] }
 ```
 
 For a local checkout:
@@ -190,6 +192,36 @@ assert!(AvatarBackground::ALL.contains(&options.background));
 The `from_byte` helpers use each enum's `ALL` slice, so new public variants do
 not require duplicated modulo constants in caller code.
 
+## Example: Core Render Plan
+
+Use `hashavatar-core` only when you need the deterministic planning boundary in
+a `no_std + alloc` environment. It does not render pixels or SVG.
+
+```toml
+[dependencies]
+hashavatar-core = "0.9.0"
+```
+
+```rust
+use hashavatar_core::{
+    AvatarBackground, AvatarHashAlgorithm, AvatarIdentityOptions, AvatarKind,
+    AvatarNamespace, AvatarOptions, AvatarRenderPlan, AvatarSpec,
+};
+
+let namespace = AvatarNamespace::new("customer-a", "v2").expect("namespace is valid");
+let spec = AvatarSpec::new(256, 256, 0).expect("spec is valid");
+let plan = AvatarRenderPlan::new(
+    spec,
+    AvatarIdentityOptions::new(namespace, AvatarHashAlgorithm::Sha512),
+    "user-123",
+    AvatarOptions::new(AvatarKind::Robot, AvatarBackground::Themed),
+)
+.expect("render plan is valid");
+
+assert_eq!(plan.spec().width(), 256);
+assert_eq!(plan.options().kind, AvatarKind::Robot);
+```
+
 ## Example: Optional Hash Algorithm
 
 ```rust
@@ -228,7 +260,7 @@ cryptographic boundary.
 
 ```toml
 [dependencies]
-hashavatar = { version = "0.8.0", features = ["blake3"] }
+hashavatar = { version = "0.9.0", features = ["blake3"] }
 ```
 
 ```rust
@@ -256,7 +288,7 @@ assert!(svg.contains("alien avatar"));
 
 ```toml
 [dependencies]
-hashavatar = { version = "0.8.0", features = ["xxh3"] }
+hashavatar = { version = "0.9.0", features = ["xxh3"] }
 ```
 
 ```rust

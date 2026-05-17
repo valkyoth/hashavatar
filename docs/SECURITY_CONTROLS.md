@@ -5,6 +5,9 @@
 ## Current Controls
 
 - The library uses `#![forbid(unsafe_code)]`.
+- `hashavatar-core` uses `#![no_std]`, `alloc`, and `#![forbid(unsafe_code)]`
+  for deterministic specs, identity hashing, options, and render-plan
+  construction.
 - `AvatarSpec` has private fields and validates dimensions at construction.
 - Public raster/SVG dimensions are bounded by `MIN_AVATAR_DIMENSION` and `MAX_AVATAR_DIMENSION`.
 - Raw RGBA raster memory is bounded by `MAX_AVATAR_RGBA_BYTES` per render before

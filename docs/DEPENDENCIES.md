@@ -3,6 +3,8 @@
 `hashavatar` keeps the published crate dependency graph focused on rendering:
 
 - `image` for raster buffers and encoders
+- `hashavatar-core` for deterministic `no_std + alloc` avatar specs, identity
+  hashing, public option enums, and render-plan construction
 - `palette` for color conversion
 - `rand` for deterministic seeded variation
 - `sha2` for identity hashing
@@ -57,8 +59,9 @@ Dependency changes should be reviewed for:
 
 ## Future Core Boundary
 
-`0.8.0` starts preparing the code for a possible future `no_std + alloc`
-deterministic core, but the published crate still requires `std`.
+`0.9.0` adds `hashavatar-core` as the deterministic `no_std + alloc` boundary.
+The main `hashavatar` crate still requires `std` because it owns raster
+buffers, SVG strings, and image encoders.
 
 Dependencies that belong outside a future core crate:
 

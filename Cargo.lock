@@ -232,12 +232,24 @@ dependencies = [
 
 [[package]]
 name = "hashavatar"
-version = "0.8.0"
+version = "0.9.0"
 dependencies = [
  "blake3",
+ "hashavatar-core",
  "image",
  "palette",
  "rand",
+ "sha2",
+ "subtle",
+ "xxhash-rust",
+ "zeroize",
+]
+
+[[package]]
+name = "hashavatar-core"
+version = "0.9.0"
+dependencies = [
+ "blake3",
  "sha2",
  "subtle",
  "xxhash-rust",

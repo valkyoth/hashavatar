@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.9.0
+
+- Bumped the crate to `0.9.0`.
+- Added the `hashavatar-core` workspace crate for deterministic
+  `no_std + alloc` avatar specs, identity hashing, public option enums, and
+  render-plan construction.
+- Kept raster buffers, SVG rendering, image encoders, filesystem boundaries,
+  HTTP concerns, and service controls in the main `hashavatar` crate.
+- Wired the main avatar render-plan path through `hashavatar-core`.
+- Added core crate no-default-feature checks to local CI scripts.
+- Added fuzz harness coverage for the core render-plan boundary.
+- Documented the precise `hashavatar-core` support boundary and remaining
+  fixed-point geometry blockers.
+
 ## 0.8.0
 
 - Bumped the crate to `0.8.0`.
