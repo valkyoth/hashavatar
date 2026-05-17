@@ -51,6 +51,10 @@ Planned or intentionally external:
 
 Security-control details live in [docs/SECURITY_CONTROLS.md](docs/SECURITY_CONTROLS.md). Dependency policy lives in [docs/DEPENDENCIES.md](docs/DEPENDENCIES.md). Panic policy lives in [docs/PANIC_POLICY.md](docs/PANIC_POLICY.md).
 
+Future version planning for pluggable hashing, dependency-provided SIMD, and a
+possible `no_std + alloc` core lives in
+[docs/VERSION_PLAN.md](docs/VERSION_PLAN.md).
+
 ## Install
 
 ```toml
