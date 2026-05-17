@@ -186,6 +186,8 @@ for that split.
 
 ## 0.10.0: Visual Layer Model
 
+Status: implemented in `0.10.0`.
+
 Goal: expand avatar variety with explicit, deterministic visual layers before
 the public API is frozen.
 
@@ -303,22 +305,24 @@ overrepresented with one accessory.
 
 `0.10.0` is done when:
 
-- Every visual layer enum has `ALL`, `as_str`, `Display`, and `FromStr`.
-- Every automatic public enum choice uses the enum's variant list instead of a
+- [x] Every visual layer enum has `ALL`, `as_str`, `Display`, and `FromStr`.
+- [x] Every automatic public enum choice uses the enum's variant list instead of a
   duplicated literal count.
-- Top-level automatic traits use distinct identity digest offsets or explicit
+- [x] Top-level automatic traits use distinct identity digest offsets or explicit
   domain-separated derivations.
-- Tests prove changing the digest byte reserved for one top-level trait does
+- [x] Tests prove changing the digest byte reserved for one top-level trait does
   not alter the other automatic trait selections.
-- Automatic layer derivation is deterministic and covered by tests.
-- Manual layer selection is covered by tests.
-- Raster and SVG renderers support all selected baseline layers.
-- Golden fingerprints cover representative combinations of kind, background,
+- [x] Automatic layer derivation is deterministic and covered by tests.
+- [x] Manual layer selection is covered by tests.
+- [x] Raster and SVG renderers support all selected baseline layers.
+- [x] Unsupported accessory/expression combinations skip deterministically
+  instead of drawing in arbitrary positions.
+- [x] Golden fingerprints cover representative combinations of kind, background,
   accessory, color palette, expression, and frame shape.
-- README includes examples for automatic and manual visual layers.
-- Release notes clearly state whether default visuals changed.
-- `scripts/stable_release_gate.sh check` passes.
-- crates.io publish dry run passes.
+- [x] README includes examples for automatic and manual visual layers.
+- [x] Release notes clearly state whether default visuals changed.
+- [x] `scripts/stable_release_gate.sh check` passes.
+- [x] crates.io publish dry run passes.
 
 ## 0.11.0: Visual Layer Coverage And Polish
 

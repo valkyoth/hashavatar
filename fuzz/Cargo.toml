@@ -8,7 +8,7 @@ publish = false
 cargo-fuzz = true
 
 [dependencies]
-hashavatar = { path = "..", version = "0.9.0" }
+hashavatar = { path = "..", version = "0.10.0" }
 libfuzzer-sys = "0.4"
 
 [[bin]]

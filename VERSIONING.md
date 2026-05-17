@@ -12,10 +12,17 @@ Within a major release line, the project aims to keep avatar output stable for t
 - `id`
 - `kind`
 - `background`
+- `accessory`
+- `color`
+- `expression`
+- `shape`
 - `format`
 - `size`
 
 That means an application can cache and embed avatar URLs without expecting silent visual churn during normal minor and patch upgrades.
+
+Callers that use the legacy `AvatarOptions` API implicitly use `accessory =
+none`, `color = default`, `expression = default`, and `shape = square`.
 
 ## When Output May Change
 

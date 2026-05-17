@@ -84,6 +84,24 @@ pub const MAX_AVATAR_ID_BYTES: usize = 1024;
 /// Largest supported namespace component in bytes.
 pub const MAX_AVATAR_NAMESPACE_COMPONENT_BYTES: usize = 128;
 
+/// Identity digest byte used for automatic avatar family selection.
+pub const AVATAR_STYLE_KIND_BYTE: usize = 0;
+
+/// Identity digest byte used for automatic background selection.
+pub const AVATAR_STYLE_BACKGROUND_BYTE: usize = 1;
+
+/// Identity digest byte used for automatic accessory selection.
+pub const AVATAR_STYLE_ACCESSORY_BYTE: usize = 2;
+
+/// Identity digest byte used for automatic color-palette selection.
+pub const AVATAR_STYLE_COLOR_BYTE: usize = 3;
+
+/// Identity digest byte used for automatic expression selection.
+pub const AVATAR_STYLE_EXPRESSION_BYTE: usize = 4;
+
+/// Identity digest byte used for automatic frame-shape selection.
+pub const AVATAR_STYLE_SHAPE_BYTE: usize = 5;
+
 const HASH_DOMAIN: &[u8] = b"hashavatar";
 const HASH_DOMAIN_ALGORITHM_COMPONENT: &[u8] = b"identity-hash";
 #[cfg(feature = "xxh3")]
@@ -1472,6 +1490,295 @@ impl std::fmt::Display for AvatarBackground {
     }
 }
 
+/// Optional avatar accessory layer.
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub enum AvatarAccessory {
+    /// No accessory layer.
+    #[default]
+    None,
+    /// Simple glasses overlay.
+    Glasses,
+    /// Hat overlay.
+    Hat,
+    /// Headphones overlay.
+    Headphones,
+    /// Crown overlay.
+    Crown,
+    /// Bowtie overlay.
+    Bowtie,
+    /// Eyepatch overlay.
+    Eyepatch,
+    /// Scarf overlay.
+    Scarf,
+    /// Halo overlay.
+    Halo,
+    /// Horn overlay.
+    Horns,
+}
+
+impl AvatarAccessory {
+    pub const ALL: &'static [Self] = &[
+        Self::None,
+        Self::Glasses,
+        Self::Hat,
+        Self::Headphones,
+        Self::Crown,
+        Self::Bowtie,
+        Self::Eyepatch,
+        Self::Scarf,
+        Self::Halo,
+        Self::Horns,
+    ];
+
+    pub fn from_byte(value: u8) -> Self {
+        Self::ALL[usize::from(value) % Self::ALL.len()]
+    }
+
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::None => "none",
+            Self::Glasses => "glasses",
+            Self::Hat => "hat",
+            Self::Headphones => "headphones",
+            Self::Crown => "crown",
+            Self::Bowtie => "bowtie",
+            Self::Eyepatch => "eyepatch",
+            Self::Scarf => "scarf",
+            Self::Halo => "halo",
+            Self::Horns => "horns",
+        }
+    }
+}
+
+impl FromStr for AvatarAccessory {
+    type Err = &'static str;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s.trim().to_ascii_lowercase().as_str() {
+            "none" => Ok(Self::None),
+            "glasses" => Ok(Self::Glasses),
+            "hat" => Ok(Self::Hat),
+            "headphones" => Ok(Self::Headphones),
+            "crown" => Ok(Self::Crown),
+            "bowtie" | "bow-tie" | "bow_tie" => Ok(Self::Bowtie),
+            "eyepatch" | "eye-patch" | "eye_patch" => Ok(Self::Eyepatch),
+            "scarf" => Ok(Self::Scarf),
+            "halo" => Ok(Self::Halo),
+            "horns" => Ok(Self::Horns),
+            _ => Err("unsupported avatar accessory"),
+        }
+    }
+}
+
+impl std::fmt::Display for AvatarAccessory {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(self.as_str())
+    }
+}
+
+/// Optional avatar accent color palette.
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub enum AvatarColor {
+    /// Family default colors.
+    #[default]
+    Default,
+    /// Bright mint accent.
+    NeonMint,
+    /// Soft pink accent.
+    PastelPink,
+    /// Deep red accent.
+    Crimson,
+    /// Warm gold accent.
+    Gold,
+    /// Blue-green accent.
+    DeepSeaBlue,
+}
+
+impl AvatarColor {
+    pub const ALL: &'static [Self] = &[
+        Self::Default,
+        Self::NeonMint,
+        Self::PastelPink,
+        Self::Crimson,
+        Self::Gold,
+        Self::DeepSeaBlue,
+    ];
+
+    pub fn from_byte(value: u8) -> Self {
+        Self::ALL[usize::from(value) % Self::ALL.len()]
+    }
+
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Default => "default",
+            Self::NeonMint => "neon-mint",
+            Self::PastelPink => "pastel-pink",
+            Self::Crimson => "crimson",
+            Self::Gold => "gold",
+            Self::DeepSeaBlue => "deep-sea-blue",
+        }
+    }
+}
+
+impl FromStr for AvatarColor {
+    type Err = &'static str;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s.trim().to_ascii_lowercase().as_str() {
+            "default" => Ok(Self::Default),
+            "neon-mint" | "neon_mint" | "neonmint" => Ok(Self::NeonMint),
+            "pastel-pink" | "pastel_pink" | "pastelpink" => Ok(Self::PastelPink),
+            "crimson" => Ok(Self::Crimson),
+            "gold" => Ok(Self::Gold),
+            "deep-sea-blue" | "deep_sea_blue" | "deepseablue" => Ok(Self::DeepSeaBlue),
+            _ => Err("unsupported avatar color"),
+        }
+    }
+}
+
+impl std::fmt::Display for AvatarColor {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(self.as_str())
+    }
+}
+
+/// Optional avatar expression layer.
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub enum AvatarExpression {
+    /// Family default expression.
+    #[default]
+    Default,
+    /// Happy expression overlay.
+    Happy,
+    /// Grumpy expression overlay.
+    Grumpy,
+    /// Surprised expression overlay.
+    Surprised,
+    /// Sleepy expression overlay.
+    Sleepy,
+    /// Winking expression overlay.
+    Winking,
+    /// Cool expression overlay.
+    Cool,
+    /// Crying expression overlay.
+    Crying,
+}
+
+impl AvatarExpression {
+    pub const ALL: &'static [Self] = &[
+        Self::Default,
+        Self::Happy,
+        Self::Grumpy,
+        Self::Surprised,
+        Self::Sleepy,
+        Self::Winking,
+        Self::Cool,
+        Self::Crying,
+    ];
+
+    pub fn from_byte(value: u8) -> Self {
+        Self::ALL[usize::from(value) % Self::ALL.len()]
+    }
+
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Default => "default",
+            Self::Happy => "happy",
+            Self::Grumpy => "grumpy",
+            Self::Surprised => "surprised",
+            Self::Sleepy => "sleepy",
+            Self::Winking => "winking",
+            Self::Cool => "cool",
+            Self::Crying => "crying",
+        }
+    }
+}
+
+impl FromStr for AvatarExpression {
+    type Err = &'static str;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s.trim().to_ascii_lowercase().as_str() {
+            "default" => Ok(Self::Default),
+            "happy" => Ok(Self::Happy),
+            "grumpy" => Ok(Self::Grumpy),
+            "surprised" => Ok(Self::Surprised),
+            "sleepy" => Ok(Self::Sleepy),
+            "winking" | "wink" => Ok(Self::Winking),
+            "cool" => Ok(Self::Cool),
+            "crying" => Ok(Self::Crying),
+            _ => Err("unsupported avatar expression"),
+        }
+    }
+}
+
+impl std::fmt::Display for AvatarExpression {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(self.as_str())
+    }
+}
+
+/// Optional frame shape for the generated avatar.
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub enum AvatarShape {
+    /// Default square canvas.
+    #[default]
+    Square,
+    /// Circular frame.
+    Circle,
+    /// Rounded rectangle frame.
+    Squircle,
+    /// Hexagonal frame.
+    Hexagon,
+    /// Octagonal frame.
+    Octagon,
+}
+
+impl AvatarShape {
+    pub const ALL: &'static [Self] = &[
+        Self::Square,
+        Self::Circle,
+        Self::Squircle,
+        Self::Hexagon,
+        Self::Octagon,
+    ];
+
+    pub fn from_byte(value: u8) -> Self {
+        Self::ALL[usize::from(value) % Self::ALL.len()]
+    }
+
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Square => "square",
+            Self::Circle => "circle",
+            Self::Squircle => "squircle",
+            Self::Hexagon => "hexagon",
+            Self::Octagon => "octagon",
+        }
+    }
+}
+
+impl FromStr for AvatarShape {
+    type Err = &'static str;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s.trim().to_ascii_lowercase().as_str() {
+            "square" => Ok(Self::Square),
+            "circle" => Ok(Self::Circle),
+            "squircle" => Ok(Self::Squircle),
+            "hexagon" => Ok(Self::Hexagon),
+            "octagon" => Ok(Self::Octagon),
+            _ => Err("unsupported avatar shape"),
+        }
+    }
+}
+
+impl std::fmt::Display for AvatarShape {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(self.as_str())
+    }
+}
+
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 pub struct AvatarOptions {
     pub kind: AvatarKind,
@@ -1481,6 +1788,83 @@ pub struct AvatarOptions {
 impl AvatarOptions {
     pub const fn new(kind: AvatarKind, background: AvatarBackground) -> Self {
         Self { kind, background }
+    }
+}
+
+/// Full avatar style selection including the baseline kind/background and
+/// optional visual layers.
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub struct AvatarStyleOptions {
+    pub kind: AvatarKind,
+    pub background: AvatarBackground,
+    pub accessory: AvatarAccessory,
+    pub color: AvatarColor,
+    pub expression: AvatarExpression,
+    pub shape: AvatarShape,
+}
+
+impl AvatarStyleOptions {
+    pub const fn new(
+        kind: AvatarKind,
+        background: AvatarBackground,
+        accessory: AvatarAccessory,
+        color: AvatarColor,
+        expression: AvatarExpression,
+        shape: AvatarShape,
+    ) -> Self {
+        Self {
+            kind,
+            background,
+            accessory,
+            color,
+            expression,
+            shape,
+        }
+    }
+
+    pub const fn from_options(options: AvatarOptions) -> Self {
+        Self {
+            kind: options.kind,
+            background: options.background,
+            accessory: AvatarAccessory::None,
+            color: AvatarColor::Default,
+            expression: AvatarExpression::Default,
+            shape: AvatarShape::Square,
+        }
+    }
+
+    pub fn from_identity(identity: &AvatarIdentity) -> Self {
+        Self {
+            kind: AvatarKind::from_byte(identity.byte(AVATAR_STYLE_KIND_BYTE)),
+            background: AvatarBackground::from_byte(identity.byte(AVATAR_STYLE_BACKGROUND_BYTE)),
+            accessory: AvatarAccessory::from_byte(identity.byte(AVATAR_STYLE_ACCESSORY_BYTE)),
+            color: AvatarColor::from_byte(identity.byte(AVATAR_STYLE_COLOR_BYTE)),
+            expression: AvatarExpression::from_byte(identity.byte(AVATAR_STYLE_EXPRESSION_BYTE)),
+            shape: AvatarShape::from_byte(identity.byte(AVATAR_STYLE_SHAPE_BYTE)),
+        }
+    }
+
+    pub const fn legacy_options(self) -> AvatarOptions {
+        AvatarOptions::new(self.kind, self.background)
+    }
+
+    const fn has_extra_layers(self) -> bool {
+        !matches!(self.accessory, AvatarAccessory::None)
+            || !matches!(self.color, AvatarColor::Default)
+            || !matches!(self.expression, AvatarExpression::Default)
+            || !matches!(self.shape, AvatarShape::Square)
+    }
+}
+
+impl From<AvatarOptions> for AvatarStyleOptions {
+    fn from(options: AvatarOptions) -> Self {
+        Self::from_options(options)
+    }
+}
+
+impl From<AvatarStyleOptions> for AvatarOptions {
+    fn from(options: AvatarStyleOptions) -> Self {
+        options.legacy_options()
     }
 }
 
@@ -1690,11 +2074,81 @@ pub fn encode_avatar_with_identity_options<T: AsRef<[u8]>>(
     encode_owned_rgba_image(image, format)
 }
 
+pub fn encode_avatar_style_for_id<T: AsRef<[u8]>>(
+    spec: AvatarSpec,
+    id: T,
+    format: AvatarOutputFormat,
+    style: AvatarStyleOptions,
+) -> ImageResult<Vec<u8>> {
+    encode_avatar_style_for_namespace(spec, AvatarNamespace::default(), id, format, style)
+}
+
+pub fn encode_avatar_style_for_namespace<T: AsRef<[u8]>>(
+    spec: AvatarSpec,
+    namespace: AvatarNamespace<'_>,
+    id: T,
+    format: AvatarOutputFormat,
+    style: AvatarStyleOptions,
+) -> ImageResult<Vec<u8>> {
+    encode_avatar_style_with_identity_options(
+        spec,
+        AvatarIdentityOptions::new(namespace, AvatarHashAlgorithm::Sha512),
+        id,
+        format,
+        style,
+    )
+}
+
+pub fn encode_avatar_style_with_identity_options<T: AsRef<[u8]>>(
+    spec: AvatarSpec,
+    identity_options: AvatarIdentityOptions<'_>,
+    id: T,
+    format: AvatarOutputFormat,
+    style: AvatarStyleOptions,
+) -> ImageResult<Vec<u8>> {
+    let image = render_avatar_style_with_identity_options(spec, identity_options, id, style)
+        .map_err(avatar_render_error_to_image_error)?;
+    encode_owned_rgba_image(image, format)
+}
+
+pub fn encode_avatar_auto_for_id<T: AsRef<[u8]>>(
+    spec: AvatarSpec,
+    id: T,
+    format: AvatarOutputFormat,
+) -> ImageResult<Vec<u8>> {
+    encode_avatar_auto_for_namespace(spec, AvatarNamespace::default(), id, format)
+}
+
+pub fn encode_avatar_auto_for_namespace<T: AsRef<[u8]>>(
+    spec: AvatarSpec,
+    namespace: AvatarNamespace<'_>,
+    id: T,
+    format: AvatarOutputFormat,
+) -> ImageResult<Vec<u8>> {
+    encode_avatar_auto_with_identity_options(
+        spec,
+        AvatarIdentityOptions::new(namespace, AvatarHashAlgorithm::Sha512),
+        id,
+        format,
+    )
+}
+
+pub fn encode_avatar_auto_with_identity_options<T: AsRef<[u8]>>(
+    spec: AvatarSpec,
+    identity_options: AvatarIdentityOptions<'_>,
+    id: T,
+    format: AvatarOutputFormat,
+) -> ImageResult<Vec<u8>> {
+    let image = render_avatar_auto_with_identity_options(spec, identity_options, id)
+        .map_err(avatar_render_error_to_image_error)?;
+    encode_owned_rgba_image(image, format)
+}
+
 #[derive(Clone, Debug)]
 struct AvatarRenderPlan {
     spec: AvatarSpec,
     identity: AvatarIdentity,
-    options: AvatarOptions,
+    style: AvatarStyleOptions,
 }
 
 impl AvatarRenderPlan {
@@ -1704,114 +2158,130 @@ impl AvatarRenderPlan {
         id: T,
         options: AvatarOptions,
     ) -> Result<Self, AvatarRenderError> {
+        Self::new_with_style(
+            spec,
+            identity_options,
+            id,
+            AvatarStyleOptions::from(options),
+        )
+    }
+
+    fn new_with_style<T: AsRef<[u8]>>(
+        spec: AvatarSpec,
+        identity_options: AvatarIdentityOptions<'_>,
+        id: T,
+        style: AvatarStyleOptions,
+    ) -> Result<Self, AvatarRenderError> {
         spec.validate()?;
         let identity = AvatarIdentity::new_with_options(identity_options, id)?;
         Ok(Self {
             spec,
             identity,
-            options,
+            style,
+        })
+    }
+
+    fn new_auto<T: AsRef<[u8]>>(
+        spec: AvatarSpec,
+        identity_options: AvatarIdentityOptions<'_>,
+        id: T,
+    ) -> Result<Self, AvatarRenderError> {
+        spec.validate()?;
+        let identity = AvatarIdentity::new_with_options(identity_options, id)?;
+        let style = AvatarStyleOptions::from_identity(&identity);
+        Ok(Self {
+            spec,
+            identity,
+            style,
         })
     }
 
     fn render_rgba(&self) -> Result<RgbaImage, AvatarSpecError> {
-        match self.options.kind {
+        let mut image = match self.style.kind {
             AvatarKind::Cat => render_cat_avatar_for_identity_with_background(
                 self.spec,
                 &self.identity,
-                self.options.background,
+                self.style.background,
             ),
             AvatarKind::Dog => {
-                render_dog_avatar_for_identity(self.spec, &self.identity, self.options.background)
+                render_dog_avatar_for_identity(self.spec, &self.identity, self.style.background)
             }
             AvatarKind::Robot => {
-                render_robot_avatar_for_identity(self.spec, &self.identity, self.options.background)
+                render_robot_avatar_for_identity(self.spec, &self.identity, self.style.background)
             }
             AvatarKind::Fox => {
-                render_fox_avatar_for_identity(self.spec, &self.identity, self.options.background)
+                render_fox_avatar_for_identity(self.spec, &self.identity, self.style.background)
             }
             AvatarKind::Alien => {
-                render_alien_avatar_for_identity(self.spec, &self.identity, self.options.background)
+                render_alien_avatar_for_identity(self.spec, &self.identity, self.style.background)
             }
-            AvatarKind::Monster => render_monster_avatar_for_identity(
-                self.spec,
-                &self.identity,
-                self.options.background,
-            ),
+            AvatarKind::Monster => {
+                render_monster_avatar_for_identity(self.spec, &self.identity, self.style.background)
+            }
             AvatarKind::Ghost => {
-                render_ghost_avatar_for_identity(self.spec, &self.identity, self.options.background)
+                render_ghost_avatar_for_identity(self.spec, &self.identity, self.style.background)
             }
             AvatarKind::Slime => {
-                render_slime_avatar_for_identity(self.spec, &self.identity, self.options.background)
+                render_slime_avatar_for_identity(self.spec, &self.identity, self.style.background)
             }
             AvatarKind::Bird => {
-                render_bird_avatar_for_identity(self.spec, &self.identity, self.options.background)
+                render_bird_avatar_for_identity(self.spec, &self.identity, self.style.background)
             }
-            AvatarKind::Wizard => render_wizard_avatar_for_identity(
-                self.spec,
-                &self.identity,
-                self.options.background,
-            ),
+            AvatarKind::Wizard => {
+                render_wizard_avatar_for_identity(self.spec, &self.identity, self.style.background)
+            }
             AvatarKind::Skull => {
-                render_skull_avatar_for_identity(self.spec, &self.identity, self.options.background)
+                render_skull_avatar_for_identity(self.spec, &self.identity, self.style.background)
             }
             AvatarKind::Paws => {
-                render_paws_avatar_for_identity(self.spec, &self.identity, self.options.background)
+                render_paws_avatar_for_identity(self.spec, &self.identity, self.style.background)
             }
-            AvatarKind::Planet => render_planet_avatar_for_identity(
-                self.spec,
-                &self.identity,
-                self.options.background,
-            ),
-            AvatarKind::Rocket => render_rocket_avatar_for_identity(
-                self.spec,
-                &self.identity,
-                self.options.background,
-            ),
+            AvatarKind::Planet => {
+                render_planet_avatar_for_identity(self.spec, &self.identity, self.style.background)
+            }
+            AvatarKind::Rocket => {
+                render_rocket_avatar_for_identity(self.spec, &self.identity, self.style.background)
+            }
             AvatarKind::Mushroom => render_mushroom_avatar_for_identity(
                 self.spec,
                 &self.identity,
-                self.options.background,
+                self.style.background,
             ),
-            AvatarKind::Cactus => render_cactus_avatar_for_identity(
-                self.spec,
-                &self.identity,
-                self.options.background,
-            ),
+            AvatarKind::Cactus => {
+                render_cactus_avatar_for_identity(self.spec, &self.identity, self.style.background)
+            }
             AvatarKind::Frog => {
-                render_frog_avatar_for_identity(self.spec, &self.identity, self.options.background)
+                render_frog_avatar_for_identity(self.spec, &self.identity, self.style.background)
             }
             AvatarKind::Panda => {
-                render_panda_avatar_for_identity(self.spec, &self.identity, self.options.background)
+                render_panda_avatar_for_identity(self.spec, &self.identity, self.style.background)
             }
-            AvatarKind::Cupcake => render_cupcake_avatar_for_identity(
-                self.spec,
-                &self.identity,
-                self.options.background,
-            ),
+            AvatarKind::Cupcake => {
+                render_cupcake_avatar_for_identity(self.spec, &self.identity, self.style.background)
+            }
             AvatarKind::Pizza => {
-                render_pizza_avatar_for_identity(self.spec, &self.identity, self.options.background)
+                render_pizza_avatar_for_identity(self.spec, &self.identity, self.style.background)
             }
             AvatarKind::Icecream => render_icecream_avatar_for_identity(
                 self.spec,
                 &self.identity,
-                self.options.background,
+                self.style.background,
             ),
-            AvatarKind::Octopus => render_octopus_avatar_for_identity(
-                self.spec,
-                &self.identity,
-                self.options.background,
-            ),
-            AvatarKind::Knight => render_knight_avatar_for_identity(
-                self.spec,
-                &self.identity,
-                self.options.background,
-            ),
-        }
+            AvatarKind::Octopus => {
+                render_octopus_avatar_for_identity(self.spec, &self.identity, self.style.background)
+            }
+            AvatarKind::Knight => {
+                render_knight_avatar_for_identity(self.spec, &self.identity, self.style.background)
+            }
+        }?;
+
+        apply_style_layers(&mut image, self.spec, self.style, &self.identity);
+        Ok(image)
     }
 
     fn svg_background_color(&self) -> Color {
-        match self.options.background {
-            AvatarBackground::Themed => match self.options.kind {
+        match self.style.background {
+            AvatarBackground::Themed => match self.style.kind {
                 AvatarKind::Cat => {
                     hsl_to_color(28.0 + self.identity.unit_f32(2) * 40.0, 0.25, 0.92)
                 }
@@ -1891,7 +2361,7 @@ impl AvatarRenderPlan {
     }
 
     fn render_svg_body(&self) -> String {
-        match self.options.kind {
+        match self.style.kind {
             AvatarKind::Cat => render_cat_svg(self.spec, &self.identity),
             AvatarKind::Dog => render_dog_svg(self.spec, &self.identity),
             AvatarKind::Robot => render_robot_svg(self.spec, &self.identity),
@@ -1919,7 +2389,7 @@ impl AvatarRenderPlan {
     }
 
     fn render_svg(&self) -> String {
-        let background = match self.options.background {
+        let background = match self.style.background {
             AvatarBackground::Transparent => String::new(),
             AvatarBackground::Themed
             | AvatarBackground::White
@@ -1933,13 +2403,19 @@ impl AvatarRenderPlan {
             }
         };
 
+        let body = format!(
+            "{}{}",
+            self.render_svg_body(),
+            render_style_svg_layers(self.spec, self.style, &self.identity)
+        );
+
         format!(
             r#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {w} {h}" width="{w}" height="{h}" role="img" aria-label="{label} avatar">{background}{body}</svg>"#,
             w = self.spec.width,
             h = self.spec.height,
-            label = self.options.kind.as_str(),
+            label = self.style.kind.as_str(),
             background = background,
-            body = self.render_svg_body(),
+            body = body,
         )
         .replace('\n', "")
         .replace("  ", "")
@@ -1980,6 +2456,71 @@ pub fn render_avatar_with_identity_options<T: AsRef<[u8]>>(
         .map_err(AvatarRenderError::from)
 }
 
+/// Render an avatar image with explicit visual layer style options.
+pub fn render_avatar_style_for_id<T: AsRef<[u8]>>(
+    spec: AvatarSpec,
+    id: T,
+    style: AvatarStyleOptions,
+) -> Result<RgbaImage, AvatarRenderError> {
+    render_avatar_style_for_namespace(spec, AvatarNamespace::default(), id, style)
+}
+
+pub fn render_avatar_style_for_namespace<T: AsRef<[u8]>>(
+    spec: AvatarSpec,
+    namespace: AvatarNamespace<'_>,
+    id: T,
+    style: AvatarStyleOptions,
+) -> Result<RgbaImage, AvatarRenderError> {
+    render_avatar_style_with_identity_options(
+        spec,
+        AvatarIdentityOptions::new(namespace, AvatarHashAlgorithm::Sha512),
+        id,
+        style,
+    )
+}
+
+pub fn render_avatar_style_with_identity_options<T: AsRef<[u8]>>(
+    spec: AvatarSpec,
+    identity_options: AvatarIdentityOptions<'_>,
+    id: T,
+    style: AvatarStyleOptions,
+) -> Result<RgbaImage, AvatarRenderError> {
+    AvatarRenderPlan::new_with_style(spec, identity_options, id, style)?
+        .render_rgba()
+        .map_err(AvatarRenderError::from)
+}
+
+/// Render an avatar image with all public style choices derived from distinct
+/// identity digest bytes.
+pub fn render_avatar_auto_for_id<T: AsRef<[u8]>>(
+    spec: AvatarSpec,
+    id: T,
+) -> Result<RgbaImage, AvatarRenderError> {
+    render_avatar_auto_for_namespace(spec, AvatarNamespace::default(), id)
+}
+
+pub fn render_avatar_auto_for_namespace<T: AsRef<[u8]>>(
+    spec: AvatarSpec,
+    namespace: AvatarNamespace<'_>,
+    id: T,
+) -> Result<RgbaImage, AvatarRenderError> {
+    render_avatar_auto_with_identity_options(
+        spec,
+        AvatarIdentityOptions::new(namespace, AvatarHashAlgorithm::Sha512),
+        id,
+    )
+}
+
+pub fn render_avatar_auto_with_identity_options<T: AsRef<[u8]>>(
+    spec: AvatarSpec,
+    identity_options: AvatarIdentityOptions<'_>,
+    id: T,
+) -> Result<RgbaImage, AvatarRenderError> {
+    AvatarRenderPlan::new_auto(spec, identity_options, id)?
+        .render_rgba()
+        .map_err(AvatarRenderError::from)
+}
+
 /// Render an avatar as a compact SVG string.
 pub fn render_avatar_svg_for_id<T: AsRef<[u8]>>(
     spec: AvatarSpec,
@@ -2010,6 +2551,1177 @@ pub fn render_avatar_svg_with_identity_options<T: AsRef<[u8]>>(
     options: AvatarOptions,
 ) -> Result<String, AvatarRenderError> {
     Ok(AvatarRenderPlan::new(spec, identity_options, id, options)?.render_svg())
+}
+
+/// Render an avatar with explicit visual layer style options as a compact SVG string.
+pub fn render_avatar_svg_style_for_id<T: AsRef<[u8]>>(
+    spec: AvatarSpec,
+    id: T,
+    style: AvatarStyleOptions,
+) -> Result<String, AvatarRenderError> {
+    render_avatar_svg_style_for_namespace(spec, AvatarNamespace::default(), id, style)
+}
+
+pub fn render_avatar_svg_style_for_namespace<T: AsRef<[u8]>>(
+    spec: AvatarSpec,
+    namespace: AvatarNamespace<'_>,
+    id: T,
+    style: AvatarStyleOptions,
+) -> Result<String, AvatarRenderError> {
+    render_avatar_svg_style_with_identity_options(
+        spec,
+        AvatarIdentityOptions::new(namespace, AvatarHashAlgorithm::Sha512),
+        id,
+        style,
+    )
+}
+
+pub fn render_avatar_svg_style_with_identity_options<T: AsRef<[u8]>>(
+    spec: AvatarSpec,
+    identity_options: AvatarIdentityOptions<'_>,
+    id: T,
+    style: AvatarStyleOptions,
+) -> Result<String, AvatarRenderError> {
+    Ok(AvatarRenderPlan::new_with_style(spec, identity_options, id, style)?.render_svg())
+}
+
+/// Render an avatar SVG with all public style choices derived from distinct
+/// identity digest bytes.
+pub fn render_avatar_svg_auto_for_id<T: AsRef<[u8]>>(
+    spec: AvatarSpec,
+    id: T,
+) -> Result<String, AvatarRenderError> {
+    render_avatar_svg_auto_for_namespace(spec, AvatarNamespace::default(), id)
+}
+
+pub fn render_avatar_svg_auto_for_namespace<T: AsRef<[u8]>>(
+    spec: AvatarSpec,
+    namespace: AvatarNamespace<'_>,
+    id: T,
+) -> Result<String, AvatarRenderError> {
+    render_avatar_svg_auto_with_identity_options(
+        spec,
+        AvatarIdentityOptions::new(namespace, AvatarHashAlgorithm::Sha512),
+        id,
+    )
+}
+
+pub fn render_avatar_svg_auto_with_identity_options<T: AsRef<[u8]>>(
+    spec: AvatarSpec,
+    identity_options: AvatarIdentityOptions<'_>,
+    id: T,
+) -> Result<String, AvatarRenderError> {
+    Ok(AvatarRenderPlan::new_auto(spec, identity_options, id)?.render_svg())
+}
+
+fn apply_style_layers(
+    image: &mut RgbaImage,
+    spec: AvatarSpec,
+    style: AvatarStyleOptions,
+    identity: &AvatarIdentity,
+) {
+    if !style.has_extra_layers() {
+        return;
+    }
+
+    let accent = style_accent_color(style.color, identity);
+    if style.color != AvatarColor::Default {
+        draw_style_color_layer(image, spec, accent);
+    }
+    draw_expression_layer(image, spec, style.kind, style.expression, accent);
+    draw_accessory_layer(image, spec, style.kind, style.accessory, accent);
+    apply_shape_layer(image, spec, style.shape, accent);
+}
+
+#[derive(Clone, Copy, Debug)]
+struct AvatarLayerAnchors {
+    left_eye: (f32, f32),
+    right_eye: (f32, f32),
+    mouth: (f32, f32),
+    top: f32,
+    neck: f32,
+    face_width: f32,
+    eye_radius: f32,
+}
+
+impl AvatarLayerAnchors {
+    fn point(self, spec: AvatarSpec, point: (f32, f32)) -> (i32, i32) {
+        (
+            (point.0 * spec.width as f32).round() as i32,
+            (point.1 * spec.height as f32).round() as i32,
+        )
+    }
+
+    fn y(self, spec: AvatarSpec, value: f32) -> i32 {
+        (value * spec.height as f32).round() as i32
+    }
+
+    fn span(self, spec: AvatarSpec, value: f32) -> i32 {
+        (value * spec.width.min(spec.height) as f32).round() as i32
+    }
+}
+
+fn avatar_layer_anchors(kind: AvatarKind) -> Option<AvatarLayerAnchors> {
+    let anchors = match kind {
+        AvatarKind::Cat => AvatarLayerAnchors {
+            left_eye: (0.40, 0.50),
+            right_eye: (0.60, 0.50),
+            mouth: (0.50, 0.62),
+            top: 0.28,
+            neck: 0.72,
+            face_width: 0.58,
+            eye_radius: 0.055,
+        },
+        AvatarKind::Dog => AvatarLayerAnchors {
+            left_eye: (0.40, 0.46),
+            right_eye: (0.60, 0.46),
+            mouth: (0.50, 0.61),
+            top: 0.24,
+            neck: 0.72,
+            face_width: 0.62,
+            eye_radius: 0.055,
+        },
+        AvatarKind::Robot => AvatarLayerAnchors {
+            left_eye: (0.38, 0.45),
+            right_eye: (0.62, 0.45),
+            mouth: (0.50, 0.60),
+            top: 0.25,
+            neck: 0.72,
+            face_width: 0.54,
+            eye_radius: 0.060,
+        },
+        AvatarKind::Fox => AvatarLayerAnchors {
+            left_eye: (0.40, 0.48),
+            right_eye: (0.60, 0.48),
+            mouth: (0.50, 0.62),
+            top: 0.25,
+            neck: 0.72,
+            face_width: 0.60,
+            eye_radius: 0.050,
+        },
+        AvatarKind::Alien => AvatarLayerAnchors {
+            left_eye: (0.39, 0.48),
+            right_eye: (0.61, 0.48),
+            mouth: (0.50, 0.63),
+            top: 0.25,
+            neck: 0.72,
+            face_width: 0.58,
+            eye_radius: 0.070,
+        },
+        AvatarKind::Monster => AvatarLayerAnchors {
+            left_eye: (0.45, 0.52),
+            right_eye: (0.55, 0.52),
+            mouth: (0.50, 0.66),
+            top: 0.27,
+            neck: 0.74,
+            face_width: 0.62,
+            eye_radius: 0.045,
+        },
+        AvatarKind::Ghost => AvatarLayerAnchors {
+            left_eye: (0.44, 0.50),
+            right_eye: (0.56, 0.50),
+            mouth: (0.50, 0.61),
+            top: 0.27,
+            neck: 0.72,
+            face_width: 0.54,
+            eye_radius: 0.045,
+        },
+        AvatarKind::Slime => AvatarLayerAnchors {
+            left_eye: (0.40, 0.48),
+            right_eye: (0.60, 0.48),
+            mouth: (0.50, 0.61),
+            top: 0.32,
+            neck: 0.73,
+            face_width: 0.58,
+            eye_radius: 0.055,
+        },
+        AvatarKind::Bird => AvatarLayerAnchors {
+            left_eye: (0.445, 0.51),
+            right_eye: (0.555, 0.51),
+            mouth: (0.50, 0.61),
+            top: 0.31,
+            neck: 0.70,
+            face_width: 0.50,
+            eye_radius: 0.035,
+        },
+        AvatarKind::Wizard => AvatarLayerAnchors {
+            left_eye: (0.455, 0.55),
+            right_eye: (0.545, 0.55),
+            mouth: (0.50, 0.67),
+            top: 0.36,
+            neck: 0.73,
+            face_width: 0.44,
+            eye_radius: 0.040,
+        },
+        AvatarKind::Skull => AvatarLayerAnchors {
+            left_eye: (0.40, 0.45),
+            right_eye: (0.60, 0.45),
+            mouth: (0.50, 0.63),
+            top: 0.24,
+            neck: 0.72,
+            face_width: 0.55,
+            eye_radius: 0.065,
+        },
+        AvatarKind::Frog => AvatarLayerAnchors {
+            left_eye: (0.37, 0.39),
+            right_eye: (0.63, 0.39),
+            mouth: (0.50, 0.62),
+            top: 0.25,
+            neck: 0.72,
+            face_width: 0.64,
+            eye_radius: 0.070,
+        },
+        AvatarKind::Panda => AvatarLayerAnchors {
+            left_eye: (0.41, 0.53),
+            right_eye: (0.59, 0.53),
+            mouth: (0.50, 0.62),
+            top: 0.28,
+            neck: 0.72,
+            face_width: 0.62,
+            eye_radius: 0.040,
+        },
+        AvatarKind::Octopus => AvatarLayerAnchors {
+            left_eye: (0.42, 0.52),
+            right_eye: (0.58, 0.52),
+            mouth: (0.50, 0.65),
+            top: 0.28,
+            neck: 0.70,
+            face_width: 0.58,
+            eye_radius: 0.045,
+        },
+        AvatarKind::Knight => AvatarLayerAnchors {
+            left_eye: (0.40, 0.45),
+            right_eye: (0.60, 0.45),
+            mouth: (0.50, 0.60),
+            top: 0.22,
+            neck: 0.72,
+            face_width: 0.58,
+            eye_radius: 0.050,
+        },
+        AvatarKind::Paws
+        | AvatarKind::Planet
+        | AvatarKind::Rocket
+        | AvatarKind::Mushroom
+        | AvatarKind::Cactus
+        | AvatarKind::Cupcake
+        | AvatarKind::Pizza
+        | AvatarKind::Icecream => return None,
+    };
+    Some(anchors)
+}
+
+fn style_accent_color(color: AvatarColor, identity: &AvatarIdentity) -> Color {
+    match color {
+        AvatarColor::Default => hsl_to_color(180.0 + identity.unit_f32(25) * 160.0, 0.58, 0.48),
+        AvatarColor::NeonMint => Color::rgb(27, 235, 179),
+        AvatarColor::PastelPink => Color::rgb(246, 160, 196),
+        AvatarColor::Crimson => Color::rgb(190, 18, 60),
+        AvatarColor::Gold => Color::rgb(234, 179, 8),
+        AvatarColor::DeepSeaBlue => Color::rgb(14, 116, 144),
+    }
+}
+
+fn rgba_with_alpha(color: Color, alpha: u8) -> Rgba<u8> {
+    Rgba([color.0[0], color.0[1], color.0[2], alpha])
+}
+
+fn blend_pixel(image: &mut RgbaImage, x: i32, y: i32, source: Rgba<u8>) {
+    if !in_bounds(image, x, y) {
+        return;
+    }
+
+    let destination = *image.get_pixel(x as u32, y as u32);
+    let alpha = u32::from(source.0[3]);
+    let inverse = 255 - alpha;
+    let blended = Rgba([
+        ((u32::from(source.0[0]) * alpha + u32::from(destination.0[0]) * inverse + 127) / 255)
+            as u8,
+        ((u32::from(source.0[1]) * alpha + u32::from(destination.0[1]) * inverse + 127) / 255)
+            as u8,
+        ((u32::from(source.0[2]) * alpha + u32::from(destination.0[2]) * inverse + 127) / 255)
+            as u8,
+        source.0[3].saturating_add(((u32::from(destination.0[3]) * inverse + 127) / 255) as u8),
+    ]);
+    image.put_pixel(x as u32, y as u32, blended);
+}
+
+fn draw_blended_rect_mut(image: &mut RgbaImage, rect: Rect, color: Rgba<u8>) {
+    if image.width() == 0 || image.height() == 0 {
+        return;
+    }
+
+    let bounds = Rect::at(0, 0).of_size(image.width(), image.height());
+    if let Some(intersection) = bounds.intersect(rect) {
+        for dy in 0..intersection.height() {
+            for dx in 0..intersection.width() {
+                let x = intersection.left() + dx as i32;
+                let y = intersection.top() + dy as i32;
+                blend_pixel(image, x, y, color);
+            }
+        }
+    }
+}
+
+fn draw_style_color_layer(image: &mut RgbaImage, spec: AvatarSpec, accent: Color) {
+    let width = spec.width as i32;
+    let height = spec.height as i32;
+    let bar_height = ((height as f32 * 0.08) as u32).max(3);
+    draw_blended_rect_mut(
+        image,
+        Rect::at(0, height - bar_height as i32).of_size(spec.width, bar_height),
+        rgba_with_alpha(accent, 210),
+    );
+
+    let stripe = ((spec.width.min(spec.height) as f32 * 0.03) as u32).max(2);
+    draw_blended_rect_mut(
+        image,
+        Rect::at(0, 0).of_size(stripe, spec.height),
+        rgba_with_alpha(accent, 145),
+    );
+    draw_blended_rect_mut(
+        image,
+        Rect::at(width - stripe as i32, 0).of_size(stripe, spec.height),
+        rgba_with_alpha(accent, 145),
+    );
+}
+
+fn draw_accessory_layer(
+    image: &mut RgbaImage,
+    spec: AvatarSpec,
+    kind: AvatarKind,
+    accessory: AvatarAccessory,
+    accent: Color,
+) {
+    if accessory == AvatarAccessory::None {
+        return;
+    }
+
+    let Some(anchors) = avatar_layer_anchors(kind) else {
+        return;
+    };
+
+    let min = spec.width.min(spec.height) as i32;
+    let (left_eye_x, left_eye_y) = anchors.point(spec, anchors.left_eye);
+    let (right_eye_x, right_eye_y) = anchors.point(spec, anchors.right_eye);
+    let (mouth_x, mouth_y) = anchors.point(spec, anchors.mouth);
+    let eye_y = (left_eye_y + right_eye_y) / 2;
+    let top_y = anchors.y(spec, anchors.top);
+    let neck_y = anchors.y(spec, anchors.neck);
+    let face_half = anchors.span(spec, anchors.face_width) / 2;
+    let eye_radius = anchors.span(spec, anchors.eye_radius).max(3);
+    let dark = Rgba([31, 41, 55, 255]);
+    let light = rgba_with_alpha(accent, 255);
+
+    match accessory {
+        AvatarAccessory::None => {}
+        AvatarAccessory::Glasses => {
+            let radius = (eye_radius * 2).max(5);
+            draw_hollow_circle_mut(image, (left_eye_x, left_eye_y), radius, dark);
+            draw_hollow_circle_mut(image, (right_eye_x, right_eye_y), radius, dark);
+            draw_line_segment_mut(
+                image,
+                ((left_eye_x + radius) as f32, left_eye_y as f32),
+                ((right_eye_x - radius) as f32, right_eye_y as f32),
+                dark,
+            );
+        }
+        AvatarAccessory::Hat => {
+            let brim_w = (face_half * 14 / 10).max(min * 20 / 100);
+            let brim_h = (min * 5 / 100).max(2);
+            let top_w = (brim_w * 7 / 10).max(min * 16 / 100);
+            let top_h = min * 18 / 100;
+            let y = (top_y - top_h / 2).max(0);
+            draw_filled_rect_mut(
+                image,
+                Rect::at(mouth_x - top_w / 2, y).of_size(top_w as u32, top_h as u32),
+                light,
+            );
+            draw_filled_rect_mut(
+                image,
+                Rect::at(mouth_x - brim_w / 2, y + top_h).of_size(brim_w as u32, brim_h as u32),
+                dark,
+            );
+        }
+        AvatarAccessory::Headphones => {
+            let side_r = (eye_radius * 2).max(5);
+            let left_x = mouth_x - face_half;
+            let right_x = mouth_x + face_half;
+            draw_hollow_ellipse_mut(
+                image,
+                (mouth_x, eye_y),
+                face_half,
+                (eye_y - top_y).max(min * 8 / 100),
+                dark,
+            );
+            draw_filled_circle_mut(image, (left_x, eye_y), side_r, light);
+            draw_filled_circle_mut(image, (right_x, eye_y), side_r, light);
+            draw_hollow_circle_mut(image, (left_x, eye_y), side_r, dark);
+            draw_hollow_circle_mut(image, (right_x, eye_y), side_r, dark);
+        }
+        AvatarAccessory::Crown => {
+            let base_y = top_y;
+            let points = [
+                Point::new(mouth_x - face_half * 7 / 10, base_y + min * 12 / 100),
+                Point::new(mouth_x - face_half * 45 / 100, base_y),
+                Point::new(mouth_x - face_half * 16 / 100, base_y + min * 10 / 100),
+                Point::new(mouth_x, (base_y - min * 4 / 100).max(0)),
+                Point::new(mouth_x + face_half * 16 / 100, base_y + min * 10 / 100),
+                Point::new(mouth_x + face_half * 45 / 100, base_y),
+                Point::new(mouth_x + face_half * 7 / 10, base_y + min * 12 / 100),
+            ];
+            draw_polygon_mut(image, &points, light);
+            draw_line_segment_mut(
+                image,
+                (
+                    (mouth_x - face_half * 7 / 10) as f32,
+                    (base_y + min * 12 / 100) as f32,
+                ),
+                (
+                    (mouth_x + face_half * 7 / 10) as f32,
+                    (base_y + min * 12 / 100) as f32,
+                ),
+                dark,
+            );
+        }
+        AvatarAccessory::Bowtie => {
+            let y = neck_y;
+            let size = min * 10 / 100;
+            let left = [
+                Point::new(mouth_x, y),
+                Point::new(mouth_x - size * 2, y - size),
+                Point::new(mouth_x - size * 2, y + size),
+            ];
+            let right = [
+                Point::new(mouth_x, y),
+                Point::new(mouth_x + size * 2, y - size),
+                Point::new(mouth_x + size * 2, y + size),
+            ];
+            draw_polygon_mut(image, &left, light);
+            draw_polygon_mut(image, &right, light);
+            draw_filled_circle_mut(image, (mouth_x, y), (size / 2).max(2), dark);
+        }
+        AvatarAccessory::Eyepatch => {
+            let patch_rx = (eye_radius * 2).max(5);
+            let patch_ry = (eye_radius * 3 / 2).max(4);
+            draw_line_segment_mut(
+                image,
+                ((mouth_x - face_half) as f32, top_y as f32),
+                (
+                    (mouth_x + face_half * 7 / 10) as f32,
+                    (mouth_y - eye_radius) as f32,
+                ),
+                dark,
+            );
+            draw_filled_ellipse_mut(image, (left_eye_x, left_eye_y), patch_rx, patch_ry, dark);
+        }
+        AvatarAccessory::Scarf => {
+            let scarf_h = (min * 8 / 100).max(4);
+            let y = neck_y;
+            draw_filled_rect_mut(
+                image,
+                Rect::at(mouth_x - face_half * 8 / 10, y)
+                    .of_size((face_half * 16 / 10) as u32, scarf_h as u32),
+                light,
+            );
+            draw_filled_rect_mut(
+                image,
+                Rect::at(mouth_x + face_half / 5, y + scarf_h / 2)
+                    .of_size((min * 9 / 100) as u32, (min * 20 / 100) as u32),
+                light,
+            );
+        }
+        AvatarAccessory::Halo => {
+            draw_hollow_ellipse_mut(
+                image,
+                (mouth_x, (top_y - min * 7 / 100).max(0)),
+                (face_half * 7 / 10).max(min * 10 / 100),
+                min * 7 / 100,
+                light,
+            );
+        }
+        AvatarAccessory::Horns => {
+            let y = top_y + min * 5 / 100;
+            let left = [
+                Point::new(mouth_x - face_half * 6 / 10, y + min * 7 / 100),
+                Point::new(mouth_x - face_half, (y - min * 12 / 100).max(0)),
+                Point::new(mouth_x - face_half * 3 / 10, y + min * 2 / 100),
+            ];
+            let right = [
+                Point::new(mouth_x + face_half * 6 / 10, y + min * 7 / 100),
+                Point::new(mouth_x + face_half, (y - min * 12 / 100).max(0)),
+                Point::new(mouth_x + face_half * 3 / 10, y + min * 2 / 100),
+            ];
+            draw_polygon_mut(image, &left, light);
+            draw_polygon_mut(image, &right, light);
+        }
+    }
+}
+
+fn draw_expression_layer(
+    image: &mut RgbaImage,
+    spec: AvatarSpec,
+    kind: AvatarKind,
+    expression: AvatarExpression,
+    accent: Color,
+) {
+    if expression == AvatarExpression::Default {
+        return;
+    }
+
+    let Some(anchors) = avatar_layer_anchors(kind) else {
+        return;
+    };
+
+    let min = spec.width.min(spec.height) as i32;
+    let (left_eye_x, left_eye_y) = anchors.point(spec, anchors.left_eye);
+    let (right_eye_x, right_eye_y) = anchors.point(spec, anchors.right_eye);
+    let (mouth_x, mouth_y) = anchors.point(spec, anchors.mouth);
+    let eye_radius = anchors.span(spec, anchors.eye_radius).max(3);
+    let dark = Rgba([17, 24, 39, 255]);
+    let accent = rgba_with_alpha(accent, 255);
+
+    match expression {
+        AvatarExpression::Default => {}
+        AvatarExpression::Happy => {
+            draw_smile_curve(
+                image,
+                mouth_x,
+                mouth_y,
+                min * 14 / 100,
+                min * 8 / 100,
+                false,
+                dark,
+            );
+        }
+        AvatarExpression::Grumpy => {
+            draw_smile_curve(
+                image,
+                mouth_x,
+                mouth_y + min * 7 / 100,
+                min * 14 / 100,
+                min * 8 / 100,
+                true,
+                dark,
+            );
+        }
+        AvatarExpression::Surprised => {
+            draw_hollow_circle_mut(image, (mouth_x, mouth_y), (min * 7 / 100).max(3), dark);
+        }
+        AvatarExpression::Sleepy => {
+            draw_line_segment_mut(
+                image,
+                ((left_eye_x - eye_radius) as f32, left_eye_y as f32),
+                ((left_eye_x + eye_radius) as f32, left_eye_y as f32),
+                dark,
+            );
+            draw_line_segment_mut(
+                image,
+                ((right_eye_x - eye_radius) as f32, right_eye_y as f32),
+                ((right_eye_x + eye_radius) as f32, right_eye_y as f32),
+                dark,
+            );
+        }
+        AvatarExpression::Winking => {
+            draw_line_segment_mut(
+                image,
+                ((left_eye_x - eye_radius) as f32, left_eye_y as f32),
+                ((left_eye_x + eye_radius) as f32, left_eye_y as f32),
+                dark,
+            );
+            draw_filled_circle_mut(
+                image,
+                (right_eye_x, right_eye_y),
+                (eye_radius * 7 / 10).max(2),
+                dark,
+            );
+        }
+        AvatarExpression::Cool => {
+            let rect_h = (eye_radius * 2).max(4) as u32;
+            let left = left_eye_x.min(right_eye_x) - eye_radius * 2;
+            let width = (right_eye_x.max(left_eye_x) - left + eye_radius * 2).max(min * 24 / 100);
+            draw_filled_rect_mut(
+                image,
+                Rect::at(left, left_eye_y.min(right_eye_y) - eye_radius)
+                    .of_size(width as u32, rect_h),
+                dark,
+            );
+            draw_blended_rect_mut(
+                image,
+                Rect::at(
+                    left + eye_radius,
+                    left_eye_y.min(right_eye_y) - eye_radius / 2,
+                )
+                .of_size((width / 3).max(2) as u32, (eye_radius / 2).max(2) as u32),
+                Rgba([255, 255, 255, 70]),
+            );
+        }
+        AvatarExpression::Crying => {
+            draw_smile_curve(
+                image,
+                mouth_x,
+                mouth_y + min * 7 / 100,
+                min * 12 / 100,
+                min * 7 / 100,
+                true,
+                dark,
+            );
+            draw_filled_ellipse_mut(
+                image,
+                (right_eye_x + eye_radius, right_eye_y + eye_radius * 2),
+                (eye_radius * 7 / 10).max(2),
+                (eye_radius * 3 / 2).max(4),
+                accent,
+            );
+        }
+    }
+}
+
+fn draw_smile_curve(
+    image: &mut RgbaImage,
+    cx: i32,
+    cy: i32,
+    width: i32,
+    height: i32,
+    inverted: bool,
+    color: Rgba<u8>,
+) {
+    let mut previous = None;
+    for step in 0..=16 {
+        let t = step as f32 / 16.0;
+        let x = cx - width + (2.0 * width as f32 * t) as i32;
+        let curve = (1.0 - (2.0 * t - 1.0).powi(2)) * height as f32;
+        let y = if inverted {
+            cy - curve as i32
+        } else {
+            cy + curve as i32
+        };
+        if let Some((px, py)) = previous {
+            draw_antialiased_line_segment_mut(image, (px, py), (x, y), color, interpolate);
+        }
+        previous = Some((x, y));
+    }
+}
+
+fn draw_hollow_ellipse_mut(
+    image: &mut RgbaImage,
+    center: (i32, i32),
+    width_radius: i32,
+    height_radius: i32,
+    color: Rgba<u8>,
+) {
+    let (cx, cy) = center;
+    let steps = (width_radius.max(height_radius) * 8).max(24);
+    let mut previous = None;
+    for step in 0..=steps {
+        let angle = step as f32 / steps as f32 * std::f32::consts::TAU;
+        let x = cx + (angle.cos() * width_radius as f32).round() as i32;
+        let y = cy + (angle.sin() * height_radius as f32).round() as i32;
+        if let Some((px, py)) = previous {
+            draw_antialiased_line_segment_mut(image, (px, py), (x, y), color, interpolate);
+        }
+        previous = Some((x, y));
+    }
+}
+
+fn apply_shape_layer(image: &mut RgbaImage, spec: AvatarSpec, shape: AvatarShape, accent: Color) {
+    if shape == AvatarShape::Square {
+        return;
+    }
+
+    for y in 0..spec.height {
+        for x in 0..spec.width {
+            if !point_inside_avatar_shape(x as i32, y as i32, spec, shape) {
+                image.put_pixel(x, y, Rgba([255, 255, 255, 0]));
+            }
+        }
+    }
+
+    let frame = rgba_with_alpha(accent, 255);
+    for y in 0..spec.height as i32 {
+        for x in 0..spec.width as i32 {
+            if point_inside_avatar_shape(x, y, spec, shape)
+                && (!point_inside_avatar_shape(x - 1, y, spec, shape)
+                    || !point_inside_avatar_shape(x + 1, y, spec, shape)
+                    || !point_inside_avatar_shape(x, y - 1, spec, shape)
+                    || !point_inside_avatar_shape(x, y + 1, spec, shape))
+            {
+                image.put_pixel(x as u32, y as u32, frame);
+            }
+        }
+    }
+}
+
+fn point_inside_avatar_shape(x: i32, y: i32, spec: AvatarSpec, shape: AvatarShape) -> bool {
+    if x < 0 || y < 0 || x >= spec.width as i32 || y >= spec.height as i32 {
+        return false;
+    }
+
+    let w = spec.width as f32;
+    let h = spec.height as f32;
+    let xf = x as f32 + 0.5;
+    let yf = y as f32 + 0.5;
+
+    match shape {
+        AvatarShape::Square => true,
+        AvatarShape::Circle => {
+            let nx = (xf - w / 2.0) / (w / 2.0);
+            let ny = (yf - h / 2.0) / (h / 2.0);
+            nx * nx + ny * ny <= 1.0
+        }
+        AvatarShape::Squircle => {
+            let r = w.min(h) * 0.18;
+            let inner_left = r;
+            let inner_right = w - r;
+            let inner_top = r;
+            let inner_bottom = h - r;
+            if (xf >= inner_left && xf <= inner_right) || (yf >= inner_top && yf <= inner_bottom) {
+                true
+            } else {
+                let cx = if xf < inner_left {
+                    inner_left
+                } else {
+                    inner_right
+                };
+                let cy = if yf < inner_top {
+                    inner_top
+                } else {
+                    inner_bottom
+                };
+                (xf - cx).powi(2) + (yf - cy).powi(2) <= r.powi(2)
+            }
+        }
+        AvatarShape::Hexagon => point_inside_normalized_polygon(
+            xf,
+            yf,
+            w,
+            h,
+            &[
+                (0.25, 0.0),
+                (0.75, 0.0),
+                (1.0, 0.5),
+                (0.75, 1.0),
+                (0.25, 1.0),
+                (0.0, 0.5),
+            ],
+        ),
+        AvatarShape::Octagon => point_inside_normalized_polygon(
+            xf,
+            yf,
+            w,
+            h,
+            &[
+                (0.30, 0.0),
+                (0.70, 0.0),
+                (1.0, 0.30),
+                (1.0, 0.70),
+                (0.70, 1.0),
+                (0.30, 1.0),
+                (0.0, 0.70),
+                (0.0, 0.30),
+            ],
+        ),
+    }
+}
+
+fn point_inside_normalized_polygon(
+    x: f32,
+    y: f32,
+    width: f32,
+    height: f32,
+    points: &[(f32, f32)],
+) -> bool {
+    let mut inside = false;
+    let mut previous = points[points.len() - 1];
+    for &current in points {
+        let xi = current.0 * width;
+        let yi = current.1 * height;
+        let xj = previous.0 * width;
+        let yj = previous.1 * height;
+        let crosses = (yi > y) != (yj > y);
+        if crosses {
+            let at_x = (xj - xi) * (y - yi) / (yj - yi) + xi;
+            if x < at_x {
+                inside = !inside;
+            }
+        }
+        previous = current;
+    }
+    inside
+}
+
+fn render_style_svg_layers(
+    spec: AvatarSpec,
+    style: AvatarStyleOptions,
+    identity: &AvatarIdentity,
+) -> String {
+    if !style.has_extra_layers() {
+        return String::new();
+    }
+
+    let accent = style_accent_color(style.color, identity);
+    let mut svg = String::new();
+    if style.color != AvatarColor::Default {
+        svg.push_str(&render_color_svg_layer(spec, accent));
+    }
+    svg.push_str(&render_expression_svg_layer(
+        spec,
+        style.kind,
+        style.expression,
+        accent,
+    ));
+    svg.push_str(&render_accessory_svg_layer(
+        spec,
+        style.kind,
+        style.accessory,
+        accent,
+    ));
+    svg.push_str(&render_shape_svg_layer(spec, style.shape, accent));
+    svg
+}
+
+fn render_color_svg_layer(spec: AvatarSpec, accent: Color) -> String {
+    let bar_height = spec.height as f32 * 0.08;
+    let stripe = spec.width.min(spec.height) as f32 * 0.03;
+    format!(
+        r#"<g data-layer="color"><rect x="0" y="{bar_y}" width="{w}" height="{bar_h}" fill="{fill}" opacity="0.82"/><rect x="0" y="0" width="{stripe}" height="{h}" fill="{fill}" opacity="0.56"/><rect x="{right}" y="0" width="{stripe}" height="{h}" fill="{fill}" opacity="0.56"/></g>"#,
+        bar_y = spec.height as f32 - bar_height,
+        w = spec.width,
+        h = spec.height,
+        bar_h = bar_height,
+        stripe = stripe,
+        right = spec.width as f32 - stripe,
+        fill = color_hex(accent),
+    )
+}
+
+fn render_accessory_svg_layer(
+    spec: AvatarSpec,
+    kind: AvatarKind,
+    accessory: AvatarAccessory,
+    accent: Color,
+) -> String {
+    if accessory == AvatarAccessory::None {
+        return String::new();
+    }
+
+    let Some(anchors) = avatar_layer_anchors(kind) else {
+        return String::new();
+    };
+
+    let min = spec.width.min(spec.height) as f32;
+    let (left_eye_x, left_eye_y) = (
+        anchors.left_eye.0 * spec.width as f32,
+        anchors.left_eye.1 * spec.height as f32,
+    );
+    let (right_eye_x, right_eye_y) = (
+        anchors.right_eye.0 * spec.width as f32,
+        anchors.right_eye.1 * spec.height as f32,
+    );
+    let (mouth_x, mouth_y) = (
+        anchors.mouth.0 * spec.width as f32,
+        anchors.mouth.1 * spec.height as f32,
+    );
+    let eye_y = (left_eye_y + right_eye_y) / 2.0;
+    let top_y = anchors.top * spec.height as f32;
+    let neck_y = anchors.neck * spec.height as f32;
+    let face_half = anchors.face_width * min / 2.0;
+    let eye_radius = (anchors.eye_radius * min).max(3.0);
+    let fill = color_hex(accent);
+    let dark = "#1f2937";
+    let layer = accessory.as_str();
+
+    let body = match accessory {
+        AvatarAccessory::None => String::new(),
+        AvatarAccessory::Glasses => format!(
+            r#"<circle cx="{lx}" cy="{y}" r="{r}" fill="none" stroke="{dark}" stroke-width="3"/><circle cx="{rx}" cy="{y}" r="{r}" fill="none" stroke="{dark}" stroke-width="3"/><line x1="{l2}" y1="{y}" x2="{r2}" y2="{y}" stroke="{dark}" stroke-width="3"/>"#,
+            lx = left_eye_x,
+            rx = right_eye_x,
+            y = eye_y,
+            r = eye_radius * 2.0,
+            l2 = left_eye_x + eye_radius * 2.0,
+            r2 = right_eye_x - eye_radius * 2.0,
+        ),
+        AvatarAccessory::Hat => format!(
+            r#"<rect x="{x}" y="{y}" width="{tw}" height="{th}" fill="{fill}"/><rect x="{bx}" y="{by}" width="{bw}" height="{bh}" fill="{dark}"/>"#,
+            x = mouth_x - face_half * 0.35,
+            y = (top_y - min * 0.09).max(0.0),
+            tw = face_half * 0.70,
+            th = min * 0.18,
+            bx = mouth_x - face_half * 0.70,
+            by = (top_y - min * 0.09).max(0.0) + min * 0.18,
+            bw = face_half * 1.40,
+            bh = min * 0.05,
+        ),
+        AvatarAccessory::Headphones => format!(
+            r#"<path d="M {l} {y} A {r} {r} 0 0 1 {rr} {y}" fill="none" stroke="{dark}" stroke-width="4"/><circle cx="{l}" cy="{ear_y}" r="{er}" fill="{fill}" stroke="{dark}" stroke-width="2"/><circle cx="{rr}" cy="{ear_y}" r="{er}" fill="{fill}" stroke="{dark}" stroke-width="2"/>"#,
+            l = mouth_x - face_half,
+            rr = mouth_x + face_half,
+            y = eye_y,
+            r = face_half,
+            ear_y = eye_y,
+            er = eye_radius * 2.0,
+        ),
+        AvatarAccessory::Crown => {
+            let p = format!(
+                "{},{} {},{} {},{} {},{} {},{} {},{} {},{}",
+                mouth_x - face_half * 0.70,
+                top_y + min * 0.12,
+                mouth_x - face_half * 0.45,
+                top_y,
+                mouth_x - face_half * 0.16,
+                top_y + min * 0.10,
+                mouth_x,
+                (top_y - min * 0.04).max(0.0),
+                mouth_x + face_half * 0.16,
+                top_y + min * 0.10,
+                mouth_x + face_half * 0.45,
+                top_y,
+                mouth_x + face_half * 0.70,
+                top_y + min * 0.12
+            );
+            format!(
+                r#"<polygon points="{p}" fill="{fill}"/><line x1="{x1}" y1="{y}" x2="{x2}" y2="{y}" stroke="{dark}" stroke-width="3"/>"#,
+                x1 = mouth_x - face_half * 0.70,
+                x2 = mouth_x + face_half * 0.70,
+                y = top_y + min * 0.12,
+            )
+        }
+        AvatarAccessory::Bowtie => {
+            let lp = format!(
+                "{},{} {},{} {},{}",
+                mouth_x,
+                neck_y,
+                mouth_x - min * 0.20,
+                neck_y - min * 0.10,
+                mouth_x - min * 0.20,
+                neck_y + min * 0.10
+            );
+            let rp = format!(
+                "{},{} {},{} {},{}",
+                mouth_x,
+                neck_y,
+                mouth_x + min * 0.20,
+                neck_y - min * 0.10,
+                mouth_x + min * 0.20,
+                neck_y + min * 0.10
+            );
+            format!(
+                r#"<polygon points="{lp}" fill="{fill}"/><polygon points="{rp}" fill="{fill}"/><circle cx="{cx}" cy="{y}" r="{r}" fill="{dark}"/>"#,
+                cx = mouth_x,
+                y = neck_y,
+                r = min * 0.05,
+            )
+        }
+        AvatarAccessory::Eyepatch => format!(
+            r#"<line x1="{x1}" y1="{y1}" x2="{x2}" y2="{y2}" stroke="{dark}" stroke-width="3"/><ellipse cx="{cx}" cy="{cy}" rx="{rx}" ry="{ry}" fill="{dark}"/>"#,
+            x1 = mouth_x - face_half,
+            y1 = top_y,
+            x2 = mouth_x + face_half * 0.70,
+            y2 = mouth_y - eye_radius,
+            cx = left_eye_x,
+            cy = left_eye_y,
+            rx = eye_radius * 2.0,
+            ry = eye_radius * 1.5,
+        ),
+        AvatarAccessory::Scarf => format!(
+            r#"<rect x="{x}" y="{y}" width="{sw}" height="{sh}" fill="{fill}"/><rect x="{tx}" y="{ty}" width="{tw}" height="{th}" fill="{fill}"/>"#,
+            x = mouth_x - face_half * 0.80,
+            y = neck_y,
+            sw = face_half * 1.60,
+            sh = min * 0.08,
+            tx = mouth_x + face_half * 0.20,
+            ty = neck_y + min * 0.04,
+            tw = min * 0.09,
+            th = min * 0.20,
+        ),
+        AvatarAccessory::Halo => format!(
+            r#"<ellipse cx="{cx}" cy="{cy}" rx="{rx}" ry="{ry}" fill="none" stroke="{fill}" stroke-width="3"/>"#,
+            cx = mouth_x,
+            cy = (top_y - min * 0.07).max(0.0),
+            rx = (face_half * 0.70).max(min * 0.10),
+            ry = min * 0.07,
+        ),
+        AvatarAccessory::Horns => {
+            let lp = format!(
+                "{},{} {},{} {},{}",
+                mouth_x - face_half * 0.60,
+                top_y + min * 0.12,
+                mouth_x - face_half,
+                (top_y - min * 0.12).max(0.0),
+                mouth_x - face_half * 0.30,
+                top_y + min * 0.07
+            );
+            let rp = format!(
+                "{},{} {},{} {},{}",
+                mouth_x + face_half * 0.60,
+                top_y + min * 0.12,
+                mouth_x + face_half,
+                (top_y - min * 0.12).max(0.0),
+                mouth_x + face_half * 0.30,
+                top_y + min * 0.07
+            );
+            format!(
+                r#"<polygon points="{lp}" fill="{fill}"/><polygon points="{rp}" fill="{fill}"/>"#
+            )
+        }
+    };
+
+    format!(r#"<g data-layer="accessory-{layer}">{body}</g>"#)
+}
+
+fn render_expression_svg_layer(
+    spec: AvatarSpec,
+    kind: AvatarKind,
+    expression: AvatarExpression,
+    accent: Color,
+) -> String {
+    if expression == AvatarExpression::Default {
+        return String::new();
+    }
+
+    let Some(anchors) = avatar_layer_anchors(kind) else {
+        return String::new();
+    };
+
+    let min = spec.width.min(spec.height) as f32;
+    let left_eye_x = anchors.left_eye.0 * spec.width as f32;
+    let left_eye_y = anchors.left_eye.1 * spec.height as f32;
+    let right_eye_x = anchors.right_eye.0 * spec.width as f32;
+    let right_eye_y = anchors.right_eye.1 * spec.height as f32;
+    let mouth_x = anchors.mouth.0 * spec.width as f32;
+    let mouth_y = anchors.mouth.1 * spec.height as f32;
+    let eye_radius = (anchors.eye_radius * min).max(3.0);
+    let dark = "#111827";
+    let layer = expression.as_str();
+    let body = match expression {
+        AvatarExpression::Default => String::new(),
+        AvatarExpression::Happy => format!(
+            r#"<path d="M {x1} {y} Q {cx} {my} {x2} {y}" fill="none" stroke="{dark}" stroke-width="3" stroke-linecap="round"/>"#,
+            x1 = mouth_x - min * 0.14,
+            x2 = mouth_x + min * 0.14,
+            y = mouth_y,
+            cx = mouth_x,
+            my = mouth_y + min * 0.09,
+        ),
+        AvatarExpression::Grumpy => format!(
+            r#"<path d="M {x1} {y} Q {cx} {my} {x2} {y}" fill="none" stroke="{dark}" stroke-width="3" stroke-linecap="round"/>"#,
+            x1 = mouth_x - min * 0.14,
+            x2 = mouth_x + min * 0.14,
+            y = mouth_y,
+            cx = mouth_x,
+            my = mouth_y - min * 0.09,
+        ),
+        AvatarExpression::Surprised => format!(
+            r#"<circle cx="{cx}" cy="{y}" r="{r}" fill="none" stroke="{dark}" stroke-width="3"/>"#,
+            cx = mouth_x,
+            y = mouth_y,
+            r = min * 0.07,
+        ),
+        AvatarExpression::Sleepy => format!(
+            r#"<line x1="{x1}" y1="{ey}" x2="{x2}" y2="{ey}" stroke="{dark}" stroke-width="3" stroke-linecap="round"/><line x1="{x3}" y1="{ey}" x2="{x4}" y2="{ey}" stroke="{dark}" stroke-width="3" stroke-linecap="round"/>"#,
+            x1 = left_eye_x - eye_radius,
+            x2 = left_eye_x + eye_radius,
+            x3 = right_eye_x - eye_radius,
+            x4 = right_eye_x + eye_radius,
+            ey = (left_eye_y + right_eye_y) / 2.0,
+        ),
+        AvatarExpression::Winking => format!(
+            r#"<line x1="{x1}" y1="{ey}" x2="{x2}" y2="{ey}" stroke="{dark}" stroke-width="3" stroke-linecap="round"/><circle cx="{rx}" cy="{ey}" r="{r}" fill="{dark}"/>"#,
+            x1 = left_eye_x - eye_radius,
+            x2 = left_eye_x + eye_radius,
+            rx = right_eye_x,
+            ey = right_eye_y,
+            r = eye_radius * 0.70,
+        ),
+        AvatarExpression::Cool => format!(
+            r#"<rect x="{x}" y="{ey}" width="{ww}" height="{hh}" fill="{dark}"/>"#,
+            x = left_eye_x.min(right_eye_x) - eye_radius * 2.0,
+            ey = left_eye_y.min(right_eye_y) - eye_radius,
+            ww = right_eye_x.max(left_eye_x) - left_eye_x.min(right_eye_x) + eye_radius * 4.0,
+            hh = eye_radius * 2.0,
+        ),
+        AvatarExpression::Crying => format!(
+            r#"<path d="M {x1} {y} Q {cx} {my} {x2} {y}" fill="none" stroke="{dark}" stroke-width="3" stroke-linecap="round"/><ellipse cx="{tx}" cy="{ty}" rx="{rx}" ry="{ry}" fill="{fill}"/>"#,
+            x1 = mouth_x - min * 0.12,
+            x2 = mouth_x + min * 0.12,
+            y = mouth_y,
+            cx = mouth_x,
+            my = mouth_y - min * 0.08,
+            tx = right_eye_x + eye_radius,
+            ty = right_eye_y + eye_radius * 2.0,
+            rx = eye_radius * 0.70,
+            ry = eye_radius * 1.50,
+            fill = color_hex(accent),
+        ),
+    };
+    format!(r#"<g data-layer="expression-{layer}">{body}</g>"#)
+}
+
+fn render_shape_svg_layer(spec: AvatarSpec, shape: AvatarShape, accent: Color) -> String {
+    if shape == AvatarShape::Square {
+        return String::new();
+    }
+
+    let w = spec.width as f32;
+    let h = spec.height as f32;
+    let fill = color_hex(accent);
+    let body = match shape {
+        AvatarShape::Square => String::new(),
+        AvatarShape::Circle => format!(
+            r#"<ellipse cx="{cx}" cy="{cy}" rx="{rx}" ry="{ry}" fill="none" stroke="{fill}" stroke-width="3"/>"#,
+            cx = w / 2.0,
+            cy = h / 2.0,
+            rx = w / 2.0 - 1.5,
+            ry = h / 2.0 - 1.5,
+        ),
+        AvatarShape::Squircle => format!(
+            r#"<rect x="1.5" y="1.5" width="{rw}" height="{rh}" rx="{r}" ry="{r}" fill="none" stroke="{fill}" stroke-width="3"/>"#,
+            rw = w - 3.0,
+            rh = h - 3.0,
+            r = w.min(h) * 0.18,
+        ),
+        AvatarShape::Hexagon => {
+            let points = format!(
+                "{},{} {},{} {},{} {},{} {},{} {},{}",
+                w * 0.25,
+                1.5,
+                w * 0.75,
+                1.5,
+                w - 1.5,
+                h * 0.5,
+                w * 0.75,
+                h - 1.5,
+                w * 0.25,
+                h - 1.5,
+                1.5,
+                h * 0.5
+            );
+            format!(r#"<polygon points="{points}" fill="none" stroke="{fill}" stroke-width="3"/>"#)
+        }
+        AvatarShape::Octagon => {
+            let points = format!(
+                "{},{} {},{} {},{} {},{} {},{} {},{} {},{} {},{}",
+                w * 0.30,
+                1.5,
+                w * 0.70,
+                1.5,
+                w - 1.5,
+                h * 0.30,
+                w - 1.5,
+                h * 0.70,
+                w * 0.70,
+                h - 1.5,
+                w * 0.30,
+                h - 1.5,
+                1.5,
+                h * 0.70,
+                1.5,
+                h * 0.30
+            );
+            format!(r#"<polygon points="{points}" fill="none" stroke="{fill}" stroke-width="3"/>"#)
+        }
+    };
+    format!(r#"<g data-layer="shape-{}">{body}</g>"#, shape.as_str())
 }
 
 /// Render a cat face avatar into an RGBA image.
@@ -6599,6 +8311,30 @@ mod tests {
             .expect("valid avatar spec should render as svg")
     }
 
+    fn render_avatar_style_for_id<T: AsRef<[u8]>>(
+        spec: AvatarSpec,
+        id: T,
+        style: AvatarStyleOptions,
+    ) -> RgbaImage {
+        super::render_avatar_style_for_id(spec, id, style)
+            .expect("valid avatar style should render")
+    }
+
+    fn render_avatar_svg_style_for_id<T: AsRef<[u8]>>(
+        spec: AvatarSpec,
+        id: T,
+        style: AvatarStyleOptions,
+    ) -> String {
+        super::render_avatar_svg_style_for_id(spec, id, style)
+            .expect("valid avatar style should render as svg")
+    }
+
+    fn identity_with_digest_byte(index: usize, value: u8) -> AvatarIdentity {
+        let mut digest = [0_u8; 64];
+        digest[index] = value;
+        AvatarIdentity { digest }
+    }
+
     fn render_cat_avatar(spec: AvatarSpec) -> RgbaImage {
         super::render_cat_avatar(spec).expect("valid avatar spec should render")
     }
@@ -7131,6 +8867,28 @@ mod tests {
             );
             assert_eq!(format.to_string(), format.as_str());
         }
+        for &accessory in AvatarAccessory::ALL {
+            assert_eq!(
+                accessory.as_str().parse::<AvatarAccessory>().ok(),
+                Some(accessory)
+            );
+            assert_eq!(accessory.to_string(), accessory.as_str());
+        }
+        for &color in AvatarColor::ALL {
+            assert_eq!(color.as_str().parse::<AvatarColor>().ok(), Some(color));
+            assert_eq!(color.to_string(), color.as_str());
+        }
+        for &expression in AvatarExpression::ALL {
+            assert_eq!(
+                expression.as_str().parse::<AvatarExpression>().ok(),
+                Some(expression)
+            );
+            assert_eq!(expression.to_string(), expression.as_str());
+        }
+        for &shape in AvatarShape::ALL {
+            assert_eq!(shape.as_str().parse::<AvatarShape>().ok(), Some(shape));
+            assert_eq!(shape.to_string(), shape.as_str());
+        }
     }
 
     #[test]
@@ -7159,6 +8917,69 @@ mod tests {
             .map(|format| format.as_str())
             .collect();
         assert_eq!(format_labels, ["webp", "png", "jpg", "gif"]);
+
+        let accessory_labels: Vec<_> = AvatarAccessory::ALL
+            .iter()
+            .map(|accessory| accessory.as_str())
+            .collect();
+        assert_eq!(
+            accessory_labels,
+            [
+                "none",
+                "glasses",
+                "hat",
+                "headphones",
+                "crown",
+                "bowtie",
+                "eyepatch",
+                "scarf",
+                "halo",
+                "horns",
+            ]
+        );
+
+        let color_labels: Vec<_> = AvatarColor::ALL
+            .iter()
+            .map(|color| color.as_str())
+            .collect();
+        assert_eq!(
+            color_labels,
+            [
+                "default",
+                "neon-mint",
+                "pastel-pink",
+                "crimson",
+                "gold",
+                "deep-sea-blue",
+            ]
+        );
+
+        let expression_labels: Vec<_> = AvatarExpression::ALL
+            .iter()
+            .map(|expression| expression.as_str())
+            .collect();
+        assert_eq!(
+            expression_labels,
+            [
+                "default",
+                "happy",
+                "grumpy",
+                "surprised",
+                "sleepy",
+                "winking",
+                "cool",
+                "crying",
+            ]
+        );
+
+        let shape_labels: Vec<_> = AvatarShape::ALL
+            .iter()
+            .map(|shape| shape.as_str())
+            .collect();
+        assert_eq!(
+            shape_labels,
+            ["square", "circle", "squircle", "hexagon", "octagon"]
+        );
     }
 
     #[test]
@@ -7194,6 +9015,38 @@ mod tests {
             AvatarHashAlgorithm::from_byte(AvatarHashAlgorithm::ALL.len() as u8),
             AvatarHashAlgorithm::ALL[0]
         );
+
+        for (index, &accessory) in AvatarAccessory::ALL.iter().enumerate() {
+            assert_eq!(AvatarAccessory::from_byte(index as u8), accessory);
+        }
+        assert_eq!(
+            AvatarAccessory::from_byte(AvatarAccessory::ALL.len() as u8),
+            AvatarAccessory::ALL[0]
+        );
+
+        for (index, &color) in AvatarColor::ALL.iter().enumerate() {
+            assert_eq!(AvatarColor::from_byte(index as u8), color);
+        }
+        assert_eq!(
+            AvatarColor::from_byte(AvatarColor::ALL.len() as u8),
+            AvatarColor::ALL[0]
+        );
+
+        for (index, &expression) in AvatarExpression::ALL.iter().enumerate() {
+            assert_eq!(AvatarExpression::from_byte(index as u8), expression);
+        }
+        assert_eq!(
+            AvatarExpression::from_byte(AvatarExpression::ALL.len() as u8),
+            AvatarExpression::ALL[0]
+        );
+
+        for (index, &shape) in AvatarShape::ALL.iter().enumerate() {
+            assert_eq!(AvatarShape::from_byte(index as u8), shape);
+        }
+        assert_eq!(
+            AvatarShape::from_byte(AvatarShape::ALL.len() as u8),
+            AvatarShape::ALL[0]
+        );
     }
 
     #[test]
@@ -7217,6 +9070,239 @@ mod tests {
             direct.as_raw()
         );
         assert!(plan.render_svg().contains("robot avatar"));
+    }
+
+    #[test]
+    fn avatar_style_options_from_legacy_options_is_noop() {
+        let spec = valid_spec(128, 128, 0);
+        let options = AvatarOptions::new(AvatarKind::Robot, AvatarBackground::Themed);
+        let style = AvatarStyleOptions::from_options(options);
+
+        let legacy = render_avatar_for_id(spec, "style@example.com", options);
+        let styled = render_avatar_style_for_id(spec, "style@example.com", style);
+        assert_eq!(legacy.as_raw(), styled.as_raw());
+
+        let legacy_svg = render_avatar_svg_for_id(spec, "style@example.com", options);
+        let styled_svg = render_avatar_svg_style_for_id(spec, "style@example.com", style);
+        assert_eq!(legacy_svg, styled_svg);
+    }
+
+    #[test]
+    fn automatic_style_derivation_uses_distinct_digest_offsets() {
+        let base = AvatarStyleOptions::from_identity(&identity_with_digest_byte(63, 99));
+
+        let kind = AvatarStyleOptions::from_identity(&identity_with_digest_byte(
+            AVATAR_STYLE_KIND_BYTE,
+            1,
+        ));
+        assert_ne!(kind.kind, base.kind);
+        assert_eq!(kind.background, base.background);
+        assert_eq!(kind.accessory, base.accessory);
+        assert_eq!(kind.color, base.color);
+        assert_eq!(kind.expression, base.expression);
+        assert_eq!(kind.shape, base.shape);
+
+        let background = AvatarStyleOptions::from_identity(&identity_with_digest_byte(
+            AVATAR_STYLE_BACKGROUND_BYTE,
+            1,
+        ));
+        assert_eq!(background.kind, base.kind);
+        assert_ne!(background.background, base.background);
+        assert_eq!(background.accessory, base.accessory);
+        assert_eq!(background.color, base.color);
+        assert_eq!(background.expression, base.expression);
+        assert_eq!(background.shape, base.shape);
+
+        let accessory = AvatarStyleOptions::from_identity(&identity_with_digest_byte(
+            AVATAR_STYLE_ACCESSORY_BYTE,
+            1,
+        ));
+        assert_eq!(accessory.kind, base.kind);
+        assert_eq!(accessory.background, base.background);
+        assert_ne!(accessory.accessory, base.accessory);
+        assert_eq!(accessory.color, base.color);
+        assert_eq!(accessory.expression, base.expression);
+        assert_eq!(accessory.shape, base.shape);
+
+        let color = AvatarStyleOptions::from_identity(&identity_with_digest_byte(
+            AVATAR_STYLE_COLOR_BYTE,
+            1,
+        ));
+        assert_eq!(color.kind, base.kind);
+        assert_eq!(color.background, base.background);
+        assert_eq!(color.accessory, base.accessory);
+        assert_ne!(color.color, base.color);
+        assert_eq!(color.expression, base.expression);
+        assert_eq!(color.shape, base.shape);
+
+        let expression = AvatarStyleOptions::from_identity(&identity_with_digest_byte(
+            AVATAR_STYLE_EXPRESSION_BYTE,
+            1,
+        ));
+        assert_eq!(expression.kind, base.kind);
+        assert_eq!(expression.background, base.background);
+        assert_eq!(expression.accessory, base.accessory);
+        assert_eq!(expression.color, base.color);
+        assert_ne!(expression.expression, base.expression);
+        assert_eq!(expression.shape, base.shape);
+
+        let shape = AvatarStyleOptions::from_identity(&identity_with_digest_byte(
+            AVATAR_STYLE_SHAPE_BYTE,
+            1,
+        ));
+        assert_eq!(shape.kind, base.kind);
+        assert_eq!(shape.background, base.background);
+        assert_eq!(shape.accessory, base.accessory);
+        assert_eq!(shape.color, base.color);
+        assert_eq!(shape.expression, base.expression);
+        assert_ne!(shape.shape, base.shape);
+    }
+
+    #[test]
+    fn automatic_style_derivation_is_deterministic() {
+        let identity = valid_identity("auto-style@example.com");
+
+        assert_eq!(
+            AvatarStyleOptions::from_identity(&identity),
+            AvatarStyleOptions::from_identity(&identity)
+        );
+        assert_eq!(
+            super::render_avatar_auto_for_id(valid_spec(96, 96, 0), "auto-style@example.com")
+                .expect("automatic style should render")
+                .as_raw(),
+            super::render_avatar_auto_for_id(valid_spec(96, 96, 0), "auto-style@example.com")
+                .expect("automatic style should render")
+                .as_raw()
+        );
+    }
+
+    #[test]
+    fn manual_style_selection_changes_raster_and_svg() {
+        let spec = valid_spec(128, 128, 0);
+        let legacy_options = AvatarOptions::new(AvatarKind::Cat, AvatarBackground::Themed);
+        let layered_style = AvatarStyleOptions::new(
+            AvatarKind::Cat,
+            AvatarBackground::Themed,
+            AvatarAccessory::Glasses,
+            AvatarColor::Gold,
+            AvatarExpression::Happy,
+            AvatarShape::Circle,
+        );
+
+        let legacy = render_avatar_for_id(spec, "manual-style@example.com", legacy_options);
+        let layered = render_avatar_style_for_id(spec, "manual-style@example.com", layered_style);
+        assert_ne!(legacy.as_raw(), layered.as_raw());
+
+        let svg = render_avatar_svg_style_for_id(spec, "manual-style@example.com", layered_style);
+        assert!(svg.contains(r#"data-layer="accessory-glasses""#));
+        assert!(svg.contains(r#"data-layer="expression-happy""#));
+        assert!(svg.contains(r#"data-layer="shape-circle""#));
+    }
+
+    #[test]
+    fn style_layers_render_for_all_baseline_variants() {
+        let spec = valid_spec(96, 96, 0);
+
+        for &accessory in AvatarAccessory::ALL {
+            let style = AvatarStyleOptions::new(
+                AvatarKind::Robot,
+                AvatarBackground::Themed,
+                accessory,
+                AvatarColor::NeonMint,
+                AvatarExpression::Default,
+                AvatarShape::Square,
+            );
+            let image = render_avatar_style_for_id(spec, "accessory@example.com", style);
+            assert_eq!(image.width(), 96, "{accessory}");
+            assert!(
+                render_avatar_svg_style_for_id(spec, "accessory@example.com", style)
+                    .starts_with("<svg ")
+            );
+        }
+
+        for &color in AvatarColor::ALL {
+            let style = AvatarStyleOptions::new(
+                AvatarKind::Robot,
+                AvatarBackground::Themed,
+                AvatarAccessory::None,
+                color,
+                AvatarExpression::Default,
+                AvatarShape::Square,
+            );
+            let image = render_avatar_style_for_id(spec, "color@example.com", style);
+            assert_eq!(image.height(), 96, "{color}");
+            assert!(
+                render_avatar_svg_style_for_id(spec, "color@example.com", style)
+                    .starts_with("<svg ")
+            );
+        }
+
+        for &expression in AvatarExpression::ALL {
+            let style = AvatarStyleOptions::new(
+                AvatarKind::Robot,
+                AvatarBackground::Themed,
+                AvatarAccessory::None,
+                AvatarColor::Default,
+                expression,
+                AvatarShape::Square,
+            );
+            let image = render_avatar_style_for_id(spec, "expression@example.com", style);
+            assert_eq!(image.width(), 96, "{expression}");
+            assert!(
+                render_avatar_svg_style_for_id(spec, "expression@example.com", style)
+                    .starts_with("<svg ")
+            );
+        }
+
+        for &shape in AvatarShape::ALL {
+            let style = AvatarStyleOptions::new(
+                AvatarKind::Robot,
+                AvatarBackground::Themed,
+                AvatarAccessory::None,
+                AvatarColor::Default,
+                AvatarExpression::Default,
+                shape,
+            );
+            let image = render_avatar_style_for_id(spec, "shape@example.com", style);
+            assert_eq!(image.height(), 96, "{shape}");
+            assert!(
+                render_avatar_svg_style_for_id(spec, "shape@example.com", style)
+                    .starts_with("<svg ")
+            );
+        }
+    }
+
+    #[test]
+    fn unsupported_family_accessories_and_expressions_are_skipped() {
+        let spec = valid_spec(128, 128, 0);
+        for kind in [AvatarKind::Paws, AvatarKind::Planet, AvatarKind::Rocket] {
+            let baseline_options = AvatarOptions::new(kind, AvatarBackground::Themed);
+            let unsupported_style = AvatarStyleOptions::new(
+                kind,
+                AvatarBackground::Themed,
+                AvatarAccessory::Eyepatch,
+                AvatarColor::Default,
+                AvatarExpression::Winking,
+                AvatarShape::Square,
+            );
+
+            let baseline =
+                render_avatar_for_id(spec, "unsupported-layer@example.com", baseline_options);
+            let unsupported = render_avatar_style_for_id(
+                spec,
+                "unsupported-layer@example.com",
+                unsupported_style,
+            );
+            assert_eq!(baseline.as_raw(), unsupported.as_raw(), "{kind}");
+
+            let svg = render_avatar_svg_style_for_id(
+                spec,
+                "unsupported-layer@example.com",
+                unsupported_style,
+            );
+            assert!(!svg.contains("accessory-eyepatch"), "{kind}");
+            assert!(!svg.contains("expression-winking"), "{kind}");
+        }
     }
 
     #[test]
@@ -7446,6 +9532,26 @@ mod tests {
                 regression_fingerprint_for(label).expect("missing golden regression fingerprint");
             assert_eq!(fingerprint, expected, "fingerprint mismatch for {label}");
         }
+
+        for (label, style) in style_regression_scenarios() {
+            let image =
+                render_avatar_style_for_id(valid_spec(128, 128, 0), "snapshot@example.com", style);
+            let fingerprint = image_fingerprint(&image);
+            let expected =
+                regression_fingerprint_for(label).expect("missing golden regression fingerprint");
+            assert_eq!(fingerprint, expected, "fingerprint mismatch for {label}");
+        }
+
+        let auto =
+            super::render_avatar_auto_for_id(valid_spec(128, 128, 0), "snapshot@example.com")
+                .expect("automatic avatar should render");
+        let auto_fingerprint = image_fingerprint(&auto);
+        let auto_expected =
+            regression_fingerprint_for("auto-layered").expect("missing golden auto fingerprint");
+        assert_eq!(
+            auto_fingerprint, auto_expected,
+            "fingerprint mismatch for auto-layered"
+        );
     }
 
     #[ignore]
@@ -7545,6 +9651,17 @@ mod tests {
                 render_avatar_for_id(valid_spec(128, 128, 0), "snapshot@example.com", options);
             println!("{label}: {}", image_fingerprint(&image));
         }
+
+        for (label, style) in style_regression_scenarios() {
+            let image =
+                render_avatar_style_for_id(valid_spec(128, 128, 0), "snapshot@example.com", style);
+            println!("{label}: {}", image_fingerprint(&image));
+        }
+
+        let auto =
+            super::render_avatar_auto_for_id(valid_spec(128, 128, 0), "snapshot@example.com")
+                .expect("automatic avatar should render");
+        println!("auto-layered: {}", image_fingerprint(&auto));
     }
 
     fn regression_scenarios() -> [(&'static str, AvatarOptions); 22] {
@@ -7636,6 +9753,55 @@ mod tests {
             (
                 "knight-themed",
                 AvatarOptions::new(AvatarKind::Knight, AvatarBackground::Themed),
+            ),
+        ]
+    }
+
+    fn style_regression_scenarios() -> [(&'static str, AvatarStyleOptions); 4] {
+        [
+            (
+                "style-robot-glasses-gold-happy-circle",
+                AvatarStyleOptions::new(
+                    AvatarKind::Robot,
+                    AvatarBackground::Themed,
+                    AvatarAccessory::Glasses,
+                    AvatarColor::Gold,
+                    AvatarExpression::Happy,
+                    AvatarShape::Circle,
+                ),
+            ),
+            (
+                "style-fox-halo-neon-cool-squircle",
+                AvatarStyleOptions::new(
+                    AvatarKind::Fox,
+                    AvatarBackground::White,
+                    AvatarAccessory::Halo,
+                    AvatarColor::NeonMint,
+                    AvatarExpression::Cool,
+                    AvatarShape::Squircle,
+                ),
+            ),
+            (
+                "style-monster-horns-crimson-grumpy-hexagon",
+                AvatarStyleOptions::new(
+                    AvatarKind::Monster,
+                    AvatarBackground::Dark,
+                    AvatarAccessory::Horns,
+                    AvatarColor::Crimson,
+                    AvatarExpression::Grumpy,
+                    AvatarShape::Hexagon,
+                ),
+            ),
+            (
+                "style-knight-scarf-deepsea-winking-octagon",
+                AvatarStyleOptions::new(
+                    AvatarKind::Knight,
+                    AvatarBackground::Light,
+                    AvatarAccessory::Scarf,
+                    AvatarColor::DeepSeaBlue,
+                    AvatarExpression::Winking,
+                    AvatarShape::Octagon,
+                ),
             ),
         ]
     }

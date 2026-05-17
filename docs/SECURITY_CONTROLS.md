@@ -30,7 +30,8 @@
 - Encode APIs zeroize temporary owned raster buffers after encoding. JPEG
   export also zeroizes the temporary RGB flattening buffer. Returned encoded
   bytes and images returned by render APIs are caller-owned and must be cleared
-  by the caller if their environment requires that.
+  by the caller if their environment requires that. The README includes
+  `zeroize` examples for returned `Vec<u8>` and `RgbaImage` buffers.
 - Rendering time is intentionally not constant-time. Shape counts, geometry,
   raster encoding, and SVG length can vary with the identity digest, so callers
   should not treat rendered avatar timing or output size as secret-preserving
@@ -41,7 +42,9 @@
   than blocking runtime worker threads.
 - The crate bounds individual render sizes, but service-level memory exhaustion
   from many concurrent maximum-size renders must be controlled by callers with
-  API rate limits, request concurrency limits, and caching.
+  API rate limits, request concurrency limits, and caching. Use
+  `MAX_AVATAR_RGBA_BYTES` and `AvatarSpec::rgba_buffer_len()` to size
+  service-level render semaphores against the application's memory budget.
 - Internal rectangle helpers use saturating or clamping arithmetic.
 - The SVG renderer emits generated shape markup from structured numeric values rather than from caller-provided SVG fragments.
 - Golden fingerprint tests protect deterministic rendering output.

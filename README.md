@@ -6,7 +6,7 @@ The crate starts conservative: validated avatar dimensions, bounded identity inp
 
 ## Current Status
 
-The current development version is `0.9.0`.
+The current development version is `0.10.0`.
 
 Implemented now:
 
@@ -16,6 +16,10 @@ Implemented now:
   features.
 - Public enum variant lists use single-source `ALL` slices and byte-to-variant
   helpers for deterministic option derivation.
+- Visual layer options for accessories, accent palettes, expressions, and
+  frame shapes through `AvatarStyleOptions`.
+- Automatic style derivation uses distinct identity digest bytes for kind,
+  background, accessory, color, expression, and shape.
 - Namespace-aware identity derivation for tenant isolation and visual rollouts.
 - Length-prefixed hash components to avoid delimiter ambiguity.
 - Avatar families: `cat`, `dog`, `robot`, `fox`, `alien`, `monster`, `ghost`, `slime`, `bird`, `wizard`, `skull`, `paws`, `planet`, `rocket`, `mushroom`, `cactus`, `frog`, `panda`, `cupcake`, `pizza`, `icecream`, `octopus`, and `knight`.
@@ -55,7 +59,7 @@ Planned or intentionally external:
 
 Security-control details live in [docs/SECURITY_CONTROLS.md](docs/SECURITY_CONTROLS.md). Dependency policy lives in [docs/DEPENDENCIES.md](docs/DEPENDENCIES.md). Panic policy lives in [docs/PANIC_POLICY.md](docs/PANIC_POLICY.md).
 
-Future version planning for visual layers and 1.0 stabilization lives in
+Future version planning for visual layer polish, variant expansion, and 1.0 stabilization lives in
 [docs/VERSION_PLAN.md](docs/VERSION_PLAN.md). `hashavatar` remains a single
 image-generation crate; low-level core planning is kept internal unless a
 future release has a concrete image-generation reason to split it.
@@ -64,14 +68,14 @@ future release has a concrete image-generation reason to split it.
 
 ```toml
 [dependencies]
-hashavatar = "0.9.0"
+hashavatar = "0.10.0"
 ```
 
 Optional identity hash algorithms are disabled by default:
 
 ```toml
 [dependencies]
-hashavatar = { version = "0.9.0", features = ["blake3", "xxh3"] }
+hashavatar = { version = "0.10.0", features = ["blake3", "xxh3"] }
 ```
 
 For a local checkout:
@@ -190,6 +194,65 @@ assert!(AvatarBackground::ALL.contains(&options.background));
 The `from_byte` helpers use each enum's `ALL` slice, so new public variants do
 not require duplicated modulo constants in caller code.
 
+## Example: Automatic Visual Layers
+
+```rust
+use hashavatar::{AvatarSpec, render_avatar_auto_for_id};
+
+let spec = AvatarSpec::new(256, 256, 0)?;
+let image = render_avatar_auto_for_id(spec, "layered@hashavatar.app")?;
+
+assert_eq!(image.width(), 256);
+
+# Ok::<(), Box<dyn std::error::Error>>(())
+```
+
+Automatic mode derives these top-level choices from distinct SHA-512 digest
+bytes:
+
+| Choice | Digest byte |
+| --- | --- |
+| `AvatarKind` | `AVATAR_STYLE_KIND_BYTE` |
+| `AvatarBackground` | `AVATAR_STYLE_BACKGROUND_BYTE` |
+| `AvatarAccessory` | `AVATAR_STYLE_ACCESSORY_BYTE` |
+| `AvatarColor` | `AVATAR_STYLE_COLOR_BYTE` |
+| `AvatarExpression` | `AVATAR_STYLE_EXPRESSION_BYTE` |
+| `AvatarShape` | `AVATAR_STYLE_SHAPE_BYTE` |
+
+## Example: Manual Visual Layers
+
+```rust
+use hashavatar::{
+    AvatarAccessory, AvatarBackground, AvatarColor, AvatarExpression, AvatarKind,
+    AvatarShape, AvatarSpec, AvatarStyleOptions, render_avatar_svg_style_for_id,
+};
+
+let spec = AvatarSpec::new(256, 256, 0)?;
+let style = AvatarStyleOptions::new(
+    AvatarKind::Robot,
+    AvatarBackground::Themed,
+    AvatarAccessory::Glasses,
+    AvatarColor::Gold,
+    AvatarExpression::Happy,
+    AvatarShape::Circle,
+);
+
+let svg = render_avatar_svg_style_for_id(spec, "robot@hashavatar.app", style)?;
+
+assert!(svg.contains("robot avatar"));
+assert!(svg.contains("accessory-glasses"));
+
+# Ok::<(), Box<dyn std::error::Error>>(())
+```
+
+Existing `AvatarOptions::new(kind, background)` callers keep the old baseline
+visual behavior. Use `AvatarStyleOptions::from_options(options)` when you want
+to pass legacy options through a style-aware API without enabling extra layers.
+Accessories and expressions are rendered only for avatar families with
+calibrated face anchors. Non-face families such as `paws`, `planet`, and
+`rocket` skip those layers deterministically instead of drawing them in
+misleading positions. Color and frame-shape layers still apply.
+
 ## Example: Optional Hash Algorithm
 
 ```rust
@@ -228,7 +291,7 @@ cryptographic boundary.
 
 ```toml
 [dependencies]
-hashavatar = { version = "0.9.0", features = ["blake3"] }
+hashavatar = { version = "0.10.0", features = ["blake3"] }
 ```
 
 ```rust
@@ -256,7 +319,7 @@ assert!(svg.contains("alien avatar"));
 
 ```toml
 [dependencies]
-hashavatar = { version = "0.9.0", features = ["xxh3"] }
+hashavatar = { version = "0.10.0", features = ["xxh3"] }
 ```
 
 ```rust
@@ -332,6 +395,76 @@ maximum-size raster render needs up to `MAX_AVATAR_RGBA_BYTES` raw RGBA bytes
 before encoder overhead, so public services should bound simultaneous large
 renders at the API layer.
 
+### Caller-Owned Output Cleanup
+
+Encode APIs zeroize internal temporary raster buffers after encoding, but the
+returned `Vec<u8>` belongs to the caller. Render APIs return an `RgbaImage`
+owned by the caller. High-assurance applications that treat avatar output as
+sensitive should clear those buffers after use:
+
+```rust
+use hashavatar::{
+    AvatarBackground, AvatarKind, AvatarOptions, AvatarOutputFormat, AvatarSpec,
+    encode_avatar_for_id, render_avatar_for_id,
+};
+use zeroize::Zeroize;
+
+let spec = AvatarSpec::new(256, 256, 0)?;
+let options = AvatarOptions::new(AvatarKind::Cat, AvatarBackground::Transparent);
+
+let mut bytes = encode_avatar_for_id(
+    spec,
+    "sensitive-user-id",
+    AvatarOutputFormat::WebP,
+    options,
+)?;
+// Send, store, or otherwise consume `bytes`.
+bytes.zeroize();
+
+let mut image = render_avatar_for_id(spec, "sensitive-user-id", options)?;
+// Composite, inspect, or encode `image`.
+image.as_mut().zeroize();
+
+# Ok::<(), Box<dyn std::error::Error>>(())
+```
+
+### Concurrent Render Limits
+
+This crate bounds each individual render, not process-wide memory pressure.
+Public services should combine `MAX_AVATAR_RGBA_BYTES` with their own memory
+budget and reject or queue excess work. For example, a Tokio-based API can use
+a semaphore around render work:
+
+```rust
+use std::sync::Arc;
+
+use hashavatar::{
+    AvatarBackground, AvatarKind, AvatarOptions, AvatarSpec, MAX_AVATAR_RGBA_BYTES,
+    render_avatar_for_id,
+};
+use tokio::sync::Semaphore;
+
+fn render_permits_for_budget(memory_budget_bytes: usize) -> usize {
+    (memory_budget_bytes / MAX_AVATAR_RGBA_BYTES).max(1)
+}
+
+async fn render_with_limit(
+    semaphore: Arc<Semaphore>,
+    id: &str,
+    requested_size: u32,
+) -> Result<image::RgbaImage, Box<dyn std::error::Error>> {
+    let _permit = semaphore.acquire().await?;
+    let spec = AvatarSpec::new(requested_size, requested_size, 0)?;
+    let options = AvatarOptions::new(AvatarKind::Cat, AvatarBackground::Transparent);
+
+    Ok(render_avatar_for_id(spec, id, options)?)
+}
+```
+
+For async web servers, run CPU-heavy rendering on an appropriate blocking
+worker pool when needed, and keep the semaphore at the service boundary so it
+accounts for all concurrent requests.
+
 ## API Reference Summary
 
 Important public entry points:
@@ -342,12 +475,20 @@ Important public entry points:
 - `AvatarIdentityOptions::new(namespace, algorithm)`
 - `AvatarNamespace::new(tenant, style_version) -> Result<AvatarNamespace, AvatarIdentityError>`
 - `AvatarOptions::new(kind, background)`
+- `AvatarStyleOptions::new(kind, background, accessory, color, expression, shape)`
+- `AvatarStyleOptions::from_identity(identity)`
 - `encode_avatar_for_id(...)`
+- `encode_avatar_style_for_id(...)`
+- `encode_avatar_auto_for_id(...)`
 - `encode_avatar_for_namespace(...)`
 - `render_avatar_for_id(...)`
+- `render_avatar_style_for_id(...)`
+- `render_avatar_auto_for_id(...)`
 - `render_avatar_for_namespace(...)`
 - `render_avatar_with_identity_options(...)`
 - `render_avatar_svg_for_id(...)`
+- `render_avatar_svg_style_for_id(...)`
+- `render_avatar_svg_auto_for_id(...)`
 - `render_avatar_svg_for_namespace(...)`
 - `render_avatar_svg_with_identity_options(...)`
 
@@ -374,6 +515,13 @@ identity hash algorithm + namespace tenant + namespace style version + identity 
 ```
 
 This makes the crate suitable for stable CDN-backed avatar URLs and golden regression tests. Namespace hashing uses length-prefixed components, so embedded separator bytes cannot create tenant/style-version ambiguity. The default SHA-512 path keeps the pre-0.7 identity preimage stable; non-default algorithms are domain-separated.
+
+For style-aware rendering, the deterministic tuple also includes
+`accessory`, `color`, `expression`, and `shape`. Existing `AvatarOptions`
+entry points keep those extra layer choices at `none`, `default`, `default`,
+and `square`, so their default visual output is unchanged in `0.10.0`.
+Some family/layer combinations are deterministic no-ops when the layer has no
+sensible anchor for that family.
 
 The renderer uses floating-point geometry internally. The project tests golden
 fingerprints on the release platform, but it does not yet claim formal
@@ -442,6 +590,8 @@ The repository includes:
 - raster export round-trip tests
 - SVG safety and compactness tests
 - enum parsing tests
+- automatic visual layer derivation tests
+- style-aware raster and SVG layer tests
 - transparent background checks
 - golden visual fingerprint tests
 - fuzz harness compilation

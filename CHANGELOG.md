@@ -1,5 +1,26 @@
 # Changelog
 
+## 0.10.0
+
+- Bumped the crate to `0.10.0`.
+- Added visual layer enums: `AvatarAccessory`, `AvatarColor`,
+  `AvatarExpression`, and `AvatarShape`.
+- Added `AvatarStyleOptions` for explicit kind, background, accessory, color,
+  expression, and frame-shape selection.
+- Added style-aware raster, SVG, and encode entry points alongside the existing
+  `AvatarOptions` API.
+- Added automatic style rendering helpers that derive top-level style choices
+  from distinct identity digest bytes.
+- Kept existing `AvatarOptions` output unchanged by mapping it to no accessory,
+  default color, default expression, and square frame.
+- Added generic raster and SVG support for all baseline visual layers.
+- Added family-aware face anchors for accessories and expressions, with
+  deterministic no-op behavior for non-face families where those layers do not
+  make sense.
+- Expanded enum drift tests, automatic derivation tests, layer rendering tests,
+  fuzz coverage, and golden visual fingerprints for representative layered
+  avatars.
+
 ## 0.9.0
 
 - Bumped the crate to `0.9.0`.
