@@ -41,6 +41,7 @@ use image::{
 use palette::{FromColor, Hsl, Srgb};
 use rand::{RngExt, SeedableRng, rngs::StdRng};
 use sha2::{Digest, Sha512};
+use subtle::ConstantTimeEq;
 use zeroize::Zeroize;
 
 /// Rendering contract version for deterministic avatars.
@@ -928,7 +929,7 @@ impl Default for AvatarIdentityOptions<'static> {
 /// This is intended for Robohash-style uniqueness: the same input always maps
 /// to the same visual genome, while different inputs produce different shape
 /// and palette parameters with negligible collision risk.
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq)]
 pub struct AvatarIdentity {
     digest: [u8; 64],
 }
@@ -1005,6 +1006,12 @@ impl AvatarIdentity {
 impl Zeroize for AvatarIdentity {
     fn zeroize(&mut self) {
         self.digest.zeroize();
+    }
+}
+
+impl PartialEq for AvatarIdentity {
+    fn eq(&self, other: &Self) -> bool {
+        self.digest.ct_eq(&other.digest).into()
     }
 }
 
@@ -6522,6 +6529,16 @@ mod tests {
         assert_eq!(rng_seed.len(), 32);
         assert_eq!(&rng_seed, &identity.as_digest()[32..64]);
         assert_ne!(&identity.as_digest()[..32], &rng_seed);
+    }
+
+    #[test]
+    fn avatar_identity_equality_compares_digest_values() {
+        let left = valid_identity("alice@example.com");
+        let same = valid_identity("alice@example.com");
+        let different = valid_identity("bob@example.com");
+
+        assert_eq!(left, same);
+        assert_ne!(left, different);
     }
 
     #[test]

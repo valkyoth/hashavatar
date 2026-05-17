@@ -1,9 +1,20 @@
-# cargo-deny license policy for hashavatar.
+# cargo-deny policy for hashavatar.
 #
 # The project itself is dual-licensed under MIT OR Apache-2.0. This allowlist
 # admits the project license and permissive dependency licenses. More
 # restrictive reciprocal licenses should be reviewed and added as crate-specific
 # exceptions rather than allowed globally.
+
+[advisories]
+version = 2
+ignore = []
+
+[bans]
+multiple-versions = "warn"
+wildcards = "deny"
+deny = []
+allow = []
+skip = []
 
 [licenses]
 confidence-threshold = 0.8

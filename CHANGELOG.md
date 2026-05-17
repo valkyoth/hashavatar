@@ -16,6 +16,9 @@
 - Added `zeroize` cleanup for derived identity digests and temporary identity hash preimage buffers.
 - Changed procedural cat RNG seeding to use 256 bits from the second half of
   the identity digest, intentionally updating cat-family golden fingerprints.
+- Added constant-time equality for `AvatarIdentity`.
+- Documented that rendering itself is not constant-time and should not be
+  treated as secret-preserving against timing or output-size side channels.
 
 ## 0.6.0
 

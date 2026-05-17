@@ -17,6 +17,8 @@
 - Hardened anti-aliased zero-length line drawing against NaN gradient propagation
 - Added `zeroize` cleanup for derived identity digests and temporary identity hash preimage buffers
 - Changed procedural cat RNG seeding to use 256 bits from the second half of the identity digest
+- Added constant-time equality for `AvatarIdentity`
+- Documented that rendering itself is not constant-time
 
 ## Compatibility
 
@@ -40,4 +42,9 @@
 - Procedural RNG seeding uses 256 bits from the second half of the identity
   digest, separate from lower digest bytes used for direct visual parameters.
 - Derived identity digests and temporary identity hash preimage buffers are zeroized when dropped.
+- `AvatarIdentity` equality uses constant-time digest comparison.
+- Rendering and encoding are intentionally variable-time operations. Shape
+  counts, geometry, encoded size, and SVG length can vary with identity digest
+  bytes, so callers should not treat rendering timing or output size as
+  secret-preserving side channels.
 - Tests cover parser round-trips, algorithm separation, optional feature paths, oversized input rejection, zero-length line drawing, JPEG alpha flattening, and zeroize trait coverage.

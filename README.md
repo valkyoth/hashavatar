@@ -352,6 +352,12 @@ identity digest and uses the lower digest bytes for direct visual parameters.
 That keeps RNG state separate from directly observed parameter bytes. The
 change intentionally updates cat-family golden fingerprints in `0.7.0`.
 
+`AvatarIdentity` equality uses constant-time digest comparison. Rendering and
+encoding are not constant-time: shape counts, geometry, encoded size, and SVG
+length can vary with identity digest bytes. Applications with strict side
+channel requirements should not treat avatar render timing or output size as
+secret-preserving signals.
+
 ## Testing And Release Evidence
 
 The repository includes:

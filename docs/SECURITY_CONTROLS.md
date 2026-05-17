@@ -22,8 +22,13 @@
 - Procedural RNG seeding uses 256 bits from the second half of the identity
   digest, separate from the lower digest bytes commonly used for direct visual
   parameters.
+- `AvatarIdentity` equality uses constant-time digest comparison.
 - Derived identity digests and temporary hash preimage buffers are zeroized
   when dropped.
+- Rendering time is intentionally not constant-time. Shape counts, geometry,
+  raster encoding, and SVG length can vary with the identity digest, so callers
+  should not treat rendered avatar timing or output size as secret-preserving
+  side channels.
 - Internal rectangle helpers use saturating or clamping arithmetic.
 - The SVG renderer emits generated shape markup from structured numeric values rather than from caller-provided SVG fragments.
 - Golden fingerprint tests protect deterministic rendering output.

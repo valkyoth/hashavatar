@@ -19,6 +19,7 @@ image = { version = "0.25.10", default-features = false, features = ["gif", "jpe
 palette = { version = "0.7.6", default-features = false, features = ["std"] }
 rand = { version = "0.10.1", default-features = false, features = ["std", "std_rng"] }
 sha2 = { version = "0.11.0", default-features = false, features = ["alloc"] }
+subtle = { version = "2.6.1", default-features = false }
 xxhash-rust = { version = "0.8.15", default-features = false, features = ["xxh3"], optional = true }
 zeroize = { version = "1.8.2", default-features = false, features = ["alloc"] }
 

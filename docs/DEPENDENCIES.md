@@ -6,6 +6,7 @@
 - `palette` for color conversion
 - `rand` for deterministic seeded variation
 - `sha2` for identity hashing
+- `subtle` for constant-time identity digest comparison
 - optional `blake3` for BLAKE3 identity hashing when the `blake3` feature is enabled
 - optional `xxhash-rust` for XXH3-128 identity distribution when the `xxh3` feature is enabled
 - `zeroize` for clearing derived identity digests and temporary hash preimage buffers
