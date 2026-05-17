@@ -15,6 +15,9 @@
 - Changed public render APIs to return `Result<_, AvatarSpecError>` for invalid dimensions instead of panicking
 - Removed public path-writing export helpers; callers should write encoded bytes or SVG strings through their own storage boundary
 - Changed namespace identity hashing to length-prefix components, preventing separator ambiguity from embedded NUL bytes
+- Hardened internal polygon and ellipse rasterization against edge-case panics and large-radius precision loss
+- Added post-0.6 version planning for pluggable hashing, no-std preparation, visual layers, variant expansion, and 1.0 stabilization
+- Documented maintenance rules for dependency freshness, security review, GitHub CodeQL default setup, and self-testing expectations
 
 ## Why This Changed
 
@@ -40,5 +43,7 @@ The public HTTP API and demo website already live in `hashavatar-api`. Keeping a
 - Public render APIs reject invalid dimensions without panicking.
 - Namespace identity hashing is no longer delimiter-ambiguous when tenant or style version strings contain embedded NUL bytes.
 - Rectangle helpers use saturating and clamping arithmetic.
+- Polygon scanline rasterization skips incomplete intersection pairs instead of indexing blindly.
+- Ellipse rasterization now uses `f64` intermediates for high-magnitude geometry calculations.
 - `scripts/checks.sh` now validates release metadata, package contents, dependency scope, unsafe boundaries, reviewed panic-like sites, docs, fuzz harness compilation, dependency licenses, and RustSec advisories.
 - `scripts/stable_release_gate.sh` adds publish dry-run, reproducibility, and optional SBOM generation for release validation.

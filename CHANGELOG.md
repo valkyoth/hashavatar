@@ -15,6 +15,9 @@
 - Removed public path-writing export helpers so the crate does not provide filesystem APIs that can be wired to untrusted paths
 - Changed namespace identity hashing to length-prefix tenant, style version, and input components, preventing embedded NUL separator ambiguity
 - Hardened internal rectangle arithmetic with saturating and clamping operations
+- Hardened internal polygon and ellipse rasterization against edge-case panics and large-radius precision loss
+- Added post-0.6 version planning for pluggable hashing, no-std preparation, visual layers, variant expansion, and 1.0 stabilization
+- Documented maintenance rules for dependency freshness, security review, GitHub CodeQL default setup, and self-testing expectations
 
 ## 0.5.0
 
