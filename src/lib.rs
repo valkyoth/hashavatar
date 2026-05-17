@@ -59,6 +59,15 @@ pub const MIN_AVATAR_DIMENSION: u32 = 64;
 /// before encoder overhead.
 pub const MAX_AVATAR_DIMENSION: u32 = 2048;
 
+/// Largest supported identity input in bytes.
+///
+/// This prevents applications from accidentally hashing attacker-controlled
+/// request bodies or other unbounded byte strings as avatar identities.
+pub const MAX_AVATAR_ID_BYTES: usize = 1024;
+
+/// Largest supported namespace component in bytes.
+pub const MAX_AVATAR_NAMESPACE_COMPONENT_BYTES: usize = 128;
+
 /// RGBA color helper for concise shape drawing.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct Color(pub [u8; 4]);
@@ -699,6 +708,109 @@ fn avatar_spec_error_to_image_error(_: AvatarSpecError) -> ImageError {
     ImageError::Limits(LimitError::from_kind(LimitErrorKind::DimensionError))
 }
 
+fn avatar_identity_error_to_image_error(error: AvatarIdentityError) -> ImageError {
+    ImageError::IoError(std::io::Error::new(std::io::ErrorKind::InvalidInput, error))
+}
+
+fn avatar_render_error_to_image_error(error: AvatarRenderError) -> ImageError {
+    match error {
+        AvatarRenderError::Spec(error) => avatar_spec_error_to_image_error(error),
+        AvatarRenderError::Identity(error) => avatar_identity_error_to_image_error(error),
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum AvatarIdentityComponent {
+    Input,
+    Tenant,
+    StyleVersion,
+}
+
+impl AvatarIdentityComponent {
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Input => "identity input",
+            Self::Tenant => "namespace tenant",
+            Self::StyleVersion => "namespace style version",
+        }
+    }
+}
+
+impl std::fmt::Display for AvatarIdentityComponent {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(self.as_str())
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct AvatarIdentityError {
+    component: AvatarIdentityComponent,
+    length: usize,
+    max: usize,
+}
+
+impl AvatarIdentityError {
+    pub const fn component(self) -> AvatarIdentityComponent {
+        self.component
+    }
+
+    pub const fn length(self) -> usize {
+        self.length
+    }
+
+    pub const fn max(self) -> usize {
+        self.max
+    }
+}
+
+impl std::fmt::Display for AvatarIdentityError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "{} must be at most {} bytes, got {} bytes",
+            self.component, self.max, self.length
+        )
+    }
+}
+
+impl std::error::Error for AvatarIdentityError {}
+
+#[derive(Debug)]
+pub enum AvatarRenderError {
+    Spec(AvatarSpecError),
+    Identity(AvatarIdentityError),
+}
+
+impl From<AvatarSpecError> for AvatarRenderError {
+    fn from(error: AvatarSpecError) -> Self {
+        Self::Spec(error)
+    }
+}
+
+impl From<AvatarIdentityError> for AvatarRenderError {
+    fn from(error: AvatarIdentityError) -> Self {
+        Self::Identity(error)
+    }
+}
+
+impl std::fmt::Display for AvatarRenderError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Spec(error) => error.fmt(f),
+            Self::Identity(error) => error.fmt(f),
+        }
+    }
+}
+
+impl std::error::Error for AvatarRenderError {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        match self {
+            Self::Spec(error) => Some(error),
+            Self::Identity(error) => Some(error),
+        }
+    }
+}
+
 /// A stable avatar identity derived from a SHA-512 digest.
 ///
 /// This is intended for Robohash-style uniqueness: the same input always maps
@@ -710,16 +822,39 @@ pub struct AvatarIdentity {
 }
 
 impl AvatarIdentity {
-    pub fn new<T: AsRef<[u8]>>(input: T) -> Self {
+    pub fn new<T: AsRef<[u8]>>(input: T) -> Result<Self, AvatarIdentityError> {
         Self::new_with_namespace(AvatarNamespace::default(), input)
     }
 
-    pub fn new_with_namespace<T: AsRef<[u8]>>(namespace: AvatarNamespace<'_>, input: T) -> Self {
+    pub fn new_with_namespace<T: AsRef<[u8]>>(
+        namespace: AvatarNamespace<'_>,
+        input: T,
+    ) -> Result<Self, AvatarIdentityError> {
+        let input = input.as_ref();
+        validate_identity_component(
+            AvatarIdentityComponent::Input,
+            input.len(),
+            MAX_AVATAR_ID_BYTES,
+        )?;
+        validate_identity_component(
+            AvatarIdentityComponent::Tenant,
+            namespace.tenant.len(),
+            MAX_AVATAR_NAMESPACE_COMPONENT_BYTES,
+        )?;
+        validate_identity_component(
+            AvatarIdentityComponent::StyleVersion,
+            namespace.style_version.len(),
+            MAX_AVATAR_NAMESPACE_COMPONENT_BYTES,
+        )?;
+        Ok(Self::new_unchecked(namespace, input))
+    }
+
+    fn new_unchecked(namespace: AvatarNamespace<'_>, input: &[u8]) -> Self {
         let mut hasher = Sha512::new();
         update_hash_component(&mut hasher, b"hashavatar");
         update_hash_component(&mut hasher, namespace.tenant.as_bytes());
         update_hash_component(&mut hasher, namespace.style_version.as_bytes());
-        update_hash_component(&mut hasher, input.as_ref());
+        update_hash_component(&mut hasher, input);
         let digest: [u8; 64] = hasher.finalize().into();
         Self { digest }
     }
@@ -743,6 +878,22 @@ impl AvatarIdentity {
     }
 }
 
+fn validate_identity_component(
+    component: AvatarIdentityComponent,
+    length: usize,
+    max: usize,
+) -> Result<(), AvatarIdentityError> {
+    if length <= max {
+        Ok(())
+    } else {
+        Err(AvatarIdentityError {
+            component,
+            length,
+            max,
+        })
+    }
+}
+
 fn update_hash_component(hasher: &mut Sha512, bytes: &[u8]) {
     hasher.update((bytes.len() as u64).to_le_bytes());
     hasher.update(bytes);
@@ -750,22 +901,43 @@ fn update_hash_component(hasher: &mut Sha512, bytes: &[u8]) {
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct AvatarNamespace<'a> {
-    pub tenant: &'a str,
-    pub style_version: &'a str,
+    tenant: &'a str,
+    style_version: &'a str,
 }
 
 impl<'a> AvatarNamespace<'a> {
-    pub const fn new(tenant: &'a str, style_version: &'a str) -> Self {
-        Self {
+    pub fn new(tenant: &'a str, style_version: &'a str) -> Result<Self, AvatarIdentityError> {
+        validate_identity_component(
+            AvatarIdentityComponent::Tenant,
+            tenant.len(),
+            MAX_AVATAR_NAMESPACE_COMPONENT_BYTES,
+        )?;
+        validate_identity_component(
+            AvatarIdentityComponent::StyleVersion,
+            style_version.len(),
+            MAX_AVATAR_NAMESPACE_COMPONENT_BYTES,
+        )?;
+        Ok(Self {
             tenant,
             style_version,
-        }
+        })
+    }
+
+    pub const fn tenant(self) -> &'a str {
+        self.tenant
+    }
+
+    pub const fn style_version(self) -> &'a str {
+        self.style_version
     }
 }
 
 impl Default for AvatarNamespace<'_> {
     fn default() -> Self {
-        Self::new("public", "v2")
+        Self {
+            tenant: "public",
+            style_version: "v2",
+        }
     }
 }
 
@@ -1071,14 +1243,17 @@ pub struct HashedCatAvatar {
 }
 
 impl HashedCatAvatar {
-    pub fn new<T: AsRef<[u8]>>(input: T) -> Self {
+    pub fn new<T: AsRef<[u8]>>(input: T) -> Result<Self, AvatarIdentityError> {
         Self::new_with_namespace(AvatarNamespace::default(), input)
     }
 
-    pub fn new_with_namespace<T: AsRef<[u8]>>(namespace: AvatarNamespace<'_>, input: T) -> Self {
-        Self {
-            identity: AvatarIdentity::new_with_namespace(namespace, input),
-        }
+    pub fn new_with_namespace<T: AsRef<[u8]>>(
+        namespace: AvatarNamespace<'_>,
+        input: T,
+    ) -> Result<Self, AvatarIdentityError> {
+        Ok(Self {
+            identity: AvatarIdentity::new_with_namespace(namespace, input)?,
+        })
     }
 
     pub fn identity(&self) -> &AvatarIdentity {
@@ -1099,7 +1274,10 @@ pub struct HashedDogAvatar {
 }
 
 impl HashedDogAvatar {
-    pub fn new<T: AsRef<[u8]>>(input: T, background: AvatarBackground) -> Self {
+    pub fn new<T: AsRef<[u8]>>(
+        input: T,
+        background: AvatarBackground,
+    ) -> Result<Self, AvatarIdentityError> {
         Self::new_with_namespace(AvatarNamespace::default(), input, background)
     }
 
@@ -1107,11 +1285,11 @@ impl HashedDogAvatar {
         namespace: AvatarNamespace<'_>,
         input: T,
         background: AvatarBackground,
-    ) -> Self {
-        Self {
-            identity: AvatarIdentity::new_with_namespace(namespace, input),
+    ) -> Result<Self, AvatarIdentityError> {
+        Ok(Self {
+            identity: AvatarIdentity::new_with_namespace(namespace, input)?,
             background,
-        }
+        })
     }
 }
 
@@ -1128,7 +1306,10 @@ pub struct HashedRobotAvatar {
 }
 
 impl HashedRobotAvatar {
-    pub fn new<T: AsRef<[u8]>>(input: T, background: AvatarBackground) -> Self {
+    pub fn new<T: AsRef<[u8]>>(
+        input: T,
+        background: AvatarBackground,
+    ) -> Result<Self, AvatarIdentityError> {
         Self::new_with_namespace(AvatarNamespace::default(), input, background)
     }
 
@@ -1136,11 +1317,11 @@ impl HashedRobotAvatar {
         namespace: AvatarNamespace<'_>,
         input: T,
         background: AvatarBackground,
-    ) -> Self {
-        Self {
-            identity: AvatarIdentity::new_with_namespace(namespace, input),
+    ) -> Result<Self, AvatarIdentityError> {
+        Ok(Self {
+            identity: AvatarIdentity::new_with_namespace(namespace, input)?,
             background,
-        }
+        })
     }
 }
 
@@ -1174,7 +1355,7 @@ pub fn encode_cat_avatar_for_id<T: AsRef<[u8]>>(
     id: T,
     format: AvatarOutputFormat,
 ) -> ImageResult<Vec<u8>> {
-    let renderer = HashedCatAvatar::new(id);
+    let renderer = HashedCatAvatar::new(id).map_err(avatar_identity_error_to_image_error)?;
     encode_avatar(&renderer, spec, format)
 }
 
@@ -1195,7 +1376,7 @@ pub fn encode_avatar_for_namespace<T: AsRef<[u8]>>(
     options: AvatarOptions,
 ) -> ImageResult<Vec<u8>> {
     let image = render_avatar_for_namespace(spec, namespace, id, options)
-        .map_err(avatar_spec_error_to_image_error)?;
+        .map_err(avatar_render_error_to_image_error)?;
     encode_rgba_image(&image, format)
 }
 
@@ -1204,7 +1385,7 @@ pub fn render_avatar_for_id<T: AsRef<[u8]>>(
     spec: AvatarSpec,
     id: T,
     options: AvatarOptions,
-) -> Result<RgbaImage, AvatarSpecError> {
+) -> Result<RgbaImage, AvatarRenderError> {
     render_avatar_for_namespace(spec, AvatarNamespace::default(), id, options)
 }
 
@@ -1213,10 +1394,10 @@ pub fn render_avatar_for_namespace<T: AsRef<[u8]>>(
     namespace: AvatarNamespace<'_>,
     id: T,
     options: AvatarOptions,
-) -> Result<RgbaImage, AvatarSpecError> {
+) -> Result<RgbaImage, AvatarRenderError> {
     spec.validate()?;
-    let identity = AvatarIdentity::new_with_namespace(namespace, id);
-    match options.kind {
+    let identity = AvatarIdentity::new_with_namespace(namespace, id)?;
+    let image = match options.kind {
         AvatarKind::Cat => {
             render_cat_avatar_for_identity_with_background(spec, &identity, options.background)
         }
@@ -1262,7 +1443,8 @@ pub fn render_avatar_for_namespace<T: AsRef<[u8]>>(
         AvatarKind::Knight => {
             render_knight_avatar_for_identity(spec, &identity, options.background)
         }
-    }
+    }?;
+    Ok(image)
 }
 
 /// Render an avatar as a compact SVG string.
@@ -1270,7 +1452,7 @@ pub fn render_avatar_svg_for_id<T: AsRef<[u8]>>(
     spec: AvatarSpec,
     id: T,
     options: AvatarOptions,
-) -> Result<String, AvatarSpecError> {
+) -> Result<String, AvatarRenderError> {
     render_avatar_svg_for_namespace(spec, AvatarNamespace::default(), id, options)
 }
 
@@ -1279,9 +1461,9 @@ pub fn render_avatar_svg_for_namespace<T: AsRef<[u8]>>(
     namespace: AvatarNamespace<'_>,
     id: T,
     options: AvatarOptions,
-) -> Result<String, AvatarSpecError> {
+) -> Result<String, AvatarRenderError> {
     spec.validate()?;
-    let identity = AvatarIdentity::new_with_namespace(namespace, id);
+    let identity = AvatarIdentity::new_with_namespace(namespace, id)?;
     let bg = match options.background {
         AvatarBackground::Themed => match options.kind {
             AvatarKind::Cat => hsl_to_color(28.0 + identity.unit_f32(2) * 40.0, 0.25, 0.92),
@@ -1370,7 +1552,8 @@ pub fn render_avatar_svg_for_namespace<T: AsRef<[u8]>>(
 /// Render a cat face avatar into an RGBA image.
 pub fn render_cat_avatar(spec: AvatarSpec) -> Result<RgbaImage, AvatarSpecError> {
     spec.validate()?;
-    let identity = AvatarIdentity::new(spec.seed.to_le_bytes());
+    let seed = spec.seed.to_le_bytes();
+    let identity = AvatarIdentity::new_unchecked(AvatarNamespace::default(), &seed);
     Ok(render_cat_avatar_with_identity(
         spec,
         &identity,
@@ -5905,6 +6088,21 @@ mod tests {
         AvatarSpec::new(width, height, seed).expect("test avatar spec should be valid")
     }
 
+    fn valid_namespace<'a>(tenant: &'a str, style_version: &'a str) -> AvatarNamespace<'a> {
+        super::AvatarNamespace::new(tenant, style_version).expect("test namespace should be valid")
+    }
+
+    fn valid_identity<T: AsRef<[u8]>>(input: T) -> AvatarIdentity {
+        super::AvatarIdentity::new(input).expect("test identity should be valid")
+    }
+
+    fn valid_identity_with_namespace<T: AsRef<[u8]>>(
+        namespace: AvatarNamespace<'_>,
+        input: T,
+    ) -> AvatarIdentity {
+        AvatarIdentity::new_with_namespace(namespace, input).expect("test identity should be valid")
+    }
+
     fn render_avatar_for_id<T: AsRef<[u8]>>(
         spec: AvatarSpec,
         id: T,
@@ -6013,7 +6211,7 @@ mod tests {
 
     #[test]
     fn avatar_identity_uses_sha512_digest() {
-        let identity = AvatarIdentity::new("alice@example.com");
+        let identity = valid_identity("alice@example.com");
 
         assert_eq!(identity.as_digest().len(), 64);
         assert_ne!(identity.seed(), 0);
@@ -6021,37 +6219,69 @@ mod tests {
 
     #[test]
     fn namespace_changes_identity_digest() {
-        let left = AvatarIdentity::new_with_namespace(
-            AvatarNamespace::new("tenant-a", "v2"),
-            "alice@example.com",
-        );
-        let right = AvatarIdentity::new_with_namespace(
-            AvatarNamespace::new("tenant-b", "v2"),
-            "alice@example.com",
-        );
+        let left =
+            valid_identity_with_namespace(valid_namespace("tenant-a", "v2"), "alice@example.com");
+        let right =
+            valid_identity_with_namespace(valid_namespace("tenant-b", "v2"), "alice@example.com");
 
         assert_ne!(left.as_digest(), right.as_digest());
     }
 
     #[test]
     fn namespace_hashing_is_not_ambiguous_with_nul_bytes() {
-        let left = AvatarIdentity::new_with_namespace(
-            AvatarNamespace::new("tenant\0v2", "v1"),
-            "alice@example.com",
-        );
-        let right = AvatarIdentity::new_with_namespace(
-            AvatarNamespace::new("tenant", "v2\0v1"),
-            "alice@example.com",
-        );
+        let left =
+            valid_identity_with_namespace(valid_namespace("tenant\0v2", "v1"), "alice@example.com");
+        let right =
+            valid_identity_with_namespace(valid_namespace("tenant", "v2\0v1"), "alice@example.com");
 
         assert_ne!(left.as_digest(), right.as_digest());
     }
 
     #[test]
+    fn identity_construction_rejects_oversized_input() {
+        let too_long = vec![b'a'; MAX_AVATAR_ID_BYTES + 1];
+        let error = AvatarIdentity::new(&too_long).expect_err("oversized identity should fail");
+
+        assert_eq!(error.component(), AvatarIdentityComponent::Input);
+        assert_eq!(error.length(), MAX_AVATAR_ID_BYTES + 1);
+        assert_eq!(error.max(), MAX_AVATAR_ID_BYTES);
+    }
+
+    #[test]
+    fn namespace_construction_rejects_oversized_components() {
+        let too_long = "a".repeat(MAX_AVATAR_NAMESPACE_COMPONENT_BYTES + 1);
+        let error =
+            AvatarNamespace::new(&too_long, "v2").expect_err("oversized tenant should fail");
+
+        assert_eq!(error.component(), AvatarIdentityComponent::Tenant);
+        assert_eq!(error.length(), MAX_AVATAR_NAMESPACE_COMPONENT_BYTES + 1);
+        assert_eq!(error.max(), MAX_AVATAR_NAMESPACE_COMPONENT_BYTES);
+    }
+
+    #[test]
+    fn render_avatar_for_id_rejects_oversized_identity() {
+        let too_long = vec![b'a'; MAX_AVATAR_ID_BYTES + 1];
+        let error = super::render_avatar_for_id(
+            valid_spec(128, 128, 0),
+            &too_long,
+            AvatarOptions::new(AvatarKind::Cat, AvatarBackground::Themed),
+        )
+        .expect_err("oversized identity should fail");
+
+        assert!(matches!(
+            error,
+            AvatarRenderError::Identity(AvatarIdentityError {
+                component: AvatarIdentityComponent::Input,
+                ..
+            })
+        ));
+    }
+
+    #[test]
     fn hashed_cat_avatar_is_deterministic_for_same_id() {
         let spec = valid_spec(192, 192, 0);
-        let left = render_cat_avatar_for_identity(spec, &AvatarIdentity::new("alice@example.com"));
-        let right = render_cat_avatar_for_identity(spec, &AvatarIdentity::new("alice@example.com"));
+        let left = render_cat_avatar_for_identity(spec, &valid_identity("alice@example.com"));
+        let right = render_cat_avatar_for_identity(spec, &valid_identity("alice@example.com"));
 
         assert_eq!(left.as_raw(), right.as_raw());
     }
@@ -6059,8 +6289,8 @@ mod tests {
     #[test]
     fn hashed_cat_avatar_changes_for_different_ids() {
         let spec = valid_spec(192, 192, 0);
-        let left = render_cat_avatar_for_identity(spec, &AvatarIdentity::new("alice@example.com"));
-        let right = render_cat_avatar_for_identity(spec, &AvatarIdentity::new("bob@example.com"));
+        let left = render_cat_avatar_for_identity(spec, &valid_identity("alice@example.com"));
+        let right = render_cat_avatar_for_identity(spec, &valid_identity("bob@example.com"));
 
         assert_ne!(left.as_raw(), right.as_raw());
     }
@@ -6150,7 +6380,7 @@ mod tests {
     fn white_background_mode_renders_white_corner() {
         let image = render_cat_avatar_for_identity_with_background(
             valid_spec(128, 128, 0),
-            &AvatarIdentity::new("alice@example.com"),
+            &valid_identity("alice@example.com"),
             AvatarBackground::White,
         );
 
@@ -6166,7 +6396,7 @@ mod tests {
         ] {
             let image = render_cat_avatar_for_identity_with_background(
                 valid_spec(128, 128, 0),
-                &AvatarIdentity::new("cat@hashavatar.app"),
+                &valid_identity("cat@hashavatar.app"),
                 background,
             );
 
@@ -6178,7 +6408,7 @@ mod tests {
     fn transparent_background_mode_renders_clear_corner() {
         let image = render_cat_avatar_for_identity_with_background(
             valid_spec(128, 128, 0),
-            &AvatarIdentity::new("cat@hashavatar.app"),
+            &valid_identity("cat@hashavatar.app"),
             AvatarBackground::Transparent,
         );
 
@@ -6188,7 +6418,7 @@ mod tests {
     #[test]
     fn dog_and_robot_variants_generate_distinct_images() {
         let spec = valid_spec(128, 128, 0);
-        let id = AvatarIdentity::new("alice@example.com");
+        let id = valid_identity("alice@example.com");
         let dog = render_dog_avatar_for_identity(spec, &id, AvatarBackground::Themed);
         let robot = render_robot_avatar_for_identity(spec, &id, AvatarBackground::Themed);
 
@@ -6198,7 +6428,7 @@ mod tests {
     #[test]
     fn monster_variant_is_distinct_from_alien() {
         let spec = valid_spec(128, 128, 0);
-        let id = AvatarIdentity::new("alice@example.com");
+        let id = valid_identity("alice@example.com");
         let alien = render_alien_avatar_for_identity(spec, &id, AvatarBackground::Themed);
         let monster = render_monster_avatar_for_identity(spec, &id, AvatarBackground::Themed);
 
@@ -6208,7 +6438,7 @@ mod tests {
     #[test]
     fn paws_variant_is_distinct_from_cat() {
         let spec = valid_spec(128, 128, 0);
-        let id = AvatarIdentity::new("alice@example.com");
+        let id = valid_identity("alice@example.com");
         let cat =
             render_cat_avatar_for_identity_with_background(spec, &id, AvatarBackground::Themed);
         let paws = render_paws_avatar_for_identity(spec, &id, AvatarBackground::Themed);

@@ -11,6 +11,7 @@
 - Added release security documentation for dependency policy, panic policy, release gates, and crate security controls
 - Changed public render APIs and `AvatarRenderer::render` to return `Result<_, AvatarSpecError>` for invalid dimensions instead of panicking
 - Changed `AvatarSpec::new` to validate dimensions at construction and made `AvatarSpec` fields private
+- Added enforced identity and namespace byte-length limits with typed errors to prevent accidental hashing of unbounded input
 - Removed public path-writing export helpers so the crate does not provide filesystem APIs that can be wired to untrusted paths
 - Changed namespace identity hashing to length-prefix tenant, style version, and input components, preventing embedded NUL separator ambiguity
 - Hardened internal rectangle arithmetic with saturating and clamping operations

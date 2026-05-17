@@ -11,6 +11,7 @@
 - Added crate-focused security policy checks and release gates
 - Added a fuzz harness for arbitrary avatar identities, families, backgrounds, SVG rendering, and PNG encoding
 - Changed `AvatarSpec::new` to validate dimensions at construction and made spec fields private
+- Added enforced identity and namespace byte-length limits with typed errors
 - Changed public render APIs to return `Result<_, AvatarSpecError>` for invalid dimensions instead of panicking
 - Removed public path-writing export helpers; callers should write encoded bytes or SVG strings through their own storage boundary
 - Changed namespace identity hashing to length-prefix components, preventing separator ambiguity from embedded NUL bytes
@@ -21,8 +22,9 @@ The public HTTP API and demo website already live in `hashavatar-api`. Keeping a
 
 ## Compatibility
 
-- This is a breaking API release for callers constructing `AvatarSpec`, using direct render functions, using custom `AvatarRenderer` implementations, or relying on the removed path-writing export helpers.
+- This is a breaking API release for callers constructing `AvatarSpec`, constructing `AvatarIdentity`/`AvatarNamespace`, using direct render functions, using custom `AvatarRenderer` implementations, or relying on the removed path-writing export helpers.
 - `AvatarSpec::new(...)` now returns `Result<AvatarSpec, AvatarSpecError>`.
+- `AvatarIdentity::new(...)`, `AvatarIdentity::new_with_namespace(...)`, and `AvatarNamespace::new(...)` now return `Result`.
 - Namespace-based identities intentionally produce new deterministic fingerprints because the hash input format was hardened.
 - Existing deterministic fingerprints remain covered by updated golden regression tests.
 - Users embedding the library should only see a smaller dependency graph.
@@ -33,6 +35,7 @@ The public HTTP API and demo website already live in `hashavatar-api`. Keeping a
 
 - `src/lib.rs` now forbids unsafe code.
 - `AvatarSpec` dimensions are validated before a spec value can be constructed through the public API.
+- Identity inputs are capped at 1024 bytes, and namespace tenant/style-version components are capped at 128 bytes.
 - The crate no longer writes to caller-provided filesystem paths.
 - Public render APIs reject invalid dimensions without panicking.
 - Namespace identity hashing is no longer delimiter-ambiguous when tenant or style version strings contain embedded NUL bytes.

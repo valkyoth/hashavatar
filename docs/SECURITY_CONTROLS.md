@@ -7,6 +7,8 @@
 - The library uses `#![forbid(unsafe_code)]`.
 - `AvatarSpec` has private fields and validates dimensions at construction.
 - Public raster/SVG dimensions are bounded by `MIN_AVATAR_DIMENSION` and `MAX_AVATAR_DIMENSION`.
+- Identity inputs are bounded by `MAX_AVATAR_ID_BYTES`.
+- Namespace tenant and style-version components are bounded by `MAX_AVATAR_NAMESPACE_COMPONENT_BYTES`.
 - Image-generation APIs return typed errors for unsupported dimensions before allocating or encoding raster output.
 - The crate exposes in-memory encoding and rendering APIs, but no public filesystem path-writing helpers.
 - Namespace identity hashing length-prefixes every component, so tenant and style-version values cannot collide through embedded separator bytes.

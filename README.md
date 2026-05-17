@@ -13,6 +13,7 @@ It is designed as a code-only alternative to asset-pack-based avatar systems: th
 - Namespace-aware identity hashing for multi-tenant or versioned rollouts
 - Public API suitable for web apps, services, and batch jobs
 - Built-in dimension validation for internet-facing avatar endpoints
+- Built-in identity and namespace length limits for untrusted inputs
 
 ## Why Use It
 
@@ -278,6 +279,8 @@ Use `render_avatar_svg_for_id(...)` when you need vector output.
 Important public entry points:
 
 - `AvatarSpec::new(width, height, seed) -> Result<AvatarSpec, AvatarSpecError>`
+- `AvatarIdentity::new(input) -> Result<AvatarIdentity, AvatarIdentityError>`
+- `AvatarNamespace::new(tenant, style_version) -> Result<AvatarNamespace, AvatarIdentityError>`
 - `AvatarOptions::new(kind, background)`
 - `encode_avatar_for_id(...)`
 - `render_avatar_for_id(...)`
