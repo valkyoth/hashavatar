@@ -2,7 +2,7 @@
 
 ## 0.7.0
 
-- Bumped the crate to `0.7.0` development.
+- Bumped the crate to `0.7.0`.
 - Added `AvatarHashAlgorithm` and `AvatarIdentityOptions`.
 - Kept SHA-512 as the default identity hash and preserved the existing default identity preimage.
 - Added optional BLAKE3 identity derivation behind the `blake3` Cargo feature.

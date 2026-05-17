@@ -26,6 +26,8 @@ release without letting exploratory work blur into the release criteria.
 
 ## 0.7.0: Pluggable Identity Hashing
 
+Status: implemented in `0.7.0`.
+
 Goal: make identity hashing explicit and extensible while keeping SHA-512 as
 the stable default.
 
