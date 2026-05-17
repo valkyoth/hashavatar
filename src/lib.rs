@@ -2839,6 +2839,55 @@ fn avatar_layer_anchors(kind: AvatarKind) -> Option<AvatarLayerAnchors> {
     Some(anchors)
 }
 
+fn glasses_y_offset(kind: AvatarKind) -> f32 {
+    match kind {
+        AvatarKind::Dog | AvatarKind::Robot | AvatarKind::Ghost => 0.025,
+        AvatarKind::Monster => 0.020,
+        AvatarKind::Wizard | AvatarKind::Knight => 0.035,
+        _ => 0.0,
+    }
+}
+
+fn hat_y_offset(kind: AvatarKind) -> f32 {
+    match kind {
+        AvatarKind::Cat | AvatarKind::Frog => -0.035,
+        _ => 0.0,
+    }
+}
+
+fn crown_y_offset(kind: AvatarKind) -> f32 {
+    match kind {
+        AvatarKind::Cat => -0.035,
+        AvatarKind::Alien | AvatarKind::Frog => -0.080,
+        _ => 0.0,
+    }
+}
+
+fn bowtie_y_offset(kind: AvatarKind) -> f32 {
+    match kind {
+        AvatarKind::Cat
+        | AvatarKind::Fox
+        | AvatarKind::Slime
+        | AvatarKind::Wizard
+        | AvatarKind::Octopus => 0.060,
+        _ => 0.0,
+    }
+}
+
+fn eyepatch_y_offset(kind: AvatarKind) -> f32 {
+    match kind {
+        AvatarKind::Knight => 0.030,
+        _ => 0.0,
+    }
+}
+
+fn horns_y_offset(kind: AvatarKind) -> f32 {
+    match kind {
+        AvatarKind::Dog | AvatarKind::Robot => 0.070,
+        _ => 0.0,
+    }
+}
+
 fn style_accent_color(color: AvatarColor, identity: &AvatarIdentity) -> Color {
     match color {
         AvatarColor::Default => hsl_to_color(180.0 + identity.unit_f32(25) * 160.0, 0.58, 0.48),
@@ -2945,12 +2994,16 @@ fn draw_accessory_layer(
         AvatarAccessory::None => {}
         AvatarAccessory::Glasses => {
             let radius = (eye_radius * 2).max(5);
-            draw_hollow_circle_mut(image, (left_eye_x, left_eye_y), radius, dark);
-            draw_hollow_circle_mut(image, (right_eye_x, right_eye_y), radius, dark);
+            let glasses_offset = (glasses_y_offset(kind) * spec.height as f32).round() as i32;
+            let left_glasses_y = left_eye_y + glasses_offset;
+            let right_glasses_y = right_eye_y + glasses_offset;
+            let bridge_y = (left_glasses_y + right_glasses_y) / 2;
+            draw_hollow_circle_mut(image, (left_eye_x, left_glasses_y), radius, dark);
+            draw_hollow_circle_mut(image, (right_eye_x, right_glasses_y), radius, dark);
             draw_line_segment_mut(
                 image,
-                ((left_eye_x + radius) as f32, left_eye_y as f32),
-                ((right_eye_x - radius) as f32, right_eye_y as f32),
+                ((left_eye_x + radius) as f32, bridge_y as f32),
+                ((right_eye_x - radius) as f32, bridge_y as f32),
                 dark,
             );
         }
@@ -2959,7 +3012,8 @@ fn draw_accessory_layer(
             let brim_h = (min * 5 / 100).max(2);
             let top_w = (brim_w * 7 / 10).max(min * 16 / 100);
             let top_h = min * 18 / 100;
-            let y = (top_y - top_h / 2).max(0);
+            let y_offset = (hat_y_offset(kind) * spec.height as f32).round() as i32;
+            let y = (top_y - top_h / 2 + y_offset).max(0);
             draw_filled_rect_mut(
                 image,
                 Rect::at(mouth_x - top_w / 2, y).of_size(top_w as u32, top_h as u32),
@@ -2975,7 +3029,7 @@ fn draw_accessory_layer(
             let side_r = (eye_radius * 2).max(5);
             let left_x = mouth_x - face_half;
             let right_x = mouth_x + face_half;
-            draw_hollow_ellipse_mut(
+            draw_top_hollow_ellipse_mut(
                 image,
                 (mouth_x, eye_y),
                 face_half,
@@ -2988,7 +3042,8 @@ fn draw_accessory_layer(
             draw_hollow_circle_mut(image, (right_x, eye_y), side_r, dark);
         }
         AvatarAccessory::Crown => {
-            let base_y = top_y;
+            let y_offset = (crown_y_offset(kind) * spec.height as f32).round() as i32;
+            let base_y = (top_y + y_offset).max(0);
             let points = [
                 Point::new(mouth_x - face_half * 7 / 10, base_y + min * 12 / 100),
                 Point::new(mouth_x - face_half * 45 / 100, base_y),
@@ -3013,7 +3068,8 @@ fn draw_accessory_layer(
             );
         }
         AvatarAccessory::Bowtie => {
-            let y = neck_y;
+            let y_offset = (bowtie_y_offset(kind) * spec.height as f32).round() as i32;
+            let y = neck_y + y_offset;
             let size = min * 10 / 100;
             let left = [
                 Point::new(mouth_x, y),
@@ -3032,16 +3088,17 @@ fn draw_accessory_layer(
         AvatarAccessory::Eyepatch => {
             let patch_rx = (eye_radius * 2).max(5);
             let patch_ry = (eye_radius * 3 / 2).max(4);
+            let y_offset = (eyepatch_y_offset(kind) * spec.height as f32).round() as i32;
+            let left_patch_y = left_eye_y + y_offset;
+            let strap_start_y = top_y + y_offset / 2;
+            let strap_end_y = mouth_y - eye_radius + y_offset;
             draw_line_segment_mut(
                 image,
-                ((mouth_x - face_half) as f32, top_y as f32),
-                (
-                    (mouth_x + face_half * 7 / 10) as f32,
-                    (mouth_y - eye_radius) as f32,
-                ),
+                ((mouth_x - face_half) as f32, strap_start_y as f32),
+                ((mouth_x + face_half * 7 / 10) as f32, strap_end_y as f32),
                 dark,
             );
-            draw_filled_ellipse_mut(image, (left_eye_x, left_eye_y), patch_rx, patch_ry, dark);
+            draw_filled_ellipse_mut(image, (left_eye_x, left_patch_y), patch_rx, patch_ry, dark);
         }
         AvatarAccessory::Scarf => {
             let scarf_h = (min * 8 / 100).max(4);
@@ -3069,7 +3126,8 @@ fn draw_accessory_layer(
             );
         }
         AvatarAccessory::Horns => {
-            let y = top_y + min * 5 / 100;
+            let y_offset = (horns_y_offset(kind) * spec.height as f32).round() as i32;
+            let y = top_y + min * 5 / 100 + y_offset;
             let left = [
                 Point::new(mouth_x - face_half * 6 / 10, y + min * 7 / 100),
                 Point::new(mouth_x - face_half, (y - min * 12 / 100).max(0)),
@@ -3243,6 +3301,27 @@ fn draw_hollow_ellipse_mut(
     let mut previous = None;
     for step in 0..=steps {
         let angle = step as f32 / steps as f32 * std::f32::consts::TAU;
+        let x = cx + (angle.cos() * width_radius as f32).round() as i32;
+        let y = cy + (angle.sin() * height_radius as f32).round() as i32;
+        if let Some((px, py)) = previous {
+            draw_antialiased_line_segment_mut(image, (px, py), (x, y), color, interpolate);
+        }
+        previous = Some((x, y));
+    }
+}
+
+fn draw_top_hollow_ellipse_mut(
+    image: &mut RgbaImage,
+    center: (i32, i32),
+    width_radius: i32,
+    height_radius: i32,
+    color: Rgba<u8>,
+) {
+    let (cx, cy) = center;
+    let steps = (width_radius.max(height_radius) * 4).max(16);
+    let mut previous = None;
+    for step in 0..=steps {
+        let angle = std::f32::consts::PI + step as f32 / steps as f32 * std::f32::consts::PI;
         let x = cx + (angle.cos() * width_radius as f32).round() as i32;
         let y = cy + (angle.sin() * height_radius as f32).round() as i32;
         if let Some((px, py)) = previous {
@@ -3454,6 +3533,7 @@ fn render_accessory_svg_layer(
     let neck_y = anchors.neck * spec.height as f32;
     let face_half = anchors.face_width * min / 2.0;
     let eye_radius = (anchors.eye_radius * min).max(3.0);
+    let glasses_offset = glasses_y_offset(kind) * spec.height as f32;
     let fill = color_hex(accent);
     let dark = "#1f2937";
     let layer = accessory.as_str();
@@ -3464,7 +3544,7 @@ fn render_accessory_svg_layer(
             r#"<circle cx="{lx}" cy="{y}" r="{r}" fill="none" stroke="{dark}" stroke-width="3"/><circle cx="{rx}" cy="{y}" r="{r}" fill="none" stroke="{dark}" stroke-width="3"/><line x1="{l2}" y1="{y}" x2="{r2}" y2="{y}" stroke="{dark}" stroke-width="3"/>"#,
             lx = left_eye_x,
             rx = right_eye_x,
-            y = eye_y,
+            y = eye_y + glasses_offset,
             r = eye_radius * 2.0,
             l2 = left_eye_x + eye_radius * 2.0,
             r2 = right_eye_x - eye_radius * 2.0,
@@ -3472,82 +3552,86 @@ fn render_accessory_svg_layer(
         AvatarAccessory::Hat => format!(
             r#"<rect x="{x}" y="{y}" width="{tw}" height="{th}" fill="{fill}"/><rect x="{bx}" y="{by}" width="{bw}" height="{bh}" fill="{dark}"/>"#,
             x = mouth_x - face_half * 0.35,
-            y = (top_y - min * 0.09).max(0.0),
+            y = (top_y - min * 0.09 + hat_y_offset(kind) * spec.height as f32).max(0.0),
             tw = face_half * 0.70,
             th = min * 0.18,
             bx = mouth_x - face_half * 0.70,
-            by = (top_y - min * 0.09).max(0.0) + min * 0.18,
+            by = (top_y - min * 0.09 + hat_y_offset(kind) * spec.height as f32).max(0.0)
+                + min * 0.18,
             bw = face_half * 1.40,
             bh = min * 0.05,
         ),
         AvatarAccessory::Headphones => format!(
-            r#"<path d="M {l} {y} A {r} {r} 0 0 1 {rr} {y}" fill="none" stroke="{dark}" stroke-width="4"/><circle cx="{l}" cy="{ear_y}" r="{er}" fill="{fill}" stroke="{dark}" stroke-width="2"/><circle cx="{rr}" cy="{ear_y}" r="{er}" fill="{fill}" stroke="{dark}" stroke-width="2"/>"#,
+            r#"<path d="M {l} {y} Q {cx} {top} {rr} {y}" fill="none" stroke="{dark}" stroke-width="4" stroke-linecap="round"/><circle cx="{l}" cy="{ear_y}" r="{er}" fill="{fill}" stroke="{dark}" stroke-width="2"/><circle cx="{rr}" cy="{ear_y}" r="{er}" fill="{fill}" stroke="{dark}" stroke-width="2"/>"#,
             l = mouth_x - face_half,
             rr = mouth_x + face_half,
+            cx = mouth_x,
             y = eye_y,
-            r = face_half,
+            top = top_y,
             ear_y = eye_y,
             er = eye_radius * 2.0,
         ),
         AvatarAccessory::Crown => {
+            let crown_top_y = (top_y + crown_y_offset(kind) * spec.height as f32).max(0.0);
             let p = format!(
                 "{},{} {},{} {},{} {},{} {},{} {},{} {},{}",
                 mouth_x - face_half * 0.70,
-                top_y + min * 0.12,
+                crown_top_y + min * 0.12,
                 mouth_x - face_half * 0.45,
-                top_y,
+                crown_top_y,
                 mouth_x - face_half * 0.16,
-                top_y + min * 0.10,
+                crown_top_y + min * 0.10,
                 mouth_x,
-                (top_y - min * 0.04).max(0.0),
+                (crown_top_y - min * 0.04).max(0.0),
                 mouth_x + face_half * 0.16,
-                top_y + min * 0.10,
+                crown_top_y + min * 0.10,
                 mouth_x + face_half * 0.45,
-                top_y,
+                crown_top_y,
                 mouth_x + face_half * 0.70,
-                top_y + min * 0.12
+                crown_top_y + min * 0.12
             );
             format!(
                 r#"<polygon points="{p}" fill="{fill}"/><line x1="{x1}" y1="{y}" x2="{x2}" y2="{y}" stroke="{dark}" stroke-width="3"/>"#,
                 x1 = mouth_x - face_half * 0.70,
                 x2 = mouth_x + face_half * 0.70,
-                y = top_y + min * 0.12,
+                y = crown_top_y + min * 0.12,
             )
         }
         AvatarAccessory::Bowtie => {
+            let bowtie_y = neck_y + bowtie_y_offset(kind) * spec.height as f32;
             let lp = format!(
                 "{},{} {},{} {},{}",
                 mouth_x,
-                neck_y,
+                bowtie_y,
                 mouth_x - min * 0.20,
-                neck_y - min * 0.10,
+                bowtie_y - min * 0.10,
                 mouth_x - min * 0.20,
-                neck_y + min * 0.10
+                bowtie_y + min * 0.10
             );
             let rp = format!(
                 "{},{} {},{} {},{}",
                 mouth_x,
-                neck_y,
+                bowtie_y,
                 mouth_x + min * 0.20,
-                neck_y - min * 0.10,
+                bowtie_y - min * 0.10,
                 mouth_x + min * 0.20,
-                neck_y + min * 0.10
+                bowtie_y + min * 0.10
             );
             format!(
                 r#"<polygon points="{lp}" fill="{fill}"/><polygon points="{rp}" fill="{fill}"/><circle cx="{cx}" cy="{y}" r="{r}" fill="{dark}"/>"#,
                 cx = mouth_x,
-                y = neck_y,
+                y = bowtie_y,
                 r = min * 0.05,
             )
         }
         AvatarAccessory::Eyepatch => format!(
             r#"<line x1="{x1}" y1="{y1}" x2="{x2}" y2="{y2}" stroke="{dark}" stroke-width="3"/><ellipse cx="{cx}" cy="{cy}" rx="{rx}" ry="{ry}" fill="{dark}"/>"#,
             x1 = mouth_x - face_half,
-            y1 = top_y,
+            y1 = top_y + eyepatch_y_offset(kind) * spec.height as f32 * 0.50,
             x2 = mouth_x + face_half * 0.70,
-            y2 = mouth_y - eye_radius,
+            y2 = mouth_y - eye_radius + eyepatch_y_offset(kind) * spec.height as f32,
             cx = left_eye_x,
-            cy = left_eye_y,
+            cy = left_eye_y + eyepatch_y_offset(kind) * spec.height as f32,
             rx = eye_radius * 2.0,
             ry = eye_radius * 1.5,
         ),
@@ -3570,23 +3654,24 @@ fn render_accessory_svg_layer(
             ry = min * 0.07,
         ),
         AvatarAccessory::Horns => {
+            let horn_top_y = top_y + horns_y_offset(kind) * spec.height as f32;
             let lp = format!(
                 "{},{} {},{} {},{}",
                 mouth_x - face_half * 0.60,
-                top_y + min * 0.12,
+                horn_top_y + min * 0.12,
                 mouth_x - face_half,
-                (top_y - min * 0.12).max(0.0),
+                (horn_top_y - min * 0.12).max(0.0),
                 mouth_x - face_half * 0.30,
-                top_y + min * 0.07
+                horn_top_y + min * 0.07
             );
             let rp = format!(
                 "{},{} {},{} {},{}",
                 mouth_x + face_half * 0.60,
-                top_y + min * 0.12,
+                horn_top_y + min * 0.12,
                 mouth_x + face_half,
-                (top_y - min * 0.12).max(0.0),
+                (horn_top_y - min * 0.12).max(0.0),
                 mouth_x + face_half * 0.30,
-                top_y + min * 0.07
+                horn_top_y + min * 0.07
             );
             format!(
                 r#"<polygon points="{lp}" fill="{fill}"/><polygon points="{rp}" fill="{fill}"/>"#

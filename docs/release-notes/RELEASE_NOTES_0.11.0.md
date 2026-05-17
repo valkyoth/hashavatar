@@ -11,6 +11,10 @@
   raster renderer's transparent outside-frame masking behavior.
 - Fixed malformed Paws-family SVG output where one toe-pad ellipse emitted a
   color value in the `ry` radius attribute instead of a numeric radius.
+- Lowered glasses placement slightly for dog, robot, monster, ghost, wizard,
+  and knight families.
+- Tuned eyepatch, horns, bowtie, crown, hat, and headphones placement for
+  families where those overlays were visibly off-center.
 - Added tests for supported face-layer families, unsupported fallback families,
   SVG frame clipping, and SVG radius-attribute integrity.
 

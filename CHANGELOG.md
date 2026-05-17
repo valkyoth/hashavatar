@@ -9,6 +9,10 @@
   accessory, and expression content so SVG behavior matches raster masking.
 - Fixed malformed Paws-family SVG output where one toe-pad ellipse wrote a
   color value into its `ry` radius attribute.
+- Lowered glasses placement slightly for dog, robot, monster, ghost, wizard,
+  and knight families.
+- Tuned eyepatch, horns, bowtie, crown, hat, and headphones placement for
+  families where those overlays were visibly off-center.
 - Expanded tests for face-layer support, deterministic fallback behavior, and
   SVG frame clipping.
 
