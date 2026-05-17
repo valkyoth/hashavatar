@@ -193,6 +193,9 @@ the public API is frozen.
 - Keep existing `AvatarOptions` working during the transition if practical.
 - Define a deterministic derivation path for each layer from identity bytes
   when the caller chooses an automatic/default mode.
+- Reserve distinct identity digest offsets for top-level automatic choices so
+  kind, background, accessory, palette, expression, and frame shape do not all
+  depend on the same byte.
 - Make every new enum parseable and displayable like the existing public
   enums.
 - Derive automatic layer choices from each enum's variant list rather than
@@ -267,6 +270,26 @@ tests.
   example `Self::ALL[(value as usize) % Self::ALL.len()]`, so adding a variant
   cannot silently leave it unreachable.
 
+### Automatic Derivation Schedule
+
+Automatic layer choices must use an explicit schedule of identity digest bytes
+or domain-separated sub-derivations. The simple baseline is one distinct digest
+byte per top-level choice:
+
+```rust
+let kind = AvatarKind::from_byte(identity.byte(0));
+let background = AvatarBackground::from_byte(identity.byte(1));
+let accessory = AvatarAccessory::from_byte(identity.byte(2));
+let color = AvatarColor::from_byte(identity.byte(3));
+let expression = AvatarExpression::from_byte(identity.byte(4));
+let shape = AvatarShape::from_byte(identity.byte(5));
+```
+
+The exact offsets can change during implementation, but the schedule must be
+documented and covered by tests. Reusing a byte for unrelated top-level traits
+is avoided because it creates visible correlation, such as one background being
+overrepresented with one accessory.
+
 ### Finish Line
 
 `0.10.0` is done when:
@@ -274,6 +297,10 @@ tests.
 - Every visual layer enum has `ALL`, `as_str`, `Display`, and `FromStr`.
 - Every automatic public enum choice uses the enum's variant list instead of a
   duplicated literal count.
+- Top-level automatic traits use distinct identity digest offsets or explicit
+  domain-separated derivations.
+- Tests prove changing the digest byte reserved for one top-level trait does
+  not alter the other automatic trait selections.
 - Automatic layer derivation is deterministic and covered by tests.
 - Manual layer selection is covered by tests.
 - Raster and SVG renderers support all selected baseline layers.
