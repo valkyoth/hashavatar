@@ -220,21 +220,11 @@ dependencies = [
 
 [[package]]
 name = "hashavatar"
-version = "0.9.0"
+version = "0.8.0"
 dependencies = [
- "hashavatar-core",
  "image",
  "palette",
  "rand",
- "sha2",
- "subtle",
- "zeroize",
-]
-
-[[package]]
-name = "hashavatar-core"
-version = "0.9.0"
-dependencies = [
  "sha2",
  "subtle",
  "zeroize",
@@ -245,7 +235,6 @@ name = "hashavatar-fuzz"
 version = "0.0.0"
 dependencies = [
  "hashavatar",
- "hashavatar-core",
  "libfuzzer-sys",
 ]
 

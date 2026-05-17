@@ -1,6 +1,6 @@
 [package]
 name = "hashavatar"
-version = "0.9.0"
+version = "0.8.0"
 edition = "2024"
 rust-version = "1.95"
 description = "Deterministic procedural avatars in Rust with configurable identity hashing and WebP, PNG, JPEG, GIF, and SVG export"
@@ -13,13 +13,8 @@ keywords = ["avatar", "identicon", "procedural", "webp", "svg"]
 categories = ["multimedia::images", "graphics"]
 exclude = ["Screenshot_*.png", "fuzz/**", "target/**"]
 
-[workspace]
-members = ["core"]
-exclude = ["fuzz"]
-
 [dependencies]
 blake3 = { version = "1.8.5", default-features = true, optional = true }
-hashavatar-core = { version = "0.9.0", path = "core", default-features = false, features = ["std"] }
 image = { version = "0.25.10", default-features = false, features = ["gif", "jpeg", "png", "webp"] }
 palette = { version = "0.7.6", default-features = false, features = ["std"] }
 rand = { version = "0.10.1", default-features = false, features = ["std", "std_rng"] }
@@ -30,5 +25,5 @@ zeroize = { version = "1.8.2", default-features = false, features = ["alloc"] }
 
 [features]
 default = []
-blake3 = ["dep:blake3", "hashavatar-core/blake3"]
-xxh3 = ["dep:xxhash-rust", "hashavatar-core/xxh3"]
+blake3 = ["dep:blake3"]
+xxh3 = ["dep:xxhash-rust"]

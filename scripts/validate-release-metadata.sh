@@ -61,9 +61,6 @@ test -s docs/PANIC_POLICY.md
 test -s docs/RELEASE.md
 test -s docs/SECURITY_CONTROLS.md
 test -s "RELEASE_NOTES_${cargo_version}.md"
-test -s core/Cargo.toml
-test -s core/README.md
-test -s core/src/lib.rs
 
 for required_script in \
     "scripts/check_fuzz.sh" \
@@ -102,19 +99,8 @@ if ! grep -q "^## $cargo_version" CHANGELOG.md; then
     exit 1
 fi
 
-core_version="$(
-    sed -n 's/^version = "\([^"]*\)"/\1/p' core/Cargo.toml | sed -n '1p'
-)"
-if [ "$core_version" != "$cargo_version" ]; then
-    echo "release metadata: core/Cargo.toml version $core_version does not match Cargo.toml version $cargo_version" >&2
-    exit 1
-fi
-
 package_list="$(
     cargo package --locked --allow-dirty --list
-)"
-core_package_list="$(
-    cargo package --manifest-path core/Cargo.toml --locked --allow-dirty --list
 )"
 
 for required_package_file in \
@@ -147,17 +133,6 @@ for required_package_file in \
 do
     if ! printf '%s\n' "$package_list" | grep -qx "$required_package_file"; then
         echo "release metadata: package is missing $required_package_file" >&2
-        exit 1
-    fi
-done
-
-for required_core_package_file in \
-    "Cargo.toml" \
-    "README.md" \
-    "src/lib.rs"
-do
-    if ! printf '%s\n' "$core_package_list" | grep -qx "$required_core_package_file"; then
-        echo "release metadata: core package is missing $required_core_package_file" >&2
         exit 1
     fi
 done
