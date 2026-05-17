@@ -13,6 +13,9 @@
 - Added domain separation for non-default hash algorithms
 - Added render, encode, and SVG entry points that accept identity hash options
 - Added feature-gated tests for BLAKE3 and XXH3-128 rendering
+- Hardened JPEG alpha flattening with wider arithmetic intermediates
+- Hardened anti-aliased zero-length line drawing against NaN gradient propagation
+- Added `zeroize` cleanup for derived identity digests and temporary identity hash preimage buffers
 
 ## Compatibility
 
@@ -30,4 +33,5 @@
 - All hash input components remain length-prefixed.
 - Non-default algorithms include an explicit algorithm domain component.
 - Oversized identity and namespace inputs are rejected before hashing for every enabled algorithm.
-- Tests cover parser round-trips, algorithm separation, optional feature paths, and oversized input rejection.
+- Derived identity digests and temporary identity hash preimage buffers are zeroized when dropped.
+- Tests cover parser round-trips, algorithm separation, optional feature paths, oversized input rejection, zero-length line drawing, JPEG alpha flattening, and zeroize trait coverage.

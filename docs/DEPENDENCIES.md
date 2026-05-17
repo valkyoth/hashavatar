@@ -8,6 +8,7 @@
 - `sha2` for identity hashing
 - optional `blake3` for BLAKE3 identity hashing when the `blake3` feature is enabled
 - optional `xxhash-rust` for XXH3-128 identity distribution when the `xxh3` feature is enabled
+- `zeroize` for clearing derived identity digests and temporary hash preimage buffers
 
 `sha2` remains the default identity dependency. `blake3` and `xxhash-rust` are
 explicit opt-in dependencies so default users keep the smaller conservative

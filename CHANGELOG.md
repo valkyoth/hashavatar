@@ -11,6 +11,9 @@
 - Added generic render/encode/SVG entry points that accept identity hash options.
 - Added tests for feature-gated hash modes, algorithm separation, parser round-trips, and oversized identity rejection across enabled algorithms.
 - Documented the optional hash algorithms, dependency posture, and the non-cryptographic status of XXH3-128.
+- Hardened JPEG alpha flattening with wider arithmetic intermediates.
+- Hardened anti-aliased zero-length line drawing against NaN gradient propagation.
+- Added `zeroize` cleanup for derived identity digests and temporary identity hash preimage buffers.
 
 ## 0.6.0
 

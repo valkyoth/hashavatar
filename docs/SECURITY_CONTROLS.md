@@ -17,6 +17,8 @@
 - BLAKE3 support is available only through the explicit `blake3` feature.
 - XXH3-128 support is available only through the explicit `xxh3` feature and
   is documented as non-cryptographic.
+- Derived identity digests and temporary hash preimage buffers are zeroized
+  when dropped.
 - Internal rectangle helpers use saturating or clamping arithmetic.
 - The SVG renderer emits generated shape markup from structured numeric values rather than from caller-provided SVG fragments.
 - Golden fingerprint tests protect deterministic rendering output.

@@ -41,6 +41,7 @@ use image::{
 use palette::{FromColor, Hsl, Srgb};
 use rand::{RngExt, SeedableRng, rngs::StdRng};
 use sha2::{Digest, Sha512};
+use zeroize::Zeroize;
 
 /// Rendering contract version for deterministic avatars.
 ///
@@ -312,6 +313,10 @@ fn plot_wu_line<T, B>(
 {
     let dx = end.0 - start.0;
     let dy = end.1 - start.1;
+    if dx == 0 {
+        plot_antialiased_pixel(image, transform(start.0, start.1), color, 1.0, &blend);
+        return;
+    }
     let gradient = dy as f32 / dx as f32;
     let mut fy = start.1 as f32;
 
@@ -991,6 +996,18 @@ impl AvatarIdentity {
     }
 }
 
+impl Zeroize for AvatarIdentity {
+    fn zeroize(&mut self) {
+        self.digest.zeroize();
+    }
+}
+
+impl Drop for AvatarIdentity {
+    fn drop(&mut self) {
+        self.zeroize();
+    }
+}
+
 fn validate_identity_component(
     component: AvatarIdentityComponent,
     length: usize,
@@ -1008,14 +1025,16 @@ fn validate_identity_component(
 }
 
 fn derive_identity_digest(options: AvatarIdentityOptions<'_>, input: &[u8]) -> [u8; 64] {
-    let preimage = identity_hash_preimage(options, input);
-    match options.algorithm {
+    let mut preimage = identity_hash_preimage(options, input);
+    let digest = match options.algorithm {
         AvatarHashAlgorithm::Sha512 => sha512_digest(&preimage),
         #[cfg(feature = "blake3")]
         AvatarHashAlgorithm::Blake3 => blake3_digest(&preimage),
         #[cfg(feature = "xxh3")]
         AvatarHashAlgorithm::Xxh3_128 => xxh3_128_digest(&preimage),
-    }
+    };
+    preimage.zeroize();
+    digest
 }
 
 fn identity_hash_preimage(options: AvatarIdentityOptions<'_>, input: &[u8]) -> Vec<u8> {
@@ -1080,9 +1099,11 @@ fn xxh3_128_digest(preimage: &[u8]) -> [u8; 64] {
         chunk_input.extend_from_slice(preimage);
         update_hash_input_component(&mut chunk_input, HASH_XOF_CHUNK_COMPONENT);
         update_hash_input_component(&mut chunk_input, &[chunk as u8]);
-        let chunk_digest = xxhash_rust::xxh3::xxh3_128(&chunk_input).to_le_bytes();
+        let mut chunk_digest = xxhash_rust::xxh3::xxh3_128(&chunk_input).to_le_bytes();
         let offset = chunk * chunk_digest.len();
         digest[offset..offset + chunk_digest.len()].copy_from_slice(&chunk_digest);
+        chunk_digest.zeroize();
+        chunk_input.zeroize();
     }
     digest
 }
@@ -6335,11 +6356,11 @@ fn rgba_to_rgb_over_white(image: &RgbaImage) -> Vec<u8> {
     let mut rgb = Vec::with_capacity(image.as_raw().len() / 4 * 3);
     for pixel in image.pixels() {
         let [red, green, blue, alpha] = pixel.0;
-        let alpha = u16::from(alpha);
+        let alpha = u32::from(alpha);
         let inverse_alpha = 255 - alpha;
-        rgb.push(((u16::from(red) * alpha + 255 * inverse_alpha + 127) / 255) as u8);
-        rgb.push(((u16::from(green) * alpha + 255 * inverse_alpha + 127) / 255) as u8);
-        rgb.push(((u16::from(blue) * alpha + 255 * inverse_alpha + 127) / 255) as u8);
+        rgb.push(((u32::from(red) * alpha + 255 * inverse_alpha + 127) / 255) as u8);
+        rgb.push(((u32::from(green) * alpha + 255 * inverse_alpha + 127) / 255) as u8);
+        rgb.push(((u32::from(blue) * alpha + 255 * inverse_alpha + 127) / 255) as u8);
     }
     rgb
 }
@@ -6931,6 +6952,28 @@ mod tests {
     }
 
     #[test]
+    fn avatar_identity_implements_zeroize() {
+        fn assert_zeroize<T: Zeroize>() {}
+
+        assert_zeroize::<AvatarIdentity>();
+    }
+
+    #[test]
+    fn antialiased_zero_length_line_draws_single_pixel() {
+        let mut image = RgbaImage::new(4, 4);
+
+        draw_antialiased_line_segment_mut(
+            &mut image,
+            (1, 1),
+            (1, 1),
+            Rgba([10, 20, 30, 255]),
+            interpolate,
+        );
+
+        assert_eq!(image.get_pixel(1, 1), &Rgba([10, 20, 30, 255]));
+    }
+
+    #[test]
     fn polygon_rasterizer_skips_unpaired_intersections() {
         let mut image = RgbaImage::new(32, 32);
         let triangle_with_horizontal_base =
@@ -6962,6 +7005,31 @@ mod tests {
         );
 
         assert!(render_calls > 0);
+    }
+
+    #[test]
+    fn jpeg_alpha_flattening_uses_wide_intermediates() {
+        let image = RgbaImage::from_vec(
+            3,
+            1,
+            vec![
+                0, 0, 0, 0, // transparent black over white
+                0, 0, 0, 128, // half alpha black over white
+                10, 20, 30, 255, // opaque color
+            ],
+        )
+        .expect("test image should be valid");
+
+        let rgb = rgba_to_rgb_over_white(&image);
+
+        assert_eq!(
+            rgb,
+            vec![
+                255, 255, 255, // transparent becomes white
+                127, 127, 127, // rounded half-alpha black over white
+                10, 20, 30,
+            ]
+        );
     }
 
     #[test]
