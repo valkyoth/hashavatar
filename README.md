@@ -200,6 +200,67 @@ stable identity behavior. `AvatarHashAlgorithm::Blake3` is available with the
 feature and is non-cryptographic; use it only for non-adversarial identity
 distribution.
 
+### BLAKE3 Feature Example
+
+```toml
+[dependencies]
+hashavatar = { version = "0.7.0", features = ["blake3"] }
+```
+
+```rust
+use hashavatar::{
+    AvatarBackground, AvatarHashAlgorithm, AvatarIdentityOptions, AvatarKind,
+    AvatarNamespace, AvatarOptions, AvatarSpec, render_avatar_svg_with_identity_options,
+};
+
+let namespace = AvatarNamespace::new("customer-a", "v3")?;
+let spec = AvatarSpec::new(256, 256, 0)?;
+
+let svg = render_avatar_svg_with_identity_options(
+    spec,
+    AvatarIdentityOptions::new(namespace, AvatarHashAlgorithm::Blake3),
+    "user-123",
+    AvatarOptions::new(AvatarKind::Alien, AvatarBackground::Themed),
+)?;
+
+assert!(svg.contains("alien avatar"));
+
+# Ok::<(), Box<dyn std::error::Error>>(())
+```
+
+### XXH3-128 Feature Example
+
+```toml
+[dependencies]
+hashavatar = { version = "0.7.0", features = ["xxh3"] }
+```
+
+```rust
+use hashavatar::{
+    AvatarBackground, AvatarHashAlgorithm, AvatarIdentityOptions, AvatarKind,
+    AvatarNamespace, AvatarOptions, AvatarOutputFormat, AvatarSpec,
+    encode_avatar_with_identity_options,
+};
+
+let namespace = AvatarNamespace::new("public-demo", "v3")?;
+let spec = AvatarSpec::new(256, 256, 0)?;
+
+let bytes = encode_avatar_with_identity_options(
+    spec,
+    AvatarIdentityOptions::new(namespace, AvatarHashAlgorithm::Xxh3_128),
+    "demo-user-123",
+    AvatarOutputFormat::WebP,
+    AvatarOptions::new(AvatarKind::Robot, AvatarBackground::Themed),
+)?;
+
+assert!(!bytes.is_empty());
+
+# Ok::<(), Box<dyn std::error::Error>>(())
+```
+
+XXH3-128 is fast and useful for non-adversarial distribution, but it is not a
+cryptographic hash. Keep SHA-512 or BLAKE3 for adversarial identity inputs.
+
 ## Example: Raw Image Buffer
 
 ```rust
