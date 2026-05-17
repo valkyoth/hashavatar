@@ -1,73 +1,89 @@
 # hashavatar
 
-`hashavatar` is a Rust crate for deterministic, procedural avatar generation.
+`hashavatar` is a Rust crate for deterministic, procedural avatar generation. It is designed for services that need stable user or tenant avatars without bundled artwork, sprite sheets, external asset packs, or filesystem-side effects.
 
-It is designed as a code-only alternative to asset-pack-based avatar systems: the output is generated from an identity hash and drawn from geometric primitives rather than bundled sprites, licensed art packs, or pre-rendered character sheets.
+The crate starts conservative: validated avatar dimensions, bounded identity input, namespace-isolated hashing, safe Rust rendering, in-memory raster encoding, SVG string rendering, and a release process with dependency, audit, fuzz, package, SBOM, and reproducibility checks.
 
-## Features
+## Current Status
 
-- Deterministic avatars derived from `SHA-512`
-- Multiple avatar families: `cat`, `dog`, `robot`, `fox`, `alien`, `monster`, `ghost`, `slime`, `bird`, `wizard`, `skull`, `paws`, `planet`, `rocket`, `mushroom`, `cactus`, `frog`, `panda`, `cupcake`, `pizza`, `icecream`, `octopus`, `knight`
-- Multiple background modes: `themed`, `white`, `black`, `dark`, `light`, `transparent`
-- In-memory encoding for `WebP`, `PNG`, `JPEG`, `GIF`, plus SVG string rendering
-- Namespace-aware identity hashing for multi-tenant or versioned rollouts
-- Public API suitable for web apps, services, and batch jobs
-- Built-in dimension validation for internet-facing avatar endpoints
-- Built-in identity and namespace length limits for untrusted inputs
+The current development version is `0.6.0`.
 
-## Why Use It
+Implemented now:
 
-- No bundled avatar art assets
-- Stable output for a given namespace and identity tuple
-- Small modern default output through `WebP`
-- Simple integration into Rust servers and applications
-- Suitable for CDN-backed avatar URLs because output is deterministic
+- Pure library crate; no bundled demo server and no CLI binary.
+- Deterministic avatars derived from SHA-512 identity hashes.
+- Namespace-aware identity derivation for tenant isolation and visual rollouts.
+- Length-prefixed hash components to avoid delimiter ambiguity.
+- Avatar families: `cat`, `dog`, `robot`, `fox`, `alien`, `monster`, `ghost`, `slime`, `bird`, `wizard`, `skull`, `paws`, `planet`, `rocket`, `mushroom`, `cactus`, `frog`, `panda`, `cupcake`, `pizza`, `icecream`, `octopus`, and `knight`.
+- Background modes: `themed`, `white`, `black`, `dark`, `light`, and `transparent`.
+- In-memory `WebP`, `PNG`, `JPEG`, and `GIF` encoding.
+- Compact SVG string rendering.
+- Typed errors for invalid dimensions and oversized identity inputs.
+- Private `AvatarSpec` fields so dimensions must pass construction-time validation.
+- No public path-writing helpers; callers own their storage and filesystem boundary.
+- `#![forbid(unsafe_code)]` in library code.
+- Golden visual regression fingerprints.
+- Isolated fuzz harness for avatar identities, families, backgrounds, SVG rendering, and PNG encoding.
+- Local release gates for formatting, clippy, tests, docs, dependency policy, RustSec advisories, package contents, SBOM generation, reproducible build checks, and crates.io publish dry runs.
 
-## Installation
+Planned or intentionally external:
 
-Add the crate to your project:
+- HTTP serving, rate limits, cache headers, security headers, observability, and abuse controls live in [`hashavatar-api`](https://github.com/valkyoth/hashavatar-api).
+- Additional output formats such as AVIF or JPEG XL require dependency-policy review before admission.
+- Larger identity inputs should be normalized or mapped by the application before calling this crate.
+
+## Trust Dashboard
+
+| Area | Status |
+| --- | --- |
+| License | `MIT OR Apache-2.0` |
+| MSRV | Rust `1.95.0` |
+| Crate shape | Library only |
+| Runtime dependencies | `image`, `palette`, `rand`, `sha2` |
+| Unsafe policy | `#![forbid(unsafe_code)]` |
+| Filesystem policy | No public path-writing APIs |
+| Dimension limits | `64..=2048` pixels per side |
+| Identity limits | 1024 bytes per identity input |
+| Namespace limits | 128 bytes per tenant/style-version component |
+| Hashing posture | SHA-512 with length-prefixed domain, namespace, style, and identity components |
+| SVG posture | Generated numeric markup only; caller input is not inserted into SVG fragments |
+| Release evidence | fmt, clippy, tests, docs, deny, audit, fuzz harness compile, package check, SBOM, reproducibility |
+
+Security-control details live in [docs/SECURITY_CONTROLS.md](docs/SECURITY_CONTROLS.md). Dependency policy lives in [docs/DEPENDENCIES.md](docs/DEPENDENCIES.md). Panic policy lives in [docs/PANIC_POLICY.md](docs/PANIC_POLICY.md).
+
+## Install
 
 ```toml
 [dependencies]
 hashavatar = "0.6.0"
 ```
 
-If you are using it from a local checkout:
+For a local checkout:
 
 ```toml
 [dependencies]
 hashavatar = { path = "../hashavatar" }
 ```
 
-## Core Concepts
+The crate is dual-licensed:
 
-The main types are:
+```toml
+license = "MIT OR Apache-2.0"
+```
 
-- `AvatarSpec`: image dimensions and rendering seed
-- `AvatarIdentity`: stable hash-backed identity derived from input bytes
-- `AvatarNamespace`: stable tenant/style namespace for deterministic isolation
-- `AvatarKind`: avatar family such as `Cat`, `Dog`, `Robot`, `Ghost`, `Planet`, or `Panda`
-- `AvatarBackground`: background mode: `Themed`, `White`, `Black`, `Dark`, `Light`, or `Transparent`
-- `AvatarOptions`: avatar family plus background mode
-- `AvatarOutputFormat`: raster output format for encoded bytes
+## Limits
 
-In most applications, you only need:
+| Limit | Value |
+| --- | --- |
+| Minimum width/height | `64` |
+| Maximum width/height | `2048` |
+| Maximum identity input | `1024` bytes |
+| Maximum namespace tenant | `128` bytes |
+| Maximum namespace style version | `128` bytes |
 
-- `AvatarSpec`
-- `AvatarOptions`
-- `encode_avatar_for_id(...)`
-- or `render_avatar_svg_for_id(...)`
+These limits are enforced by constructors and render entry points. They are intended to make the safe path the normal path for public web endpoints.
 
-For multi-tenant products or staged visual rollouts, also use:
-
-- `AvatarNamespace`
-- `encode_avatar_for_namespace(...)`
-- `render_avatar_for_namespace(...)`
-- `render_avatar_svg_for_namespace(...)`
-
-## Basic Usage
-
-### Encode To WebP
+## Example: Encode WebP
 
 ```rust
 use hashavatar::{
@@ -83,35 +99,14 @@ let bytes = encode_avatar_for_id(
     AvatarOptions::new(AvatarKind::Robot, AvatarBackground::Transparent),
 )?;
 
-# Ok::<(), Box<dyn std::error::Error>>(())
-```
-
-This returns encoded image bytes ready to:
-
-- write to disk
-- send as an HTTP response
-- upload to object storage
-
-### Encode To PNG
-
-```rust
-use hashavatar::{
-    AvatarBackground, AvatarKind, AvatarOptions, AvatarOutputFormat, AvatarSpec,
-    encode_avatar_for_id,
-};
-
-let spec = AvatarSpec::new(256, 256, 0)?;
-let png = encode_avatar_for_id(
-    spec,
-    "dog@hashavatar.app",
-    AvatarOutputFormat::Png,
-    AvatarOptions::new(AvatarKind::Dog, AvatarBackground::Themed),
-)?;
+assert!(!bytes.is_empty());
 
 # Ok::<(), Box<dyn std::error::Error>>(())
 ```
 
-### Render To SVG
+The returned bytes can be sent as an HTTP response, uploaded to object storage, written to a caller-selected path, or cached by a CDN.
+
+## Example: Render SVG
 
 ```rust
 use hashavatar::{
@@ -126,50 +121,62 @@ let svg = render_avatar_svg_for_id(
 )?;
 
 assert!(svg.starts_with("<svg "));
+assert!(svg.contains("alien avatar"));
 
 # Ok::<(), Box<dyn std::error::Error>>(())
 ```
 
-This is useful when you want:
+Use SVG when you need vector output, easy inspection, text storage, or post-processing by application code.
 
-- vector output
-- text-based storage
-- easier inspection or post-processing
+## Example: Namespaced Tenants
 
-### Render To An Image Buffer
+```rust
+use hashavatar::{
+    AvatarBackground, AvatarKind, AvatarNamespace, AvatarOptions, AvatarOutputFormat,
+    AvatarSpec, encode_avatar_for_namespace,
+};
 
-If you want the raw image before encoding:
+let namespace = AvatarNamespace::new("customer-a", "v2")?;
+let spec = AvatarSpec::new(256, 256, 0)?;
+
+let bytes = encode_avatar_for_namespace(
+    spec,
+    namespace,
+    "user-123",
+    AvatarOutputFormat::Png,
+    AvatarOptions::new(AvatarKind::Cat, AvatarBackground::Themed),
+)?;
+
+assert!(!bytes.is_empty());
+
+# Ok::<(), Box<dyn std::error::Error>>(())
+```
+
+Use namespaces when the same user identifier must not collide visually across tenants, products, or style-version rollouts.
+
+## Example: Raw Image Buffer
 
 ```rust
 use hashavatar::{
     AvatarBackground, AvatarKind, AvatarOptions, AvatarSpec, render_avatar_for_id,
 };
 
-let spec = AvatarSpec::new(256, 256, 0)?;
+let spec = AvatarSpec::new(128, 128, 0)?;
 let image = render_avatar_for_id(
     spec,
     "fox@hashavatar.app",
     AvatarOptions::new(AvatarKind::Fox, AvatarBackground::Themed),
 )?;
 
-assert_eq!(image.width(), 256);
-assert_eq!(image.height(), 256);
+assert_eq!(image.width(), 128);
+assert_eq!(image.height(), 128);
 
 # Ok::<(), Box<dyn std::error::Error>>(())
 ```
 
-## Recommended Integration Patterns
+Use raw buffers when the caller wants to composite, inspect pixels, run custom encoding, or integrate with an existing image pipeline.
 
-### In A Rust Web App
-
-The usual pattern is:
-
-1. accept an identity string from a route or query parameter
-2. choose `AvatarKind`, `AvatarBackground`, and output format
-3. call `encode_avatar_for_id(...)`
-4. return the bytes with the correct content type
-
-Example:
+## Handling Untrusted Input
 
 ```rust
 use hashavatar::{
@@ -177,102 +184,16 @@ use hashavatar::{
     encode_avatar_for_id,
 };
 
-fn generate_avatar_bytes(user_id: &str) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
-    let spec = AvatarSpec::new(256, 256, 0)?;
-    encode_avatar_for_id(
-        spec,
-        user_id,
-        AvatarOutputFormat::WebP,
-        AvatarOptions::new(AvatarKind::Cat, AvatarBackground::Transparent),
-    )
-    .map_err(Into::into)
+fn avatar_response_bytes(user_id: &str, requested_size: u32) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
+    let spec = AvatarSpec::new(requested_size, requested_size, 0)?;
+    let options = AvatarOptions::new(AvatarKind::Cat, AvatarBackground::Transparent);
+
+    encode_avatar_for_id(spec, user_id, AvatarOutputFormat::WebP, options)
+        .map_err(Into::into)
 }
 ```
 
-Use these content types:
-
-- `image/webp`
-- `image/png`
-- `image/jpeg`
-- `image/gif`
-- `image/svg+xml`
-
-### For Public Avatar URLs
-
-For internet-facing avatar endpoints:
-
-- use deterministic IDs
-- validate requested size
-- keep requested dimensions within the crate-supported `64..=2048` pixel range
-- cache aggressively at the CDN edge
-- treat the full request tuple as the cache key:
-  - identity
-  - avatar kind
-  - background
-  - format
-  - size
-
-### For Batch Jobs
-
-Use the crate when:
-
-- pre-generating avatars for users
-- backfilling a media bucket
-- generating static assets during a build or migration
-
-## Choosing Settings
-
-### Avatar Family
-
-Use `AvatarKind` to select the visual family:
-
-- `Cat`
-- `Dog`
-- `Robot`
-- `Fox`
-- `Alien`
-- `Monster`
-- `Ghost`
-- `Slime`
-- `Bird`
-- `Wizard`
-- `Skull`
-- `Paws`
-- `Planet`
-- `Rocket`
-- `Mushroom`
-- `Cactus`
-- `Frog`
-- `Panda`
-- `Cupcake`
-- `Pizza`
-- `Icecream`
-- `Octopus`
-- `Knight`
-
-### Background Mode
-
-Use `AvatarBackground` to control the canvas:
-
-- `Themed`: stylized background chosen by the renderer
-- `White`: pure white background for cleaner export and compositing
-- `Black`: pure black background for dark surfaces
-- `Dark`: softer charcoal background for dark UI previews
-- `Light`: subtle off-white background for softer neutral output
-- `Transparent`: fully transparent canvas for compositing onto another surface
-
-### Output Format
-
-Use `AvatarOutputFormat` for raster output:
-
-- `WebP`: recommended default for modern web delivery
-- `Png`: useful for compatibility or lossless workflows
-- `Jpeg`: legacy-compatible export; transparent pixels are composited over white
-- `Gif`: legacy-compatible single-frame export
-
-AVIF and JPEG XL are not currently exposed because they introduce a larger encoder dependency tree or lack a stable first-party encoder in the crate's current image stack.
-
-Use `render_avatar_svg_for_id(...)` when you need vector output.
+The crate rejects unsupported sizes and oversized identities. Applications should still enforce their own routing, authentication, rate limiting, cache policy, response headers, and request body limits.
 
 ## API Reference Summary
 
@@ -283,104 +204,81 @@ Important public entry points:
 - `AvatarNamespace::new(tenant, style_version) -> Result<AvatarNamespace, AvatarIdentityError>`
 - `AvatarOptions::new(kind, background)`
 - `encode_avatar_for_id(...)`
+- `encode_avatar_for_namespace(...)`
 - `render_avatar_for_id(...)`
+- `render_avatar_for_namespace(...)`
 - `render_avatar_svg_for_id(...)`
+- `render_avatar_svg_for_namespace(...)`
 
-If you need lower-level control, the crate also exposes identity-specific renderer functions for certain families.
+Lower-level identity-specific renderers are available for callers that want direct control over a specific avatar family.
 
-## Determinism And Stability
+## Output Formats
 
-The crate is designed so that:
+| Format | API value | Notes |
+| --- | --- | --- |
+| WebP | `AvatarOutputFormat::WebP` | Recommended default for modern web delivery. |
+| PNG | `AvatarOutputFormat::Png` | Lossless and broadly compatible. |
+| JPEG | `AvatarOutputFormat::Jpeg` | Transparent pixels are composited over white. |
+| GIF | `AvatarOutputFormat::Gif` | Legacy-compatible single-frame output. |
+| SVG | `render_avatar_svg_*` | Returns a string rather than raster bytes. |
 
-- the same identity and options produce the same output
-- different identities produce different procedural results
-- output remains suitable for regression testing
+AVIF and JPEG XL are not exposed because they add dependency or encoder maturity tradeoffs that have not cleared the crate's dependency policy.
 
-The test suite includes:
+## Determinism
 
-- same-input stability checks
-- different-input divergence checks
-- raster export round-trips
-- enum parsing checks
+The output is deterministic for the tuple:
+
+```text
+namespace tenant + namespace style version + identity bytes + avatar kind + background + dimensions + seed
+```
+
+This makes the crate suitable for stable CDN-backed avatar URLs and golden regression tests. Namespace hashing uses length-prefixed components, so embedded separator bytes cannot create tenant/style-version ambiguity.
+
+## Testing And Release Evidence
+
+The repository includes:
+
+- same-input stability tests
+- different-input divergence tests
+- raster export round-trip tests
+- SVG safety and compactness tests
+- enum parsing tests
 - transparent background checks
-- visual fingerprint regression tests
+- golden visual fingerprint tests
+- fuzz harness compilation
+- `cargo deny` policy
+- RustSec advisory scanning
+- reproducible package/build checks
+- SBOM generation
+- crates.io publish dry run
 
-## What's New In 0.6.0
-
-- Removed the bundled demo web server from the crate
-- Removed mandatory `axum` and `tokio` dependencies from the crate package
-- Removed the bundled `hashavatar-cli` binary so the package is a pure library crate
-- Moved web/API usage to the separate [`hashavatar-api`](https://github.com/valkyoth/hashavatar-api) project
-- Added crate-focused security policy checks and a fuzz harness for avatar inputs
-
-## What's New In 0.5.0
-
-- Starting with `0.5.0`, project licensing is dual `MIT OR Apache-2.0`
-- Added separate `LICENSE-MIT` and `LICENSE-APACHE` files
-- Removed the previous EUPL license files
-- Added Fluxheim-style local and GitHub CI checks through `scripts/checks.sh`
-- Pinned GitHub Actions to immutable commit SHAs for CodeQL-friendly workflow hardening
-- Moved demo-server WebP rendering and encoding onto Tokio's blocking task pool
-- Added defense-in-depth HTTP security headers to demo HTML, image, and error responses
-
-## What's New In 0.4.2
-
-- Moved public repository and homepage metadata to GitHub
-- Added GitHub contributor, security, issue, pull request, and CI files
-- Kept docs.rs as the canonical Rust API documentation URL
-
-## What's New In 0.4.1
-
-- Updated direct dependencies to current compatible releases
-- Moved deterministic randomization from `rand` 0.9 to `rand` 0.10
-- Moved SHA-2 hashing from `sha2` 0.10 to `sha2` 0.11
-
-## What's New In 0.4.0
-
-- Added `AvatarBackground::Transparent` for transparent raster and SVG output
-- Added `AvatarBackground::Black`, `AvatarBackground::Dark`, and `AvatarBackground::Light`
-- Added `JPEG` and `GIF` raster export formats
-- Added new avatar families: `planet`, `rocket`, `mushroom`, `cactus`, `frog`, and `panda`
-- Added new food and adventure families: `cupcake`, `pizza`, `icecream`, `octopus`, and `knight`
-- Improved visual variation for the `ghost`, `slime`, `wizard`, and `skull` families
-- Added stricter input and dimension validation for safer public endpoints
-- Removed a vulnerable transitive dependency path while keeping raster drawing code asset-free
-- Refreshed the demo presets around `@hashavatar.app` sample identities
-
-## Provenance
-
-The repository is intended to remain code-generated and asset-free.
-
-For a direct statement of how the visuals are produced, see:
-
-- [`PROVENANCE.md`](./PROVENANCE.md)
-
-## Web API And Demo
-
-The crate is focused on reusable rendering code. The public HTTP API and demo
-website live in the separate
-[`hashavatar-api`](https://github.com/valkyoth/hashavatar-api) project.
-
-## Security Checks
-
-The repository includes executable policy checks for release metadata, package
-contents, dependency scope, unsafe code, reviewed panic-like sites, fuzz harness
-compilation, dependency licenses, and RustSec advisories:
+Run the standard local gate:
 
 ```bash
 scripts/checks.sh
 ```
 
-For more detail, see:
+Run the fuller release gate:
 
-- [`docs/SECURITY_CONTROLS.md`](./docs/SECURITY_CONTROLS.md)
-- [`docs/DEPENDENCIES.md`](./docs/DEPENDENCIES.md)
-- [`docs/PANIC_POLICY.md`](./docs/PANIC_POLICY.md)
-- [`docs/RELEASE.md`](./docs/RELEASE.md)
+```bash
+scripts/stable_release_gate.sh check
+```
+
+## Provenance
+
+The repository is intended to remain code-generated and asset-free. For a direct statement of how the visuals are produced, see [PROVENANCE.md](PROVENANCE.md).
+
+## Web API And Demo
+
+The crate is focused on reusable rendering code. The public HTTP API and demo website live in the separate [`hashavatar-api`](https://github.com/valkyoth/hashavatar-api) project.
+
+## Changelog
+
+See [CHANGELOG.md](CHANGELOG.md) and the release note files for version-by-version details.
 
 ## License
 
 Licensed under either of:
 
-- Apache License, Version 2.0 ([`LICENSE-APACHE`](./LICENSE-APACHE))
-- MIT license ([`LICENSE-MIT`](./LICENSE-MIT))
+- Apache License, Version 2.0 ([LICENSE-APACHE](LICENSE-APACHE))
+- MIT license ([LICENSE-MIT](LICENSE-MIT))
