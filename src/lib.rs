@@ -26,12 +26,25 @@
 
 #![forbid(unsafe_code)]
 
+#[cfg(all(feature = "blake3", feature = "xxh3"))]
+compile_error!(
+    "hashavatar features `blake3` and `xxh3` are mutually exclusive; choose one identity hash mode"
+);
+
+#[cfg(all(feature = "fuzzing", not(any(debug_assertions, fuzzing))))]
+compile_error!(
+    "hashavatar's fuzzing feature exposes internal fuzz harness entry points and must not be enabled in non-fuzzing release builds"
+);
+
 use std::io::Cursor;
 use std::mem::swap;
 use std::str::FromStr;
 
+#[cfg(feature = "gif")]
 use image::codecs::gif::GifEncoder;
+#[cfg(feature = "jpeg")]
 use image::codecs::jpeg::JpegEncoder;
+#[cfg(feature = "png")]
 use image::codecs::png::{CompressionType, FilterType, PngEncoder};
 use image::codecs::webp::WebPEncoder;
 use image::error::{LimitError, LimitErrorKind};
@@ -40,9 +53,10 @@ use image::{
 };
 use palette::{FromColor, Hsl, Srgb};
 use rand::{RngExt, SeedableRng, rngs::StdRng};
+#[cfg(not(any(feature = "blake3", feature = "xxh3")))]
 use sha2::{Digest, Sha512};
 use subtle::ConstantTimeEq;
-use zeroize::Zeroize;
+use zeroize::{Zeroize, Zeroizing};
 
 /// Rendering contract version for deterministic avatars.
 ///
@@ -104,6 +118,12 @@ pub const AVATAR_STYLE_SHAPE_BYTE: usize = 5;
 
 const HASH_DOMAIN: &[u8] = b"hashavatar";
 const HASH_DOMAIN_ALGORITHM_COMPONENT: &[u8] = b"identity-hash";
+#[cfg(feature = "blake3")]
+const ACTIVE_HASH_ALGORITHM_LABEL: &[u8] = b"blake3";
+#[cfg(all(not(feature = "blake3"), feature = "xxh3"))]
+const ACTIVE_HASH_ALGORITHM_LABEL: &[u8] = b"xxh3-128";
+#[cfg(all(not(feature = "blake3"), not(feature = "xxh3")))]
+const ACTIVE_HASH_ALGORITHM_LABEL: &[u8] = b"sha512";
 #[cfg(feature = "xxh3")]
 const HASH_XOF_CHUNK_COMPONENT: &[u8] = b"digest-chunk";
 
@@ -190,7 +210,10 @@ impl Rect {
             return None;
         }
 
-        Some(Self::at(left, top).of_size((right - left + 1) as u32, (bottom - top + 1) as u32))
+        Some(Self::at(left, top).of_size(
+            right.saturating_sub(left).saturating_add(1) as u32,
+            bottom.saturating_sub(top).saturating_add(1) as u32,
+        ))
     }
 }
 
@@ -538,7 +561,7 @@ fn draw_filled_circle_mut(image: &mut RgbaImage, center: (i32, i32), radius: i32
 }
 
 fn draw_polygon_mut(image: &mut RgbaImage, poly: &[Point<i32>], color: Rgba<u8>) {
-    if poly.is_empty() {
+    if poly.is_empty() || image.width() == 0 || image.height() == 0 {
         return;
     }
 
@@ -579,9 +602,11 @@ fn draw_polygon_mut(image: &mut RgbaImage, poly: &[Point<i32>], color: Rgba<u8>)
                         intersections.push(p1.x);
                     }
                 } else {
-                    let fraction = (y - p0.y) as f32 / (p1.y - p0.y) as f32;
-                    let inter = p0.x as f32 + fraction * (p1.x - p0.x) as f32;
-                    intersections.push(inter.round() as i32);
+                    let dy = i64::from(p1.y) - i64::from(p0.y);
+                    let dx = i64::from(p1.x) - i64::from(p0.x);
+                    let fraction = (i64::from(y) - i64::from(p0.y)) as f64 / dy as f64;
+                    let inter = p0.x as f64 + fraction * dx as f64;
+                    intersections.push(round_f64_to_i32_saturating(inter));
                 }
             }
         }
@@ -613,6 +638,30 @@ fn draw_polygon_mut(image: &mut RgbaImage, poly: &[Point<i32>], color: Rgba<u8>)
             color,
         );
     }
+}
+
+fn round_f64_to_i32_saturating(value: f64) -> i32 {
+    if !value.is_finite() {
+        0
+    } else if value <= i32::MIN as f64 {
+        i32::MIN
+    } else if value >= i32::MAX as f64 {
+        i32::MAX
+    } else {
+        value.round() as i32
+    }
+}
+
+#[cfg(feature = "fuzzing")]
+#[doc(hidden)]
+/// Internal fuzz harness entry point.
+///
+/// This is not a stable consumer API. The crate refuses non-fuzzing release
+/// builds with the `fuzzing` feature enabled.
+pub fn fuzz_draw_polygon_rgba(width: u32, height: u32, points: &[(i32, i32)], color: [u8; 4]) {
+    let mut image = RgbaImage::new(width, height);
+    let polygon: Vec<_> = points.iter().map(|&(x, y)| Point::new(x, y)).collect();
+    draw_polygon_mut(&mut image, &polygon, Rgba(color));
 }
 
 fn interpolate(left: Rgba<u8>, right: Rgba<u8>, left_weight: f32) -> Rgba<u8> {
@@ -698,6 +747,13 @@ impl AvatarSpec {
         self.pixel_count() * AVATAR_RGBA_BYTES_PER_PIXEL
     }
 
+    pub const fn render_resource_budget(
+        self,
+        concurrent_renders: usize,
+    ) -> AvatarRenderResourceBudget {
+        AvatarRenderResourceBudget::new(self, concurrent_renders)
+    }
+
     pub const fn is_supported(self) -> bool {
         Self::dimensions_are_supported(self.width, self.height)
     }
@@ -724,6 +780,61 @@ impl AvatarSpec {
 impl Default for AvatarSpec {
     fn default() -> Self {
         Self::new_unchecked(256, 256, 1)
+    }
+}
+
+/// Resource budget estimate for raster rendering.
+///
+/// This type intentionally models the raw RGBA buffer only. Encoders may need
+/// additional temporary memory, so services should leave headroom above this
+/// estimate when sizing request concurrency limits.
+#[must_use = "use AvatarRenderResourceBudget to size service-level render concurrency limits"]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct AvatarRenderResourceBudget {
+    spec: AvatarSpec,
+    concurrent_renders: usize,
+}
+
+impl AvatarRenderResourceBudget {
+    pub const fn new(spec: AvatarSpec, concurrent_renders: usize) -> Self {
+        Self {
+            spec,
+            concurrent_renders,
+        }
+    }
+
+    pub const fn spec(self) -> AvatarSpec {
+        self.spec
+    }
+
+    pub const fn concurrent_renders(self) -> usize {
+        self.concurrent_renders
+    }
+
+    pub const fn raw_rgba_bytes_per_render(self) -> usize {
+        self.spec.rgba_buffer_len()
+    }
+
+    pub const fn raw_rgba_bytes_for_concurrent_renders(self) -> usize {
+        self.raw_rgba_bytes_per_render()
+            .saturating_mul(self.concurrent_renders)
+    }
+
+    pub const fn max_supported_raw_rgba_bytes_for_concurrent_renders(
+        concurrent_renders: usize,
+    ) -> usize {
+        MAX_AVATAR_RGBA_BYTES.saturating_mul(concurrent_renders)
+    }
+
+    pub const fn max_concurrent_renders_for_memory_budget(
+        spec: AvatarSpec,
+        memory_budget_bytes: usize,
+    ) -> usize {
+        let per_render = spec.rgba_buffer_len();
+        match memory_budget_bytes.checked_div(per_render) {
+            Some(value) => value,
+            None => 0,
+        }
     }
 }
 
@@ -866,106 +977,25 @@ impl std::error::Error for AvatarRenderError {
     }
 }
 
-/// Identity hash algorithm used to derive an avatar genome.
-///
-/// SHA-512 is always available and remains the default. Additional algorithms
-/// are available only when their Cargo features are enabled.
-#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
-pub enum AvatarHashAlgorithm {
-    #[default]
-    Sha512,
-    #[cfg(feature = "blake3")]
-    Blake3,
-    #[cfg(feature = "xxh3")]
-    Xxh3_128,
-}
-
-impl AvatarHashAlgorithm {
-    #[cfg(all(feature = "blake3", feature = "xxh3"))]
-    pub const ALL: &'static [Self] = &[Self::Sha512, Self::Blake3, Self::Xxh3_128];
-
-    #[cfg(all(feature = "blake3", not(feature = "xxh3")))]
-    pub const ALL: &'static [Self] = &[Self::Sha512, Self::Blake3];
-
-    #[cfg(all(not(feature = "blake3"), feature = "xxh3"))]
-    pub const ALL: &'static [Self] = &[Self::Sha512, Self::Xxh3_128];
-
-    #[cfg(all(not(feature = "blake3"), not(feature = "xxh3")))]
-    pub const ALL: &'static [Self] = &[Self::Sha512];
-
-    pub fn from_byte(value: u8) -> Self {
-        Self::ALL[usize::from(value) % Self::ALL.len()]
-    }
-
-    pub const fn as_str(self) -> &'static str {
-        match self {
-            Self::Sha512 => "sha512",
-            #[cfg(feature = "blake3")]
-            Self::Blake3 => "blake3",
-            #[cfg(feature = "xxh3")]
-            Self::Xxh3_128 => "xxh3-128",
-        }
-    }
-
-    const fn domain_label(self) -> &'static [u8] {
-        match self {
-            Self::Sha512 => b"sha512",
-            #[cfg(feature = "blake3")]
-            Self::Blake3 => b"blake3",
-            #[cfg(feature = "xxh3")]
-            Self::Xxh3_128 => b"xxh3-128",
-        }
-    }
-}
-
-impl FromStr for AvatarHashAlgorithm {
-    type Err = &'static str;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s.trim().to_ascii_lowercase().as_str() {
-            "sha512" | "sha-512" => Ok(Self::Sha512),
-            #[cfg(feature = "blake3")]
-            "blake3" => Ok(Self::Blake3),
-            #[cfg(feature = "xxh3")]
-            "xxh3" | "xxh3-128" | "xxh3_128" => Ok(Self::Xxh3_128),
-            _ => Err("unsupported avatar hash algorithm"),
-        }
-    }
-}
-
-impl std::fmt::Display for AvatarHashAlgorithm {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_str(self.as_str())
-    }
-}
-
 /// Options for deriving a stable avatar identity.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct AvatarIdentityOptions<'a> {
     namespace: AvatarNamespace<'a>,
-    algorithm: AvatarHashAlgorithm,
 }
 
 impl<'a> AvatarIdentityOptions<'a> {
-    pub const fn new(namespace: AvatarNamespace<'a>, algorithm: AvatarHashAlgorithm) -> Self {
-        Self {
-            namespace,
-            algorithm,
-        }
+    pub const fn new(namespace: AvatarNamespace<'a>) -> Self {
+        Self { namespace }
     }
 
     pub const fn namespace(self) -> AvatarNamespace<'a> {
         self.namespace
     }
-
-    pub const fn algorithm(self) -> AvatarHashAlgorithm {
-        self.algorithm
-    }
 }
 
 impl Default for AvatarIdentityOptions<'static> {
     fn default() -> Self {
-        Self::new(AvatarNamespace::DEFAULT, AvatarHashAlgorithm::Sha512)
+        Self::new(AvatarNamespace::DEFAULT)
     }
 }
 
@@ -974,7 +1004,14 @@ impl Default for AvatarIdentityOptions<'static> {
 /// This is intended for Robohash-style uniqueness: the same input always maps
 /// to the same visual genome, while different inputs produce different shape
 /// and palette parameters with negligible collision risk.
-#[derive(Clone, Debug, Eq)]
+///
+/// # Security
+///
+/// `AvatarIdentity` implements `Clone`. Each clone is independently zeroized
+/// on drop. Callers operating in high-assurance environments should keep clones
+/// as short-lived as possible to reduce the window during which digest bytes
+/// exist in multiple memory locations.
+#[derive(Clone, Eq)]
 pub struct AvatarIdentity {
     digest: [u8; 64],
 }
@@ -988,10 +1025,7 @@ impl AvatarIdentity {
         namespace: AvatarNamespace<'_>,
         input: T,
     ) -> Result<Self, AvatarIdentityError> {
-        Self::new_with_options(
-            AvatarIdentityOptions::new(namespace, AvatarHashAlgorithm::Sha512),
-            input,
-        )
+        Self::new_with_options(AvatarIdentityOptions::new(namespace), input)
     }
 
     pub fn new_with_options<T: AsRef<[u8]>>(
@@ -1023,20 +1057,10 @@ impl AvatarIdentity {
         }
     }
 
-    pub const fn as_digest(&self) -> &[u8; 64] {
-        &self.digest
-    }
-
-    pub fn rng_seed(&self) -> [u8; 32] {
-        let mut seed = [0u8; 32];
+    fn rng_seed(&self) -> Zeroizing<[u8; 32]> {
+        let mut seed = Zeroizing::new([0u8; 32]);
         seed.copy_from_slice(&self.digest[32..64]);
         seed
-    }
-
-    pub fn seed(&self) -> u64 {
-        let mut seed = [0u8; 8];
-        seed.copy_from_slice(&self.digest[..8]);
-        u64::from_le_bytes(seed)
     }
 
     fn byte(&self, index: usize) -> u8 {
@@ -1051,6 +1075,14 @@ impl AvatarIdentity {
 impl Zeroize for AvatarIdentity {
     fn zeroize(&mut self) {
         self.digest.zeroize();
+    }
+}
+
+impl std::fmt::Debug for AvatarIdentity {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("AvatarIdentity")
+            .field("digest", &"[REDACTED]")
+            .finish()
     }
 }
 
@@ -1084,23 +1116,17 @@ fn validate_identity_component(
 
 fn derive_identity_digest(options: AvatarIdentityOptions<'_>, input: &[u8]) -> [u8; 64] {
     let mut preimage = identity_hash_preimage(options, input);
-    let digest = match options.algorithm {
-        AvatarHashAlgorithm::Sha512 => sha512_digest(&preimage),
-        #[cfg(feature = "blake3")]
-        AvatarHashAlgorithm::Blake3 => blake3_digest(&preimage),
-        #[cfg(feature = "xxh3")]
-        AvatarHashAlgorithm::Xxh3_128 => xxh3_128_digest(&preimage),
-    };
+    let digest = active_identity_digest(&preimage);
     preimage.zeroize();
     digest
 }
 
 fn identity_hash_preimage(options: AvatarIdentityOptions<'_>, input: &[u8]) -> Vec<u8> {
-    let algorithm_overhead = if options.algorithm == AvatarHashAlgorithm::Sha512 {
-        0
-    } else {
+    let algorithm_overhead = if active_hash_algorithm_is_domain_separated() {
         length_prefixed_component_size(HASH_DOMAIN_ALGORITHM_COMPONENT)
-            + length_prefixed_component_size(options.algorithm.domain_label())
+            + length_prefixed_component_size(ACTIVE_HASH_ALGORITHM_LABEL)
+    } else {
+        0
     };
     let mut preimage = Vec::with_capacity(
         length_prefixed_component_size(HASH_DOMAIN)
@@ -1111,14 +1137,33 @@ fn identity_hash_preimage(options: AvatarIdentityOptions<'_>, input: &[u8]) -> V
     );
 
     update_hash_input_component(&mut preimage, HASH_DOMAIN);
-    if options.algorithm != AvatarHashAlgorithm::Sha512 {
+    if active_hash_algorithm_is_domain_separated() {
         update_hash_input_component(&mut preimage, HASH_DOMAIN_ALGORITHM_COMPONENT);
-        update_hash_input_component(&mut preimage, options.algorithm.domain_label());
+        update_hash_input_component(&mut preimage, ACTIVE_HASH_ALGORITHM_LABEL);
     }
     update_hash_input_component(&mut preimage, options.namespace.tenant.as_bytes());
     update_hash_input_component(&mut preimage, options.namespace.style_version.as_bytes());
     update_hash_input_component(&mut preimage, input);
     preimage
+}
+
+const fn active_hash_algorithm_is_domain_separated() -> bool {
+    cfg!(any(feature = "blake3", feature = "xxh3"))
+}
+
+#[cfg(feature = "blake3")]
+fn active_identity_digest(preimage: &[u8]) -> [u8; 64] {
+    blake3_digest(preimage)
+}
+
+#[cfg(all(not(feature = "blake3"), feature = "xxh3"))]
+fn active_identity_digest(preimage: &[u8]) -> [u8; 64] {
+    xxh3_128_digest(preimage)
+}
+
+#[cfg(all(not(feature = "blake3"), not(feature = "xxh3")))]
+fn active_identity_digest(preimage: &[u8]) -> [u8; 64] {
+    sha512_digest(preimage)
 }
 
 const fn length_prefixed_component_size(bytes: &[u8]) -> usize {
@@ -1130,6 +1175,7 @@ fn update_hash_input_component(preimage: &mut Vec<u8>, bytes: &[u8]) {
     preimage.extend_from_slice(bytes);
 }
 
+#[cfg(not(any(feature = "blake3", feature = "xxh3")))]
 fn sha512_digest(preimage: &[u8]) -> [u8; 64] {
     let mut hasher = Sha512::new();
     hasher.update(preimage);
@@ -1141,7 +1187,10 @@ fn blake3_digest(preimage: &[u8]) -> [u8; 64] {
     let mut hasher = blake3::Hasher::new();
     hasher.update(preimage);
     let mut digest = [0u8; 64];
-    hasher.finalize_xof().fill(&mut digest);
+    let mut reader = hasher.finalize_xof();
+    reader.fill(&mut digest);
+    reader.zeroize();
+    hasher.zeroize();
     digest
 }
 
@@ -1221,15 +1270,37 @@ pub trait AvatarRenderer {
 /// is usually smaller than PNG for generated avatar art.
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 pub enum AvatarOutputFormat {
+    /// Lossless WebP output.
     #[default]
     WebP,
+    /// Optional lossless PNG output.
+    #[cfg(feature = "png")]
     Png,
+    /// Optional JPEG output with transparent pixels composited over white.
+    #[cfg(feature = "jpeg")]
     Jpeg,
+    /// Optional GIF output.
+    ///
+    /// # Warning
+    ///
+    /// GIF encoding performs 256-color quantization inside the `image` crate.
+    /// Those internal quantization buffers are not accessible to `hashavatar`
+    /// and are not zeroized by this crate. For high-assurance deployments,
+    /// prefer `AvatarOutputFormat::WebP` or PNG output.
+    #[cfg(feature = "gif")]
     Gif,
 }
 
 impl AvatarOutputFormat {
-    pub const ALL: &'static [Self] = &[Self::WebP, Self::Png, Self::Jpeg, Self::Gif];
+    pub const ALL: &'static [Self] = &[
+        Self::WebP,
+        #[cfg(feature = "png")]
+        Self::Png,
+        #[cfg(feature = "jpeg")]
+        Self::Jpeg,
+        #[cfg(feature = "gif")]
+        Self::Gif,
+    ];
 
     pub fn from_byte(value: u8) -> Self {
         Self::ALL[usize::from(value) % Self::ALL.len()]
@@ -1238,8 +1309,11 @@ impl AvatarOutputFormat {
     pub const fn as_str(self) -> &'static str {
         match self {
             Self::WebP => "webp",
+            #[cfg(feature = "png")]
             Self::Png => "png",
+            #[cfg(feature = "jpeg")]
             Self::Jpeg => "jpg",
+            #[cfg(feature = "gif")]
             Self::Gif => "gif",
         }
     }
@@ -1251,8 +1325,11 @@ impl FromStr for AvatarOutputFormat {
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s.trim().to_ascii_lowercase().as_str() {
             "webp" => Ok(Self::WebP),
+            #[cfg(feature = "png")]
             "png" => Ok(Self::Png),
+            #[cfg(feature = "jpeg")]
             "jpg" | "jpeg" => Ok(Self::Jpeg),
+            #[cfg(feature = "gif")]
             "gif" => Ok(Self::Gif),
             _ => Err("unsupported avatar output format"),
         }
@@ -1319,6 +1396,22 @@ pub enum AvatarKind {
     Octopus,
     /// Knight helmet avatar.
     Knight,
+    /// Bear face avatar.
+    Bear,
+    /// Penguin avatar.
+    Penguin,
+    /// Dragon avatar.
+    Dragon,
+    /// Ninja avatar.
+    Ninja,
+    /// Astronaut avatar.
+    Astronaut,
+    /// Diamond avatar.
+    Diamond,
+    /// Coffee cup avatar.
+    CoffeeCup,
+    /// Shield avatar.
+    Shield,
 }
 
 impl AvatarKind {
@@ -1346,6 +1439,14 @@ impl AvatarKind {
         Self::Icecream,
         Self::Octopus,
         Self::Knight,
+        Self::Bear,
+        Self::Penguin,
+        Self::Dragon,
+        Self::Ninja,
+        Self::Astronaut,
+        Self::Diamond,
+        Self::CoffeeCup,
+        Self::Shield,
     ];
 
     pub fn from_byte(value: u8) -> Self {
@@ -1377,6 +1478,14 @@ impl AvatarKind {
             Self::Icecream => "icecream",
             Self::Octopus => "octopus",
             Self::Knight => "knight",
+            Self::Bear => "bear",
+            Self::Penguin => "penguin",
+            Self::Dragon => "dragon",
+            Self::Ninja => "ninja",
+            Self::Astronaut => "astronaut",
+            Self::Diamond => "diamond",
+            Self::CoffeeCup => "coffee-cup",
+            Self::Shield => "shield",
         }
     }
 
@@ -1397,6 +1506,9 @@ impl AvatarKind {
                 | Self::Cupcake
                 | Self::Pizza
                 | Self::Icecream
+                | Self::Diamond
+                | Self::CoffeeCup
+                | Self::Shield
         )
     }
 }
@@ -1429,6 +1541,14 @@ impl FromStr for AvatarKind {
             "icecream" | "ice-cream" | "ice_cream" => Ok(Self::Icecream),
             "octopus" => Ok(Self::Octopus),
             "knight" => Ok(Self::Knight),
+            "bear" => Ok(Self::Bear),
+            "penguin" => Ok(Self::Penguin),
+            "dragon" => Ok(Self::Dragon),
+            "ninja" => Ok(Self::Ninja),
+            "astronaut" => Ok(Self::Astronaut),
+            "diamond" => Ok(Self::Diamond),
+            "coffee-cup" | "coffee_cup" | "coffeecup" => Ok(Self::CoffeeCup),
+            "shield" => Ok(Self::Shield),
             _ => Err("unsupported avatar kind"),
         }
     }
@@ -2075,7 +2195,7 @@ pub fn encode_avatar_for_namespace<T: AsRef<[u8]>>(
 ) -> ImageResult<Vec<u8>> {
     encode_avatar_with_identity_options(
         spec,
-        AvatarIdentityOptions::new(namespace, AvatarHashAlgorithm::Sha512),
+        AvatarIdentityOptions::new(namespace),
         id,
         format,
         options,
@@ -2112,7 +2232,7 @@ pub fn encode_avatar_style_for_namespace<T: AsRef<[u8]>>(
 ) -> ImageResult<Vec<u8>> {
     encode_avatar_style_with_identity_options(
         spec,
-        AvatarIdentityOptions::new(namespace, AvatarHashAlgorithm::Sha512),
+        AvatarIdentityOptions::new(namespace),
         id,
         format,
         style,
@@ -2147,7 +2267,7 @@ pub fn encode_avatar_auto_for_namespace<T: AsRef<[u8]>>(
 ) -> ImageResult<Vec<u8>> {
     encode_avatar_auto_with_identity_options(
         spec,
-        AvatarIdentityOptions::new(namespace, AvatarHashAlgorithm::Sha512),
+        AvatarIdentityOptions::new(namespace),
         id,
         format,
     )
@@ -2293,6 +2413,34 @@ impl AvatarRenderPlan {
             AvatarKind::Knight => {
                 render_knight_avatar_for_identity(self.spec, &self.identity, self.style.background)
             }
+            AvatarKind::Bear => {
+                render_bear_avatar_for_identity(self.spec, &self.identity, self.style.background)
+            }
+            AvatarKind::Penguin => {
+                render_penguin_avatar_for_identity(self.spec, &self.identity, self.style.background)
+            }
+            AvatarKind::Dragon => {
+                render_dragon_avatar_for_identity(self.spec, &self.identity, self.style.background)
+            }
+            AvatarKind::Ninja => {
+                render_ninja_avatar_for_identity(self.spec, &self.identity, self.style.background)
+            }
+            AvatarKind::Astronaut => render_astronaut_avatar_for_identity(
+                self.spec,
+                &self.identity,
+                self.style.background,
+            ),
+            AvatarKind::Diamond => {
+                render_diamond_avatar_for_identity(self.spec, &self.identity, self.style.background)
+            }
+            AvatarKind::CoffeeCup => render_coffee_cup_avatar_for_identity(
+                self.spec,
+                &self.identity,
+                self.style.background,
+            ),
+            AvatarKind::Shield => {
+                render_shield_avatar_for_identity(self.spec, &self.identity, self.style.background)
+            }
         }?;
 
         apply_style_layers(&mut image, self.spec, self.style, &self.identity);
@@ -2371,6 +2519,30 @@ impl AvatarRenderPlan {
                 AvatarKind::Knight => {
                     hsl_to_color(215.0 + self.identity.unit_f32(24) * 30.0, 0.12, 0.92)
                 }
+                AvatarKind::Bear => {
+                    hsl_to_color(30.0 + self.identity.unit_f32(25) * 28.0, 0.20, 0.92)
+                }
+                AvatarKind::Penguin => {
+                    hsl_to_color(200.0 + self.identity.unit_f32(26) * 35.0, 0.18, 0.93)
+                }
+                AvatarKind::Dragon => {
+                    hsl_to_color(105.0 + self.identity.unit_f32(27) * 45.0, 0.22, 0.91)
+                }
+                AvatarKind::Ninja => {
+                    hsl_to_color(225.0 + self.identity.unit_f32(28) * 35.0, 0.12, 0.91)
+                }
+                AvatarKind::Astronaut => {
+                    hsl_to_color(215.0 + self.identity.unit_f32(29) * 60.0, 0.16, 0.92)
+                }
+                AvatarKind::Diamond => {
+                    hsl_to_color(185.0 + self.identity.unit_f32(30) * 50.0, 0.20, 0.93)
+                }
+                AvatarKind::CoffeeCup => {
+                    hsl_to_color(32.0 + self.identity.unit_f32(31) * 28.0, 0.18, 0.93)
+                }
+                AvatarKind::Shield => {
+                    hsl_to_color(215.0 + self.identity.unit_f32(32) * 40.0, 0.15, 0.92)
+                }
             },
             AvatarBackground::White => Color::rgb(255, 255, 255),
             AvatarBackground::Black => Color::rgb(0, 0, 0),
@@ -2405,6 +2577,14 @@ impl AvatarRenderPlan {
             AvatarKind::Icecream => render_icecream_svg(self.spec, &self.identity),
             AvatarKind::Octopus => render_octopus_svg(self.spec, &self.identity),
             AvatarKind::Knight => render_knight_svg(self.spec, &self.identity),
+            AvatarKind::Bear => render_bear_svg(self.spec, &self.identity),
+            AvatarKind::Penguin => render_penguin_svg(self.spec, &self.identity),
+            AvatarKind::Dragon => render_dragon_svg(self.spec, &self.identity),
+            AvatarKind::Ninja => render_ninja_svg(self.spec, &self.identity),
+            AvatarKind::Astronaut => render_astronaut_svg(self.spec, &self.identity),
+            AvatarKind::Diamond => render_diamond_svg(self.spec, &self.identity),
+            AvatarKind::CoffeeCup => render_coffee_cup_svg(self.spec, &self.identity),
+            AvatarKind::Shield => render_shield_svg(self.spec, &self.identity),
         }
     }
 
@@ -2446,8 +2626,6 @@ impl AvatarRenderPlan {
             body = clipped_content,
             shape_layer = shape_layer,
         )
-        .replace('\n', "")
-        .replace("  ", "")
     }
 }
 
@@ -2466,12 +2644,7 @@ pub fn render_avatar_for_namespace<T: AsRef<[u8]>>(
     id: T,
     options: AvatarOptions,
 ) -> Result<RgbaImage, AvatarRenderError> {
-    render_avatar_with_identity_options(
-        spec,
-        AvatarIdentityOptions::new(namespace, AvatarHashAlgorithm::Sha512),
-        id,
-        options,
-    )
+    render_avatar_with_identity_options(spec, AvatarIdentityOptions::new(namespace), id, options)
 }
 
 pub fn render_avatar_with_identity_options<T: AsRef<[u8]>>(
@@ -2502,7 +2675,7 @@ pub fn render_avatar_style_for_namespace<T: AsRef<[u8]>>(
 ) -> Result<RgbaImage, AvatarRenderError> {
     render_avatar_style_with_identity_options(
         spec,
-        AvatarIdentityOptions::new(namespace, AvatarHashAlgorithm::Sha512),
+        AvatarIdentityOptions::new(namespace),
         id,
         style,
     )
@@ -2533,11 +2706,7 @@ pub fn render_avatar_auto_for_namespace<T: AsRef<[u8]>>(
     namespace: AvatarNamespace<'_>,
     id: T,
 ) -> Result<RgbaImage, AvatarRenderError> {
-    render_avatar_auto_with_identity_options(
-        spec,
-        AvatarIdentityOptions::new(namespace, AvatarHashAlgorithm::Sha512),
-        id,
-    )
+    render_avatar_auto_with_identity_options(spec, AvatarIdentityOptions::new(namespace), id)
 }
 
 pub fn render_avatar_auto_with_identity_options<T: AsRef<[u8]>>(
@@ -2567,7 +2736,7 @@ pub fn render_avatar_svg_for_namespace<T: AsRef<[u8]>>(
 ) -> Result<String, AvatarRenderError> {
     render_avatar_svg_with_identity_options(
         spec,
-        AvatarIdentityOptions::new(namespace, AvatarHashAlgorithm::Sha512),
+        AvatarIdentityOptions::new(namespace),
         id,
         options,
     )
@@ -2599,7 +2768,7 @@ pub fn render_avatar_svg_style_for_namespace<T: AsRef<[u8]>>(
 ) -> Result<String, AvatarRenderError> {
     render_avatar_svg_style_with_identity_options(
         spec,
-        AvatarIdentityOptions::new(namespace, AvatarHashAlgorithm::Sha512),
+        AvatarIdentityOptions::new(namespace),
         id,
         style,
     )
@@ -2628,11 +2797,7 @@ pub fn render_avatar_svg_auto_for_namespace<T: AsRef<[u8]>>(
     namespace: AvatarNamespace<'_>,
     id: T,
 ) -> Result<String, AvatarRenderError> {
-    render_avatar_svg_auto_with_identity_options(
-        spec,
-        AvatarIdentityOptions::new(namespace, AvatarHashAlgorithm::Sha512),
-        id,
-    )
+    render_avatar_svg_auto_with_identity_options(spec, AvatarIdentityOptions::new(namespace), id)
 }
 
 pub fn render_avatar_svg_auto_with_identity_options<T: AsRef<[u8]>>(
@@ -2827,6 +2992,51 @@ fn avatar_layer_anchors(kind: AvatarKind) -> Option<AvatarLayerAnchors> {
             face_width: 0.58,
             eye_radius: 0.050,
         },
+        AvatarKind::Bear => AvatarLayerAnchors {
+            left_eye: (0.40, 0.48),
+            right_eye: (0.60, 0.48),
+            mouth: (0.50, 0.63),
+            top: 0.25,
+            neck: 0.73,
+            face_width: 0.62,
+            eye_radius: 0.055,
+        },
+        AvatarKind::Penguin => AvatarLayerAnchors {
+            left_eye: (0.40, 0.45),
+            right_eye: (0.60, 0.45),
+            mouth: (0.50, 0.57),
+            top: 0.20,
+            neck: 0.74,
+            face_width: 0.58,
+            eye_radius: 0.045,
+        },
+        AvatarKind::Dragon => AvatarLayerAnchors {
+            left_eye: (0.40, 0.48),
+            right_eye: (0.60, 0.48),
+            mouth: (0.50, 0.63),
+            top: 0.23,
+            neck: 0.73,
+            face_width: 0.62,
+            eye_radius: 0.052,
+        },
+        AvatarKind::Ninja => AvatarLayerAnchors {
+            left_eye: (0.40, 0.48),
+            right_eye: (0.60, 0.48),
+            mouth: (0.50, 0.64),
+            top: 0.24,
+            neck: 0.73,
+            face_width: 0.58,
+            eye_radius: 0.045,
+        },
+        AvatarKind::Astronaut => AvatarLayerAnchors {
+            left_eye: (0.40, 0.47),
+            right_eye: (0.60, 0.47),
+            mouth: (0.50, 0.62),
+            top: 0.19,
+            neck: 0.76,
+            face_width: 0.60,
+            eye_radius: 0.045,
+        },
         AvatarKind::Paws
         | AvatarKind::Planet
         | AvatarKind::Rocket
@@ -2834,7 +3044,10 @@ fn avatar_layer_anchors(kind: AvatarKind) -> Option<AvatarLayerAnchors> {
         | AvatarKind::Cactus
         | AvatarKind::Cupcake
         | AvatarKind::Pizza
-        | AvatarKind::Icecream => return None,
+        | AvatarKind::Icecream
+        | AvatarKind::Diamond
+        | AvatarKind::CoffeeCup
+        | AvatarKind::Shield => return None,
     };
     Some(anchors)
 }
@@ -3952,7 +4165,7 @@ fn render_cat_avatar_with_identity(
     for (index, byte) in spec.seed.to_le_bytes().iter().enumerate() {
         rng_seed[index] ^= *byte;
     }
-    let mut rng = StdRng::from_seed(rng_seed);
+    let mut rng = StdRng::from_seed(*rng_seed);
     let genome = CatGenome::from_identity(identity, &mut rng);
     let palette = CatPalette::from_genome(&genome);
     let mut image = ImageBuffer::from_pixel(
@@ -6595,6 +6808,562 @@ pub fn render_knight_avatar_for_identity(
     Ok(image)
 }
 
+pub fn render_bear_avatar_for_identity(
+    spec: AvatarSpec,
+    identity: &AvatarIdentity,
+    background: AvatarBackground,
+) -> Result<RgbaImage, AvatarSpecError> {
+    spec.validate()?;
+
+    let width = spec.width as i32;
+    let height = spec.height as i32;
+    let center_x = width / 2;
+    let center_y = (height as f32 * 0.56) as i32;
+    let head_rx = (width as f32 * (0.27 + identity.unit_f32(4) * 0.05)) as i32;
+    let head_ry = (height as f32 * (0.24 + identity.unit_f32(5) * 0.05)) as i32;
+    let fur = hsl_to_color(24.0 + identity.unit_f32(1) * 24.0, 0.38, 0.48);
+    let muzzle = hsl_to_color(32.0 + identity.unit_f32(2) * 12.0, 0.22, 0.84);
+    let inner = hsl_to_color(18.0 + identity.unit_f32(3) * 18.0, 0.34, 0.72);
+    let bg = hsl_to_color(34.0 + identity.unit_f32(6) * 24.0, 0.18, 0.93);
+    let dark = Color::rgb(45, 34, 28);
+    let mut image = ImageBuffer::from_pixel(
+        spec.width,
+        spec.height,
+        background_fill(background, bg).into(),
+    );
+    draw_background_accent(
+        &mut image, center_x, center_y, head_rx, head_ry, inner, 0.42, background,
+    );
+
+    let ear_r = (head_rx as f32 * 0.28) as i32;
+    for x in [center_x - head_rx * 3 / 4, center_x + head_rx * 3 / 4] {
+        draw_filled_circle_mut(&mut image, (x, center_y - head_ry), ear_r, fur.into());
+        draw_filled_circle_mut(&mut image, (x, center_y - head_ry), ear_r / 2, inner.into());
+    }
+    draw_filled_ellipse_mut(
+        &mut image,
+        (center_x, center_y),
+        head_rx,
+        head_ry,
+        fur.into(),
+    );
+    draw_filled_ellipse_mut(
+        &mut image,
+        (center_x, center_y + head_ry / 4),
+        head_rx * 2 / 5,
+        head_ry / 3,
+        muzzle.into(),
+    );
+    let eye_y = center_y - head_ry / 5;
+    for x in [center_x - head_rx / 3, center_x + head_rx / 3] {
+        draw_filled_circle_mut(&mut image, (x, eye_y), (head_rx / 10).max(3), dark.into());
+    }
+    let nose_y = center_y + head_ry / 6;
+    draw_filled_ellipse_mut(
+        &mut image,
+        (center_x, nose_y),
+        head_rx / 8,
+        head_ry / 10,
+        dark.into(),
+    );
+    draw_smile_arc(
+        &mut image,
+        center_x,
+        nose_y + head_ry / 12,
+        head_rx / 5,
+        dark,
+        0.35,
+    );
+
+    Ok(image)
+}
+
+pub fn render_penguin_avatar_for_identity(
+    spec: AvatarSpec,
+    identity: &AvatarIdentity,
+    background: AvatarBackground,
+) -> Result<RgbaImage, AvatarSpecError> {
+    spec.validate()?;
+
+    let width = spec.width as i32;
+    let height = spec.height as i32;
+    let center_x = width / 2;
+    let center_y = (height as f32 * 0.56) as i32;
+    let body_rx = (width as f32 * 0.25) as i32;
+    let body_ry = (height as f32 * 0.34) as i32;
+    let black = hsl_to_color(210.0 + identity.unit_f32(1) * 30.0, 0.22, 0.18);
+    let white = hsl_to_color(205.0 + identity.unit_f32(2) * 25.0, 0.16, 0.94);
+    let orange = hsl_to_color(32.0 + identity.unit_f32(3) * 18.0, 0.72, 0.58);
+    let bg = hsl_to_color(190.0 + identity.unit_f32(4) * 35.0, 0.22, 0.93);
+    let mut image = ImageBuffer::from_pixel(
+        spec.width,
+        spec.height,
+        background_fill(background, bg).into(),
+    );
+    draw_background_accent(
+        &mut image, center_x, center_y, body_rx, body_ry, orange, 0.36, background,
+    );
+
+    draw_filled_ellipse_mut(
+        &mut image,
+        (center_x, center_y),
+        body_rx,
+        body_ry,
+        black.into(),
+    );
+    draw_filled_ellipse_mut(
+        &mut image,
+        (center_x, center_y + body_ry / 6),
+        body_rx * 3 / 5,
+        body_ry * 2 / 3,
+        white.into(),
+    );
+    draw_filled_ellipse_mut(
+        &mut image,
+        (center_x - body_rx, center_y + body_ry / 10),
+        body_rx / 4,
+        body_ry / 2,
+        black.into(),
+    );
+    draw_filled_ellipse_mut(
+        &mut image,
+        (center_x + body_rx, center_y + body_ry / 10),
+        body_rx / 4,
+        body_ry / 2,
+        black.into(),
+    );
+    let eye_y = center_y - body_ry / 3;
+    for x in [center_x - body_rx / 3, center_x + body_rx / 3] {
+        draw_filled_circle_mut(
+            &mut image,
+            (x, eye_y),
+            (body_rx / 10).max(3),
+            Color::rgb(10, 15, 20).into(),
+        );
+    }
+    draw_polygon_mut(
+        &mut image,
+        &[
+            Point::new(center_x - body_rx / 7, center_y - body_ry / 6),
+            Point::new(center_x + body_rx / 7, center_y - body_ry / 6),
+            Point::new(center_x, center_y),
+        ],
+        orange.into(),
+    );
+    for x in [center_x - body_rx / 3, center_x + body_rx / 3] {
+        draw_filled_ellipse_mut(
+            &mut image,
+            (x, center_y + body_ry),
+            body_rx / 4,
+            body_ry / 10,
+            orange.into(),
+        );
+    }
+
+    Ok(image)
+}
+
+pub fn render_dragon_avatar_for_identity(
+    spec: AvatarSpec,
+    identity: &AvatarIdentity,
+    background: AvatarBackground,
+) -> Result<RgbaImage, AvatarSpecError> {
+    spec.validate()?;
+
+    let width = spec.width as i32;
+    let height = spec.height as i32;
+    let center_x = width / 2;
+    let center_y = (height as f32 * 0.57) as i32;
+    let head_rx = (width as f32 * 0.27) as i32;
+    let head_ry = (height as f32 * 0.23) as i32;
+    let scale = hsl_to_color(105.0 + identity.unit_f32(1) * 70.0, 0.46, 0.46);
+    let belly = hsl_to_color(70.0 + identity.unit_f32(2) * 35.0, 0.42, 0.72);
+    let horn = hsl_to_color(40.0 + identity.unit_f32(3) * 20.0, 0.34, 0.84);
+    let flame = hsl_to_color(14.0 + identity.unit_f32(4) * 25.0, 0.78, 0.56);
+    let bg = hsl_to_color(120.0 + identity.unit_f32(5) * 45.0, 0.18, 0.92);
+    let dark = Color::rgb(24, 48, 34);
+    let mut image = ImageBuffer::from_pixel(
+        spec.width,
+        spec.height,
+        background_fill(background, bg).into(),
+    );
+    draw_background_accent(
+        &mut image, center_x, center_y, head_rx, head_ry, flame, 0.40, background,
+    );
+
+    for side in [-1, 1] {
+        let horn_points = [
+            Point::new(center_x + side * head_rx / 2, center_y - head_ry),
+            Point::new(center_x + side * head_rx / 4, center_y - head_ry * 8 / 5),
+            Point::new(center_x + side * head_rx / 8, center_y - head_ry),
+        ];
+        draw_polygon_mut(&mut image, &horn_points, horn.into());
+    }
+    draw_filled_ellipse_mut(
+        &mut image,
+        (center_x, center_y),
+        head_rx,
+        head_ry,
+        scale.into(),
+    );
+    draw_filled_ellipse_mut(
+        &mut image,
+        (center_x, center_y + head_ry / 4),
+        head_rx / 2,
+        head_ry / 3,
+        belly.into(),
+    );
+    for x in [center_x - head_rx / 3, center_x + head_rx / 3] {
+        draw_filled_circle_mut(
+            &mut image,
+            (x, center_y - head_ry / 5),
+            (head_rx / 10).max(3),
+            Color::rgb(255, 255, 255).into(),
+        );
+        draw_filled_circle_mut(
+            &mut image,
+            (x, center_y - head_ry / 5),
+            (head_rx / 20).max(2),
+            dark.into(),
+        );
+    }
+    for x in [center_x - head_rx / 7, center_x + head_rx / 7] {
+        draw_filled_circle_mut(
+            &mut image,
+            (x, center_y + head_ry / 3),
+            (head_rx / 24).max(2),
+            dark.into(),
+        );
+    }
+    for offset in [-1, 0, 1] {
+        let x = center_x + offset * head_rx / 5;
+        let spike_y = center_y - head_ry;
+        let spike = [
+            Point::new(x - head_rx / 14, spike_y),
+            Point::new(x, spike_y - head_ry / 4),
+            Point::new(x + head_rx / 14, spike_y),
+        ];
+        draw_polygon_mut(&mut image, &spike, flame.into());
+    }
+
+    Ok(image)
+}
+
+pub fn render_ninja_avatar_for_identity(
+    spec: AvatarSpec,
+    identity: &AvatarIdentity,
+    background: AvatarBackground,
+) -> Result<RgbaImage, AvatarSpecError> {
+    spec.validate()?;
+
+    let width = spec.width as i32;
+    let height = spec.height as i32;
+    let center_x = width / 2;
+    let center_y = (height as f32 * 0.56) as i32;
+    let head_r = (width.min(height) as f32 * 0.28) as i32;
+    let cloth = hsl_to_color(220.0 + identity.unit_f32(1) * 50.0, 0.18, 0.14);
+    let skin = hsl_to_color(28.0 + identity.unit_f32(2) * 18.0, 0.42, 0.72);
+    let band = hsl_to_color(identity.unit_f32(3) * 360.0, 0.56, 0.50);
+    let bg = hsl_to_color(225.0 + identity.unit_f32(4) * 30.0, 0.13, 0.92);
+    let mut image = ImageBuffer::from_pixel(
+        spec.width,
+        spec.height,
+        background_fill(background, bg).into(),
+    );
+    draw_background_accent(
+        &mut image, center_x, center_y, head_r, head_r, band, 0.38, background,
+    );
+
+    draw_filled_circle_mut(&mut image, (center_x, center_y), head_r, cloth.into());
+    draw_filled_rect_mut(
+        &mut image,
+        Rect::at(center_x - head_r * 3 / 5, center_y - head_r / 4)
+            .of_size((head_r * 6 / 5) as u32, (head_r / 2) as u32),
+        skin.into(),
+    );
+    draw_filled_rect_mut(
+        &mut image,
+        Rect::at(center_x - head_r, center_y - head_r * 2 / 3)
+            .of_size((head_r * 2) as u32, (head_r / 6).max(2) as u32),
+        band.into(),
+    );
+    for x in [center_x - head_r / 3, center_x + head_r / 3] {
+        draw_filled_ellipse_mut(
+            &mut image,
+            (x, center_y - head_r / 12),
+            head_r / 9,
+            head_r / 14,
+            Color::rgb(20, 24, 32).into(),
+        );
+    }
+    let tie = [
+        Point::new(center_x + head_r * 4 / 5, center_y - head_r * 2 / 3),
+        Point::new(center_x + head_r * 7 / 5, center_y - head_r),
+        Point::new(center_x + head_r, center_y - head_r / 3),
+    ];
+    draw_polygon_mut(&mut image, &tie, band.into());
+
+    Ok(image)
+}
+
+pub fn render_astronaut_avatar_for_identity(
+    spec: AvatarSpec,
+    identity: &AvatarIdentity,
+    background: AvatarBackground,
+) -> Result<RgbaImage, AvatarSpecError> {
+    spec.validate()?;
+
+    let width = spec.width as i32;
+    let height = spec.height as i32;
+    let center_x = width / 2;
+    let center_y = (height as f32 * 0.54) as i32;
+    let helmet_r = (width.min(height) as f32 * 0.28) as i32;
+    let suit = hsl_to_color(205.0 + identity.unit_f32(1) * 35.0, 0.16, 0.90);
+    let visor = hsl_to_color(195.0 + identity.unit_f32(2) * 55.0, 0.52, 0.56);
+    let trim = hsl_to_color(identity.unit_f32(3) * 360.0, 0.45, 0.55);
+    let bg = hsl_to_color(220.0 + identity.unit_f32(4) * 60.0, 0.18, 0.91);
+    let mut image = ImageBuffer::from_pixel(
+        spec.width,
+        spec.height,
+        background_fill(background, bg).into(),
+    );
+    draw_background_accent(
+        &mut image, center_x, center_y, helmet_r, helmet_r, trim, 0.40, background,
+    );
+
+    draw_filled_rect_mut(
+        &mut image,
+        Rect::at(center_x - helmet_r / 2, center_y + helmet_r / 2)
+            .of_size(helmet_r as u32, (helmet_r * 3 / 5) as u32),
+        suit.into(),
+    );
+    draw_filled_circle_mut(&mut image, (center_x, center_y), helmet_r, suit.into());
+    draw_hollow_circle_mut(
+        &mut image,
+        (center_x, center_y),
+        helmet_r,
+        Color::rgb(96, 110, 128).into(),
+    );
+    draw_filled_ellipse_mut(
+        &mut image,
+        (center_x, center_y),
+        helmet_r * 2 / 3,
+        helmet_r / 2,
+        visor.into(),
+    );
+    draw_blended_rect_mut(
+        &mut image,
+        Rect::at(center_x - helmet_r / 3, center_y - helmet_r / 4)
+            .of_size((helmet_r / 2).max(2) as u32, (helmet_r / 8).max(2) as u32),
+        Rgba([255, 255, 255, 90]),
+    );
+    draw_filled_circle_mut(
+        &mut image,
+        (center_x + helmet_r / 2, center_y + helmet_r * 2 / 3),
+        (helmet_r / 10).max(3),
+        trim.into(),
+    );
+
+    Ok(image)
+}
+
+pub fn render_diamond_avatar_for_identity(
+    spec: AvatarSpec,
+    identity: &AvatarIdentity,
+    background: AvatarBackground,
+) -> Result<RgbaImage, AvatarSpecError> {
+    spec.validate()?;
+
+    let width = spec.width as i32;
+    let height = spec.height as i32;
+    let center_x = width / 2;
+    let center_y = (height as f32 * 0.56) as i32;
+    let rx = (width as f32 * 0.25) as i32;
+    let ry = (height as f32 * 0.30) as i32;
+    let gem = hsl_to_color(180.0 + identity.unit_f32(1) * 95.0, 0.55, 0.60);
+    let highlight = hsl_to_color(190.0 + identity.unit_f32(2) * 70.0, 0.40, 0.82);
+    let shade = hsl_to_color(200.0 + identity.unit_f32(3) * 70.0, 0.42, 0.42);
+    let bg = hsl_to_color(200.0 + identity.unit_f32(4) * 50.0, 0.18, 0.94);
+    let mut image = ImageBuffer::from_pixel(
+        spec.width,
+        spec.height,
+        background_fill(background, bg).into(),
+    );
+    draw_background_accent(
+        &mut image, center_x, center_y, rx, ry, highlight, 0.32, background,
+    );
+
+    let outer = [
+        Point::new(center_x - rx, center_y - ry / 3),
+        Point::new(center_x - rx / 2, center_y - ry),
+        Point::new(center_x + rx / 2, center_y - ry),
+        Point::new(center_x + rx, center_y - ry / 3),
+        Point::new(center_x, center_y + ry),
+    ];
+    draw_polygon_mut(&mut image, &outer, gem.into());
+    draw_polygon_mut(
+        &mut image,
+        &[
+            outer[0],
+            outer[1],
+            Point::new(center_x, center_y + ry),
+            Point::new(center_x - rx / 5, center_y - ry / 3),
+        ],
+        highlight.into(),
+    );
+    draw_polygon_mut(
+        &mut image,
+        &[
+            outer[2],
+            outer[3],
+            Point::new(center_x, center_y + ry),
+            Point::new(center_x + rx / 5, center_y - ry / 3),
+        ],
+        shade.into(),
+    );
+    for x in [center_x - rx / 2, center_x, center_x + rx / 2] {
+        draw_line_segment_mut(
+            &mut image,
+            (x as f32, (center_y - ry) as f32),
+            (center_x as f32, (center_y + ry) as f32),
+            Color::rgba(255, 255, 255, 110).into(),
+        );
+    }
+
+    Ok(image)
+}
+
+pub fn render_coffee_cup_avatar_for_identity(
+    spec: AvatarSpec,
+    identity: &AvatarIdentity,
+    background: AvatarBackground,
+) -> Result<RgbaImage, AvatarSpecError> {
+    spec.validate()?;
+
+    let width = spec.width as i32;
+    let height = spec.height as i32;
+    let center_x = width / 2;
+    let center_y = (height as f32 * 0.58) as i32;
+    let cup_w = (width as f32 * 0.38) as i32;
+    let cup_h = (height as f32 * 0.32) as i32;
+    let cup = hsl_to_color(20.0 + identity.unit_f32(1) * 35.0, 0.42, 0.60);
+    let coffee = hsl_to_color(24.0 + identity.unit_f32(2) * 18.0, 0.42, 0.26);
+    let cream = hsl_to_color(38.0 + identity.unit_f32(3) * 18.0, 0.26, 0.88);
+    let bg = hsl_to_color(34.0 + identity.unit_f32(4) * 20.0, 0.18, 0.93);
+    let mut image = ImageBuffer::from_pixel(
+        spec.width,
+        spec.height,
+        background_fill(background, bg).into(),
+    );
+    draw_background_accent(
+        &mut image,
+        center_x,
+        center_y,
+        cup_w / 2,
+        cup_h / 2,
+        cream,
+        0.30,
+        background,
+    );
+
+    draw_filled_rect_mut(
+        &mut image,
+        Rect::at(center_x - cup_w / 2, center_y - cup_h / 2).of_size(cup_w as u32, cup_h as u32),
+        cup.into(),
+    );
+    draw_filled_ellipse_mut(
+        &mut image,
+        (center_x, center_y - cup_h / 2),
+        cup_w / 2,
+        cup_h / 7,
+        coffee.into(),
+    );
+    draw_hollow_ellipse_mut(
+        &mut image,
+        (center_x + cup_w / 2, center_y - cup_h / 10),
+        cup_w / 4,
+        cup_h / 4,
+        cup.into(),
+    );
+    draw_filled_rect_mut(
+        &mut image,
+        Rect::at(center_x - cup_w * 3 / 5, center_y + cup_h / 2)
+            .of_size((cup_w * 6 / 5) as u32, (cup_h / 8).max(2) as u32),
+        Color::rgba(80, 55, 42, 180).into(),
+    );
+    for offset in [-1, 0, 1] {
+        let x = center_x + offset * cup_w / 5;
+        draw_line_segment_mut(
+            &mut image,
+            (x as f32, (center_y - cup_h) as f32),
+            ((x + cup_w / 10) as f32, (center_y - cup_h * 4 / 3) as f32),
+            Color::rgba(120, 98, 82, 120).into(),
+        );
+    }
+
+    Ok(image)
+}
+
+pub fn render_shield_avatar_for_identity(
+    spec: AvatarSpec,
+    identity: &AvatarIdentity,
+    background: AvatarBackground,
+) -> Result<RgbaImage, AvatarSpecError> {
+    spec.validate()?;
+
+    let width = spec.width as i32;
+    let height = spec.height as i32;
+    let center_x = width / 2;
+    let center_y = (height as f32 * 0.55) as i32;
+    let rx = (width as f32 * 0.25) as i32;
+    let ry = (height as f32 * 0.32) as i32;
+    let metal = hsl_to_color(210.0 + identity.unit_f32(1) * 45.0, 0.28, 0.58);
+    let accent = hsl_to_color(identity.unit_f32(2) * 360.0, 0.50, 0.50);
+    let light = hsl_to_color(210.0 + identity.unit_f32(3) * 35.0, 0.18, 0.82);
+    let bg = hsl_to_color(215.0 + identity.unit_f32(4) * 35.0, 0.16, 0.92);
+    let mut image = ImageBuffer::from_pixel(
+        spec.width,
+        spec.height,
+        background_fill(background, bg).into(),
+    );
+    draw_background_accent(
+        &mut image, center_x, center_y, rx, ry, accent, 0.36, background,
+    );
+
+    let shield = [
+        Point::new(center_x - rx, center_y - ry),
+        Point::new(center_x + rx, center_y - ry),
+        Point::new(center_x + rx * 4 / 5, center_y + ry / 4),
+        Point::new(center_x, center_y + ry),
+        Point::new(center_x - rx * 4 / 5, center_y + ry / 4),
+    ];
+    draw_polygon_mut(&mut image, &shield, metal.into());
+    draw_polygon_mut(
+        &mut image,
+        &[
+            Point::new(center_x - rx, center_y - ry),
+            Point::new(center_x, center_y - ry),
+            Point::new(center_x, center_y + ry),
+            Point::new(center_x - rx * 4 / 5, center_y + ry / 4),
+        ],
+        light.into(),
+    );
+    draw_filled_rect_mut(
+        &mut image,
+        Rect::at(center_x - rx / 8, center_y - ry * 3 / 4)
+            .of_size((rx / 4).max(2) as u32, (ry * 6 / 5) as u32),
+        accent.into(),
+    );
+    draw_filled_rect_mut(
+        &mut image,
+        Rect::at(center_x - rx * 2 / 3, center_y - ry / 5)
+            .of_size((rx * 4 / 3) as u32, (ry / 4).max(2) as u32),
+        accent.into(),
+    );
+
+    Ok(image)
+}
+
 pub fn render_paws_avatar_for_identity(
     spec: AvatarSpec,
     identity: &AvatarIdentity,
@@ -8349,6 +9118,411 @@ fn render_knight_svg(spec: AvatarSpec, identity: &AvatarIdentity) -> String {
     )
 }
 
+fn render_bear_svg(spec: AvatarSpec, identity: &AvatarIdentity) -> String {
+    let w = spec.width as f32;
+    let h = spec.height as f32;
+    let cx = w / 2.0;
+    let cy = h * 0.56;
+    let rx = w * (0.27 + identity.unit_f32(4) * 0.05);
+    let ry = h * (0.24 + identity.unit_f32(5) * 0.05);
+    let fur = hsl_to_color(24.0 + identity.unit_f32(1) * 24.0, 0.38, 0.48);
+    let muzzle = hsl_to_color(32.0 + identity.unit_f32(2) * 12.0, 0.22, 0.84);
+    let inner = hsl_to_color(18.0 + identity.unit_f32(3) * 18.0, 0.34, 0.72);
+    format!(
+        r##"<circle cx="{lel}" cy="{ey}" r="{er}" fill="{fur}"/><circle cx="{rel}" cy="{ey}" r="{er}" fill="{fur}"/><circle cx="{lel}" cy="{ey}" r="{ir}" fill="{inner}"/><circle cx="{rel}" cy="{ey}" r="{ir}" fill="{inner}"/><ellipse cx="{cx}" cy="{cy}" rx="{rx}" ry="{ry}" fill="{fur}"/><ellipse cx="{cx}" cy="{my}" rx="{mrx}" ry="{mry}" fill="{muzzle}"/><circle cx="{lx}" cy="{eye_y}" r="{pr}" fill="#2d221c"/><circle cx="{rx2}" cy="{eye_y}" r="{pr}" fill="#2d221c"/><ellipse cx="{cx}" cy="{ny}" rx="{nrx}" ry="{nry}" fill="#2d221c"/><path d="M {mx1} {mouth_y} Q {cx} {curve_y} {mx2} {mouth_y}" stroke="#2d221c" stroke-width="3" fill="none" stroke-linecap="round"/>"##,
+        lel = cx - rx * 0.75,
+        rel = cx + rx * 0.75,
+        ey = cy - ry,
+        er = rx * 0.28,
+        ir = rx * 0.14,
+        cx = cx,
+        cy = cy,
+        rx = rx,
+        ry = ry,
+        fur = color_hex(fur),
+        inner = color_hex(inner),
+        my = cy + ry * 0.25,
+        mrx = rx * 0.40,
+        mry = ry * 0.34,
+        muzzle = color_hex(muzzle),
+        lx = cx - rx / 3.0,
+        rx2 = cx + rx / 3.0,
+        eye_y = cy - ry * 0.20,
+        pr = rx * 0.10,
+        ny = cy + ry * 0.16,
+        nrx = rx * 0.13,
+        nry = ry * 0.10,
+        mx1 = cx - rx * 0.18,
+        mx2 = cx + rx * 0.18,
+        mouth_y = cy + ry * 0.30,
+        curve_y = cy + ry * 0.42,
+    )
+}
+
+fn render_penguin_svg(spec: AvatarSpec, identity: &AvatarIdentity) -> String {
+    let w = spec.width as f32;
+    let h = spec.height as f32;
+    let cx = w / 2.0;
+    let cy = h * 0.56;
+    let rx = w * 0.25;
+    let ry = h * 0.34;
+    let black = hsl_to_color(210.0 + identity.unit_f32(1) * 30.0, 0.22, 0.18);
+    let white = hsl_to_color(205.0 + identity.unit_f32(2) * 25.0, 0.16, 0.94);
+    let orange = hsl_to_color(32.0 + identity.unit_f32(3) * 18.0, 0.72, 0.58);
+    let beak_points = format!(
+        "{},{} {},{} {},{}",
+        cx - rx * 0.14,
+        cy - ry * 0.16,
+        cx + rx * 0.14,
+        cy - ry * 0.16,
+        cx,
+        cy
+    );
+    format!(
+        r##"<ellipse cx="{cx}" cy="{cy}" rx="{rx}" ry="{ry}" fill="{black}"/><ellipse cx="{cx}" cy="{by}" rx="{brx}" ry="{bry}" fill="{white}"/><ellipse cx="{lx}" cy="{wy}" rx="{wrx}" ry="{wry}" fill="{black}"/><ellipse cx="{rx2}" cy="{wy}" rx="{wrx}" ry="{wry}" fill="{black}"/><circle cx="{ex1}" cy="{ey}" r="{er}" fill="#0a0f14"/><circle cx="{ex2}" cy="{ey}" r="{er}" fill="#0a0f14"/><polygon points="{bp}" fill="{orange}"/><ellipse cx="{fx1}" cy="{fy}" rx="{frx}" ry="{fry}" fill="{orange}"/><ellipse cx="{fx2}" cy="{fy}" rx="{frx}" ry="{fry}" fill="{orange}"/>"##,
+        cx = cx,
+        cy = cy,
+        rx = rx,
+        ry = ry,
+        black = color_hex(black),
+        by = cy + ry / 6.0,
+        brx = rx * 0.60,
+        bry = ry * 0.67,
+        white = color_hex(white),
+        lx = cx - rx,
+        rx2 = cx + rx,
+        wy = cy + ry * 0.10,
+        wrx = rx * 0.25,
+        wry = ry * 0.50,
+        ex1 = cx - rx / 3.0,
+        ex2 = cx + rx / 3.0,
+        ey = cy - ry / 3.0,
+        er = rx * 0.10,
+        bp = beak_points,
+        orange = color_hex(orange),
+        fx1 = cx - rx / 3.0,
+        fx2 = cx + rx / 3.0,
+        fy = cy + ry,
+        frx = rx * 0.25,
+        fry = ry * 0.10,
+    )
+}
+
+fn render_dragon_svg(spec: AvatarSpec, identity: &AvatarIdentity) -> String {
+    let w = spec.width as f32;
+    let h = spec.height as f32;
+    let cx = w / 2.0;
+    let cy = h * 0.57;
+    let rx = w * 0.27;
+    let ry = h * 0.23;
+    let scale = hsl_to_color(105.0 + identity.unit_f32(1) * 70.0, 0.46, 0.46);
+    let belly = hsl_to_color(70.0 + identity.unit_f32(2) * 35.0, 0.42, 0.72);
+    let horn = hsl_to_color(40.0 + identity.unit_f32(3) * 20.0, 0.34, 0.84);
+    let flame = hsl_to_color(14.0 + identity.unit_f32(4) * 25.0, 0.78, 0.56);
+    let left_horn = format!(
+        "{},{} {},{} {},{}",
+        cx - rx / 2.0,
+        cy - ry,
+        cx - rx / 4.0,
+        cy - ry * 1.60,
+        cx - rx / 8.0,
+        cy - ry
+    );
+    let right_horn = format!(
+        "{},{} {},{} {},{}",
+        cx + rx / 2.0,
+        cy - ry,
+        cx + rx / 4.0,
+        cy - ry * 1.60,
+        cx + rx / 8.0,
+        cy - ry
+    );
+    let spike1 = format!(
+        "{},{} {},{} {},{}",
+        cx - rx * 0.27,
+        cy - ry,
+        cx - rx * 0.20,
+        cy - ry * 1.25,
+        cx - rx * 0.13,
+        cy - ry
+    );
+    let spike2 = format!(
+        "{},{} {},{} {},{}",
+        cx - rx * 0.07,
+        cy - ry,
+        cx,
+        cy - ry * 1.25,
+        cx + rx * 0.07,
+        cy - ry
+    );
+    let spike3 = format!(
+        "{},{} {},{} {},{}",
+        cx + rx * 0.13,
+        cy - ry,
+        cx + rx * 0.20,
+        cy - ry * 1.25,
+        cx + rx * 0.27,
+        cy - ry
+    );
+    format!(
+        r##"<polygon points="{lh}" fill="{horn}"/><polygon points="{rh}" fill="{horn}"/><ellipse cx="{cx}" cy="{cy}" rx="{rx}" ry="{ry}" fill="{scale}"/><ellipse cx="{cx}" cy="{my}" rx="{mrx}" ry="{mry}" fill="{belly}"/><circle cx="{lx}" cy="{ey}" r="{ew}" fill="#ffffff"/><circle cx="{rx2}" cy="{ey}" r="{ew}" fill="#ffffff"/><circle cx="{lx}" cy="{ey}" r="{pr}" fill="#183022"/><circle cx="{rx2}" cy="{ey}" r="{pr}" fill="#183022"/><circle cx="{nx1}" cy="{ny}" r="{nr}" fill="#183022"/><circle cx="{nx2}" cy="{ny}" r="{nr}" fill="#183022"/><polygon points="{s1}" fill="{flame}"/><polygon points="{s2}" fill="{flame}"/><polygon points="{s3}" fill="{flame}"/>"##,
+        lh = left_horn,
+        rh = right_horn,
+        horn = color_hex(horn),
+        cx = cx,
+        cy = cy,
+        rx = rx,
+        ry = ry,
+        scale = color_hex(scale),
+        my = cy + ry * 0.25,
+        mrx = rx * 0.50,
+        mry = ry * 0.34,
+        belly = color_hex(belly),
+        lx = cx - rx / 3.0,
+        rx2 = cx + rx / 3.0,
+        ey = cy - ry / 5.0,
+        ew = rx * 0.10,
+        pr = rx * 0.05,
+        nx1 = cx - rx / 7.0,
+        nx2 = cx + rx / 7.0,
+        ny = cy + ry / 3.0,
+        nr = rx * 0.04,
+        s1 = spike1,
+        s2 = spike2,
+        s3 = spike3,
+        flame = color_hex(flame),
+    )
+}
+
+fn render_ninja_svg(spec: AvatarSpec, identity: &AvatarIdentity) -> String {
+    let w = spec.width as f32;
+    let h = spec.height as f32;
+    let cx = w / 2.0;
+    let cy = h * 0.56;
+    let r = w.min(h) * 0.28;
+    let cloth = hsl_to_color(220.0 + identity.unit_f32(1) * 50.0, 0.18, 0.14);
+    let skin = hsl_to_color(28.0 + identity.unit_f32(2) * 18.0, 0.42, 0.72);
+    let band = hsl_to_color(identity.unit_f32(3) * 360.0, 0.56, 0.50);
+    let tie = format!(
+        "{},{} {},{} {},{}",
+        cx + r * 0.80,
+        cy - r * 0.67,
+        cx + r * 1.40,
+        cy - r,
+        cx + r,
+        cy - r * 0.33
+    );
+    format!(
+        r##"<circle cx="{cx}" cy="{cy}" r="{r}" fill="{cloth}"/><rect x="{sx}" y="{sy}" width="{sw}" height="{sh}" fill="{skin}"/><rect x="{bx}" y="{by}" width="{bw}" height="{bh}" fill="{band}"/><ellipse cx="{ex1}" cy="{ey}" rx="{erx}" ry="{ery}" fill="#141820"/><ellipse cx="{ex2}" cy="{ey}" rx="{erx}" ry="{ery}" fill="#141820"/><polygon points="{tie}" fill="{band}"/>"##,
+        cx = cx,
+        cy = cy,
+        r = r,
+        cloth = color_hex(cloth),
+        sx = cx - r * 0.60,
+        sy = cy - r * 0.25,
+        sw = r * 1.20,
+        sh = r * 0.50,
+        skin = color_hex(skin),
+        bx = cx - r,
+        by = cy - r * 0.67,
+        bw = r * 2.0,
+        bh = r * 0.17,
+        band = color_hex(band),
+        ex1 = cx - r / 3.0,
+        ex2 = cx + r / 3.0,
+        ey = cy - r * 0.08,
+        erx = r * 0.11,
+        ery = r * 0.07,
+        tie = tie,
+    )
+}
+
+fn render_astronaut_svg(spec: AvatarSpec, identity: &AvatarIdentity) -> String {
+    let w = spec.width as f32;
+    let h = spec.height as f32;
+    let cx = w / 2.0;
+    let cy = h * 0.54;
+    let r = w.min(h) * 0.28;
+    let suit = hsl_to_color(205.0 + identity.unit_f32(1) * 35.0, 0.16, 0.90);
+    let visor = hsl_to_color(195.0 + identity.unit_f32(2) * 55.0, 0.52, 0.56);
+    let trim = hsl_to_color(identity.unit_f32(3) * 360.0, 0.45, 0.55);
+    format!(
+        r##"<rect x="{sx}" y="{sy}" width="{sw}" height="{sh}" fill="{suit}"/><circle cx="{cx}" cy="{cy}" r="{r}" fill="{suit}" stroke="#606e80" stroke-width="3"/><ellipse cx="{cx}" cy="{cy}" rx="{vrx}" ry="{vry}" fill="{visor}"/><rect x="{glx}" y="{gly}" width="{glw}" height="{glh}" fill="#ffffff" opacity="0.35"/><circle cx="{px}" cy="{py}" r="{pr}" fill="{trim}"/>"##,
+        sx = cx - r * 0.50,
+        sy = cy + r * 0.50,
+        sw = r,
+        sh = r * 0.60,
+        suit = color_hex(suit),
+        cx = cx,
+        cy = cy,
+        r = r,
+        vrx = r * 0.67,
+        vry = r * 0.50,
+        visor = color_hex(visor),
+        glx = cx - r / 3.0,
+        gly = cy - r / 4.0,
+        glw = r / 2.0,
+        glh = r / 8.0,
+        px = cx + r / 2.0,
+        py = cy + r * 0.67,
+        pr = r * 0.10,
+        trim = color_hex(trim),
+    )
+}
+
+fn render_diamond_svg(spec: AvatarSpec, identity: &AvatarIdentity) -> String {
+    let w = spec.width as f32;
+    let h = spec.height as f32;
+    let cx = w / 2.0;
+    let cy = h * 0.56;
+    let rx = w * 0.25;
+    let ry = h * 0.30;
+    let gem = hsl_to_color(180.0 + identity.unit_f32(1) * 95.0, 0.55, 0.60);
+    let highlight = hsl_to_color(190.0 + identity.unit_f32(2) * 70.0, 0.40, 0.82);
+    let shade = hsl_to_color(200.0 + identity.unit_f32(3) * 70.0, 0.42, 0.42);
+    let outer = format!(
+        "{},{} {},{} {},{} {},{} {},{}",
+        cx - rx,
+        cy - ry / 3.0,
+        cx - rx / 2.0,
+        cy - ry,
+        cx + rx / 2.0,
+        cy - ry,
+        cx + rx,
+        cy - ry / 3.0,
+        cx,
+        cy + ry
+    );
+    let left = format!(
+        "{},{} {},{} {},{} {},{}",
+        cx - rx,
+        cy - ry / 3.0,
+        cx - rx / 2.0,
+        cy - ry,
+        cx,
+        cy + ry,
+        cx - rx / 5.0,
+        cy - ry / 3.0
+    );
+    let right = format!(
+        "{},{} {},{} {},{} {},{}",
+        cx + rx / 2.0,
+        cy - ry,
+        cx + rx,
+        cy - ry / 3.0,
+        cx,
+        cy + ry,
+        cx + rx / 5.0,
+        cy - ry / 3.0
+    );
+    format!(
+        r##"<polygon points="{outer}" fill="{gem}"/><polygon points="{left}" fill="{highlight}"/><polygon points="{right}" fill="{shade}"/><line x1="{l1}" y1="{top}" x2="{cx}" y2="{bottom}" stroke="#ffffff" stroke-width="2" opacity="0.45"/><line x1="{cx}" y1="{top}" x2="{cx}" y2="{bottom}" stroke="#ffffff" stroke-width="2" opacity="0.45"/><line x1="{r1}" y1="{top}" x2="{cx}" y2="{bottom}" stroke="#ffffff" stroke-width="2" opacity="0.45"/>"##,
+        outer = outer,
+        gem = color_hex(gem),
+        left = left,
+        right = right,
+        highlight = color_hex(highlight),
+        shade = color_hex(shade),
+        l1 = cx - rx / 2.0,
+        r1 = cx + rx / 2.0,
+        top = cy - ry,
+        bottom = cy + ry,
+        cx = cx,
+    )
+}
+
+fn render_coffee_cup_svg(spec: AvatarSpec, identity: &AvatarIdentity) -> String {
+    let w = spec.width as f32;
+    let h = spec.height as f32;
+    let cx = w / 2.0;
+    let cy = h * 0.58;
+    let cw = w * 0.38;
+    let ch = h * 0.32;
+    let cup = hsl_to_color(20.0 + identity.unit_f32(1) * 35.0, 0.42, 0.60);
+    let coffee = hsl_to_color(24.0 + identity.unit_f32(2) * 18.0, 0.42, 0.26);
+    format!(
+        r##"<rect x="{x}" y="{y}" width="{cw}" height="{ch}" fill="{cup}"/><ellipse cx="{cx}" cy="{top}" rx="{rx}" ry="{ery}" fill="{coffee}"/><ellipse cx="{hx}" cy="{hy}" rx="{hrx}" ry="{hry}" fill="none" stroke="{cup}" stroke-width="5"/><rect x="{px}" y="{py}" width="{pw}" height="{ph}" fill="#50372a" opacity="0.7"/><path d="M {s1} {sy} L {s1e} {sy2} M {s2} {sy} L {s2e} {sy2} M {s3} {sy} L {s3e} {sy2}" stroke="#786252" stroke-width="3" opacity="0.55" stroke-linecap="round"/>"##,
+        x = cx - cw / 2.0,
+        y = cy - ch / 2.0,
+        cw = cw,
+        ch = ch,
+        cup = color_hex(cup),
+        cx = cx,
+        top = cy - ch / 2.0,
+        rx = cw / 2.0,
+        ery = ch / 7.0,
+        coffee = color_hex(coffee),
+        hx = cx + cw / 2.0,
+        hy = cy - ch / 10.0,
+        hrx = cw / 4.0,
+        hry = ch / 4.0,
+        px = cx - cw * 0.60,
+        py = cy + ch / 2.0,
+        pw = cw * 1.20,
+        ph = ch / 8.0,
+        s1 = cx - cw / 5.0,
+        s2 = cx,
+        s3 = cx + cw / 5.0,
+        sy = cy - ch,
+        s1e = cx - cw / 10.0,
+        s2e = cx + cw / 10.0,
+        s3e = cx + cw * 0.30,
+        sy2 = cy - ch * 1.33,
+    )
+}
+
+fn render_shield_svg(spec: AvatarSpec, identity: &AvatarIdentity) -> String {
+    let w = spec.width as f32;
+    let h = spec.height as f32;
+    let cx = w / 2.0;
+    let cy = h * 0.55;
+    let rx = w * 0.25;
+    let ry = h * 0.32;
+    let metal = hsl_to_color(210.0 + identity.unit_f32(1) * 45.0, 0.28, 0.58);
+    let accent = hsl_to_color(identity.unit_f32(2) * 360.0, 0.50, 0.50);
+    let light = hsl_to_color(210.0 + identity.unit_f32(3) * 35.0, 0.18, 0.82);
+    let outer = format!(
+        "{},{} {},{} {},{} {},{} {},{}",
+        cx - rx,
+        cy - ry,
+        cx + rx,
+        cy - ry,
+        cx + rx * 0.80,
+        cy + ry * 0.25,
+        cx,
+        cy + ry,
+        cx - rx * 0.80,
+        cy + ry * 0.25
+    );
+    let left = format!(
+        "{},{} {},{} {},{} {},{}",
+        cx - rx,
+        cy - ry,
+        cx,
+        cy - ry,
+        cx,
+        cy + ry,
+        cx - rx * 0.80,
+        cy + ry * 0.25
+    );
+    format!(
+        r##"<polygon points="{outer}" fill="{metal}"/><polygon points="{left}" fill="{light}"/><rect x="{vx}" y="{vy}" width="{vw}" height="{vh}" fill="{accent}"/><rect x="{hx}" y="{hy}" width="{hw}" height="{hh}" fill="{accent}"/>"##,
+        outer = outer,
+        metal = color_hex(metal),
+        left = left,
+        light = color_hex(light),
+        vx = cx - rx * 0.125,
+        vy = cy - ry * 0.75,
+        vw = rx * 0.25,
+        vh = ry * 1.20,
+        hx = cx - rx * 0.67,
+        hy = cy - ry * 0.20,
+        hw = rx * 1.34,
+        hh = ry * 0.25,
+        accent = color_hex(accent),
+    )
+}
+
 fn render_paws_svg(spec: AvatarSpec, identity: &AvatarIdentity) -> String {
     let w = spec.width as f32;
     let h = spec.height as f32;
@@ -8391,14 +9565,34 @@ fn encode_rgba_image(image: &RgbaImage, format: AvatarOutputFormat) -> ImageResu
     Ok(bytes)
 }
 
-fn encode_owned_rgba_image(
-    mut image: RgbaImage,
-    format: AvatarOutputFormat,
-) -> ImageResult<Vec<u8>> {
-    let result = encode_rgba_image(&image, format);
+fn encode_owned_rgba_image(image: RgbaImage, format: AvatarOutputFormat) -> ImageResult<Vec<u8>> {
+    let image = ZeroizingRgbaImage::new(image);
+    encode_rgba_image(image.as_image(), format)
+}
+
+struct ZeroizingRgbaImage {
+    image: RgbaImage,
+}
+
+impl ZeroizingRgbaImage {
+    fn new(image: RgbaImage) -> Self {
+        Self { image }
+    }
+
+    fn as_image(&self) -> &RgbaImage {
+        &self.image
+    }
+}
+
+impl Drop for ZeroizingRgbaImage {
+    fn drop(&mut self) {
+        zeroize_rgba_pixels(&mut self.image);
+    }
+}
+
+fn zeroize_rgba_pixels(image: &mut RgbaImage) {
     let pixels: &mut [u8] = image.as_mut();
     pixels.zeroize();
-    result
 }
 
 fn encode_into_writer<W: std::io::Write>(
@@ -8413,6 +9607,7 @@ fn encode_into_writer<W: std::io::Write>(
             image.height(),
             ExtendedColorType::Rgba8,
         ),
+        #[cfg(feature = "png")]
         AvatarOutputFormat::Png => {
             PngEncoder::new_with_quality(writer, CompressionType::Best, FilterType::Adaptive)
                 .write_image(
@@ -8422,17 +9617,17 @@ fn encode_into_writer<W: std::io::Write>(
                     ExtendedColorType::Rgba8,
                 )
         }
+        #[cfg(feature = "jpeg")]
         AvatarOutputFormat::Jpeg => {
-            let mut rgb = rgba_to_rgb_over_white(image);
-            let result = JpegEncoder::new_with_quality(writer, 92).write_image(
-                &rgb,
+            let rgb = Zeroizing::new(rgba_to_rgb_over_white(image));
+            JpegEncoder::new_with_quality(writer, 92).write_image(
+                rgb.as_slice(),
                 image.width(),
                 image.height(),
                 ExtendedColorType::Rgb8,
-            );
-            rgb.zeroize();
-            result
+            )
         }
+        #[cfg(feature = "gif")]
         AvatarOutputFormat::Gif => GifEncoder::new(writer).write_image(
             image.as_raw(),
             image.width(),
@@ -8442,6 +9637,7 @@ fn encode_into_writer<W: std::io::Write>(
     }
 }
 
+#[cfg(any(feature = "jpeg", test))]
 fn rgba_to_rgb_over_white(image: &RgbaImage) -> Vec<u8> {
     let mut rgb = Vec::with_capacity(image.as_raw().len() / 4 * 3);
     for pixel in image.pixels() {
@@ -8459,6 +9655,7 @@ fn rgba_to_rgb_over_white(image: &RgbaImage) -> Vec<u8> {
 mod tests {
     use super::*;
     use image::ImageFormat;
+    use sha2::Sha512 as TestSha512;
 
     fn valid_spec(width: u32, height: u32, seed: u64) -> AvatarSpec {
         AvatarSpec::new(width, height, seed).expect("test avatar spec should be valid")
@@ -8512,6 +9709,18 @@ mod tests {
     ) -> String {
         super::render_avatar_svg_style_for_id(spec, id, style)
             .expect("valid avatar style should render as svg")
+    }
+
+    fn assert_svg_is_well_formed(svg: &str) {
+        let document = roxmltree::Document::parse(svg).expect("svg should be well-formed xml");
+        let root = document.root_element();
+
+        assert_eq!(root.tag_name().name(), "svg");
+        assert_eq!(
+            root.tag_name().namespace(),
+            Some("http://www.w3.org/2000/svg")
+        );
+        assert!(root.attribute("viewBox").is_some());
     }
 
     fn identity_with_digest_byte(index: usize, value: u8) -> AvatarIdentity {
@@ -8613,9 +9822,59 @@ mod tests {
     fn avatar_identity_uses_sha512_digest() {
         let identity = valid_identity("alice@example.com");
 
-        assert_eq!(identity.as_digest().len(), 64);
-        assert_ne!(identity.seed(), 0);
-        assert_eq!(&identity.rng_seed(), &identity.as_digest()[32..64]);
+        assert_eq!(identity.digest.len(), 64);
+        let rng_seed = identity.rng_seed();
+        assert_eq!(&rng_seed[..], &identity.digest[32..64]);
+    }
+
+    #[test]
+    fn avatar_identity_debug_redacts_digest() {
+        let identity = valid_identity("alice@example.com");
+        let debug = format!("{identity:?}");
+
+        assert_eq!(debug, r#"AvatarIdentity { digest: "[REDACTED]" }"#);
+        for byte in identity.digest {
+            assert!(
+                !debug.contains(&format!("{byte}")),
+                "debug output leaked digest byte {byte}"
+            );
+        }
+    }
+
+    #[test]
+    fn avatar_identity_rustdoc_mentions_clone_zeroization() {
+        let source = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/src/lib.rs"));
+        let before_struct = source
+            .split("pub struct AvatarIdentity {")
+            .next()
+            .expect("AvatarIdentity struct should exist");
+        let docs = before_struct
+            .rsplit("/// A stable avatar identity")
+            .next()
+            .expect("AvatarIdentity rustdoc should exist");
+
+        assert!(docs.contains("/// # Security"));
+        assert!(docs.contains("`AvatarIdentity` implements `Clone`"));
+        assert!(docs.contains("Each clone is independently zeroized"));
+        assert!(docs.contains("short-lived as possible"));
+        assert!(docs.contains("multiple memory locations"));
+    }
+
+    #[test]
+    #[cfg(not(any(feature = "blake3", feature = "xxh3")))]
+    fn sha512_hasher_state_uses_zeroize_on_drop() {
+        fn assert_zeroize_on_drop<T: zeroize::ZeroizeOnDrop>() {}
+
+        assert_zeroize_on_drop::<TestSha512>();
+    }
+
+    #[test]
+    #[cfg(feature = "blake3")]
+    fn blake3_hasher_state_can_be_zeroized() {
+        fn assert_zeroize<T: Zeroize>() {}
+
+        assert_zeroize::<blake3::Hasher>();
+        assert_zeroize::<blake3::OutputReader>();
     }
 
     #[test]
@@ -8624,8 +9883,16 @@ mod tests {
         let rng_seed = identity.rng_seed();
 
         assert_eq!(rng_seed.len(), 32);
-        assert_eq!(&rng_seed, &identity.as_digest()[32..64]);
-        assert_ne!(&identity.as_digest()[..32], &rng_seed);
+        assert_eq!(&rng_seed[..], &identity.digest[32..64]);
+        assert_ne!(&identity.digest[..32], &rng_seed[..]);
+    }
+
+    #[test]
+    fn rng_seed_copy_is_zeroizing() {
+        let identity = valid_identity("alice@example.com");
+        let rng_seed: Zeroizing<[u8; 32]> = identity.rng_seed();
+
+        assert_eq!(rng_seed.len(), 32);
     }
 
     #[test]
@@ -8639,71 +9906,76 @@ mod tests {
     }
 
     #[test]
-    fn default_identity_options_match_sha512_namespace_constructor() {
+    fn default_identity_options_match_namespace_constructor() {
         let namespace = valid_namespace("tenant-a", "v2");
         let default = AvatarIdentity::new_with_namespace(namespace, "alice@example.com")
-            .expect("sha512 identity should be valid");
+            .expect("identity should be valid");
         let explicit = AvatarIdentity::new_with_options(
-            AvatarIdentityOptions::new(namespace, AvatarHashAlgorithm::Sha512),
+            AvatarIdentityOptions::new(namespace),
             "alice@example.com",
         )
-        .expect("explicit sha512 identity should be valid");
+        .expect("explicit identity options should be valid");
 
-        assert_eq!(default.as_digest(), explicit.as_digest());
+        assert_eq!(default.digest, explicit.digest);
     }
 
     #[test]
-    fn hash_algorithm_parser_round_trips_enabled_algorithms() {
-        for &algorithm in AvatarHashAlgorithm::ALL {
-            assert_eq!(
-                algorithm.as_str().parse::<AvatarHashAlgorithm>().ok(),
-                Some(algorithm)
-            );
-        }
+    fn active_hash_algorithm_label_matches_enabled_feature() {
+        #[cfg(feature = "blake3")]
+        assert_eq!(ACTIVE_HASH_ALGORITHM_LABEL, b"blake3");
+
+        #[cfg(feature = "xxh3")]
+        assert_eq!(ACTIVE_HASH_ALGORITHM_LABEL, b"xxh3-128");
+
+        #[cfg(not(any(feature = "blake3", feature = "xxh3")))]
+        assert_eq!(ACTIVE_HASH_ALGORITHM_LABEL, b"sha512");
     }
 
     #[test]
-    fn oversized_identity_is_rejected_for_every_enabled_hash_algorithm() {
+    #[cfg(not(any(feature = "blake3", feature = "xxh3")))]
+    fn default_sha512_preimage_omits_algorithm_domain_for_legacy_stability() {
+        let preimage =
+            identity_hash_preimage(AvatarIdentityOptions::default(), b"alice@example.com");
+
+        assert!(
+            !preimage
+                .windows(HASH_DOMAIN_ALGORITHM_COMPONENT.len())
+                .any(|window| window == HASH_DOMAIN_ALGORITHM_COMPONENT)
+        );
+        assert!(
+            !preimage
+                .windows(ACTIVE_HASH_ALGORITHM_LABEL.len())
+                .any(|window| window == ACTIVE_HASH_ALGORITHM_LABEL)
+        );
+    }
+
+    #[test]
+    #[cfg(any(feature = "blake3", feature = "xxh3"))]
+    fn optional_hash_modes_add_algorithm_domain_to_preimage() {
+        let preimage =
+            identity_hash_preimage(AvatarIdentityOptions::default(), b"alice@example.com");
+
+        assert!(
+            preimage
+                .windows(HASH_DOMAIN_ALGORITHM_COMPONENT.len())
+                .any(|window| window == HASH_DOMAIN_ALGORITHM_COMPONENT)
+        );
+        assert!(
+            preimage
+                .windows(ACTIVE_HASH_ALGORITHM_LABEL.len())
+                .any(|window| window == ACTIVE_HASH_ALGORITHM_LABEL)
+        );
+    }
+
+    #[test]
+    fn oversized_identity_is_rejected_for_active_hash_mode() {
         let too_long = vec![b'a'; MAX_AVATAR_ID_BYTES + 1];
-        for &algorithm in AvatarHashAlgorithm::ALL {
-            let error = AvatarIdentity::new_with_options(
-                AvatarIdentityOptions::new(AvatarNamespace::default(), algorithm),
-                &too_long,
-            )
+        let error = AvatarIdentity::new_with_options(AvatarIdentityOptions::default(), &too_long)
             .expect_err("oversized identity should fail");
 
-            assert_eq!(error.component(), AvatarIdentityComponent::Input);
-            assert_eq!(error.length(), MAX_AVATAR_ID_BYTES + 1);
-            assert_eq!(error.max(), MAX_AVATAR_ID_BYTES);
-        }
-    }
-
-    #[test]
-    fn enabled_hash_algorithms_have_separate_identity_domains() {
-        for &left in AvatarHashAlgorithm::ALL {
-            for &right in AvatarHashAlgorithm::ALL {
-                if left == right {
-                    continue;
-                }
-
-                let left_identity = AvatarIdentity::new_with_options(
-                    AvatarIdentityOptions::new(AvatarNamespace::default(), left),
-                    "alice@example.com",
-                )
-                .expect("left identity should be valid");
-                let right_identity = AvatarIdentity::new_with_options(
-                    AvatarIdentityOptions::new(AvatarNamespace::default(), right),
-                    "alice@example.com",
-                )
-                .expect("right identity should be valid");
-
-                assert_ne!(
-                    left_identity.as_digest(),
-                    right_identity.as_digest(),
-                    "{left} and {right} must use separate domains"
-                );
-            }
-        }
+        assert_eq!(error.component(), AvatarIdentityComponent::Input);
+        assert_eq!(error.length(), MAX_AVATAR_ID_BYTES + 1);
+        assert_eq!(error.max(), MAX_AVATAR_ID_BYTES);
     }
 
     #[cfg(feature = "blake3")]
@@ -8711,7 +9983,7 @@ mod tests {
     fn blake3_identity_mode_renders_avatar() {
         let image = render_avatar_with_identity_options(
             valid_spec(96, 96, 0),
-            AvatarIdentityOptions::new(AvatarNamespace::default(), AvatarHashAlgorithm::Blake3),
+            AvatarIdentityOptions::new(AvatarNamespace::default()),
             "alice@example.com",
             AvatarOptions::new(AvatarKind::Robot, AvatarBackground::Themed),
         )
@@ -8726,7 +9998,7 @@ mod tests {
     fn xxh3_identity_mode_renders_avatar() {
         let image = render_avatar_with_identity_options(
             valid_spec(96, 96, 0),
-            AvatarIdentityOptions::new(AvatarNamespace::default(), AvatarHashAlgorithm::Xxh3_128),
+            AvatarIdentityOptions::new(AvatarNamespace::default()),
             "alice@example.com",
             AvatarOptions::new(AvatarKind::Robot, AvatarBackground::Themed),
         )
@@ -8743,7 +10015,7 @@ mod tests {
         let right =
             valid_identity_with_namespace(valid_namespace("tenant-b", "v2"), "alice@example.com");
 
-        assert_ne!(left.as_digest(), right.as_digest());
+        assert_ne!(left.digest, right.digest);
     }
 
     #[test]
@@ -8753,7 +10025,7 @@ mod tests {
         let right =
             valid_identity_with_namespace(valid_namespace("tenant", "v2\0v1"), "alice@example.com");
 
-        assert_ne!(left.as_digest(), right.as_digest());
+        assert_ne!(left.digest, right.digest);
     }
 
     #[test]
@@ -8826,6 +10098,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "png")]
     fn cat_avatar_png_export_round_trips() {
         let bytes = encode_cat_avatar(valid_spec(96, 96, 99), AvatarOutputFormat::Png)
             .expect("png encoding should succeed");
@@ -8837,6 +10110,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "jpeg")]
     fn cat_avatar_jpeg_export_round_trips() {
         let bytes = encode_cat_avatar(valid_spec(96, 96, 99), AvatarOutputFormat::Jpeg)
             .expect("jpeg encoding should succeed");
@@ -8848,6 +10122,39 @@ mod tests {
     }
 
     #[test]
+    #[cfg(not(feature = "png"))]
+    fn png_output_format_is_unavailable_without_feature() {
+        assert_eq!(
+            "png".parse::<AvatarOutputFormat>(),
+            Err("unsupported avatar output format")
+        );
+        assert!(
+            !AvatarOutputFormat::ALL
+                .iter()
+                .any(|format| format.as_str() == "png")
+        );
+    }
+
+    #[test]
+    #[cfg(not(feature = "jpeg"))]
+    fn jpeg_output_format_is_unavailable_without_feature() {
+        assert_eq!(
+            "jpg".parse::<AvatarOutputFormat>(),
+            Err("unsupported avatar output format")
+        );
+        assert_eq!(
+            "jpeg".parse::<AvatarOutputFormat>(),
+            Err("unsupported avatar output format")
+        );
+        assert!(
+            !AvatarOutputFormat::ALL
+                .iter()
+                .any(|format| format.as_str() == "jpg")
+        );
+    }
+
+    #[test]
+    #[cfg(feature = "gif")]
     fn cat_avatar_gif_export_round_trips() {
         let bytes = encode_cat_avatar(valid_spec(96, 96, 99), AvatarOutputFormat::Gif)
             .expect("gif encoding should succeed");
@@ -8859,6 +10166,21 @@ mod tests {
     }
 
     #[test]
+    #[cfg(not(feature = "gif"))]
+    fn gif_output_format_is_unavailable_without_feature() {
+        assert_eq!(
+            "gif".parse::<AvatarOutputFormat>(),
+            Err("unsupported avatar output format")
+        );
+        assert!(
+            !AvatarOutputFormat::ALL
+                .iter()
+                .any(|format| format.as_str() == "gif")
+        );
+    }
+
+    #[test]
+    #[cfg(feature = "jpeg")]
     fn jpeg_export_flattens_transparency_over_white() {
         let bytes = encode_avatar_for_id(
             valid_spec(96, 96, 0),
@@ -9010,6 +10332,102 @@ mod tests {
     }
 
     #[test]
+    fn svg_output_is_well_formed_xml_for_all_avatar_kinds() {
+        let spec = valid_spec(128, 128, 0);
+        let identities: [&[u8]; 4] = [
+            b"alice@example.com",
+            b"\0\0\0\0",
+            b"<not-svg attr=\"x\">&",
+            b"0123456789abcdef0123456789abcdef0123456789abcdef",
+        ];
+
+        for &kind in AvatarKind::ALL {
+            for &background in AvatarBackground::ALL {
+                for identity in identities {
+                    let svg = render_avatar_svg_for_id(
+                        spec,
+                        identity,
+                        AvatarOptions::new(kind, background),
+                    );
+                    assert_svg_is_well_formed(&svg);
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn styled_svg_output_is_well_formed_xml_for_all_layer_options() {
+        let spec = valid_spec(96, 96, 0);
+        let kinds = [AvatarKind::Robot, AvatarKind::Shield];
+
+        for &kind in &kinds {
+            for &accessory in AvatarAccessory::ALL {
+                let style = AvatarStyleOptions::new(
+                    kind,
+                    AvatarBackground::Themed,
+                    accessory,
+                    AvatarColor::Default,
+                    AvatarExpression::Default,
+                    AvatarShape::Square,
+                );
+                assert_svg_is_well_formed(&render_avatar_svg_style_for_id(
+                    spec,
+                    "accessory-xml@example.com",
+                    style,
+                ));
+            }
+
+            for &color in AvatarColor::ALL {
+                let style = AvatarStyleOptions::new(
+                    kind,
+                    AvatarBackground::Themed,
+                    AvatarAccessory::None,
+                    color,
+                    AvatarExpression::Default,
+                    AvatarShape::Square,
+                );
+                assert_svg_is_well_formed(&render_avatar_svg_style_for_id(
+                    spec,
+                    "color-xml@example.com",
+                    style,
+                ));
+            }
+
+            for &expression in AvatarExpression::ALL {
+                let style = AvatarStyleOptions::new(
+                    kind,
+                    AvatarBackground::Themed,
+                    AvatarAccessory::None,
+                    AvatarColor::Default,
+                    expression,
+                    AvatarShape::Square,
+                );
+                assert_svg_is_well_formed(&render_avatar_svg_style_for_id(
+                    spec,
+                    "expression-xml@example.com",
+                    style,
+                ));
+            }
+
+            for &shape in AvatarShape::ALL {
+                let style = AvatarStyleOptions::new(
+                    kind,
+                    AvatarBackground::Themed,
+                    AvatarAccessory::None,
+                    AvatarColor::Default,
+                    AvatarExpression::Default,
+                    shape,
+                );
+                assert_svg_is_well_formed(&render_avatar_svg_style_for_id(
+                    spec,
+                    "shape-xml@example.com",
+                    style,
+                ));
+            }
+        }
+    }
+
+    #[test]
     fn transparent_svg_output_has_no_background_rect() {
         let svg = render_avatar_svg_for_id(
             valid_spec(128, 128, 0),
@@ -9097,9 +10515,37 @@ mod tests {
         assert_eq!(
             kind_labels,
             [
-                "cat", "dog", "robot", "fox", "alien", "monster", "ghost", "slime", "bird",
-                "wizard", "skull", "paws", "planet", "rocket", "mushroom", "cactus", "frog",
-                "panda", "cupcake", "pizza", "icecream", "octopus", "knight",
+                "cat",
+                "dog",
+                "robot",
+                "fox",
+                "alien",
+                "monster",
+                "ghost",
+                "slime",
+                "bird",
+                "wizard",
+                "skull",
+                "paws",
+                "planet",
+                "rocket",
+                "mushroom",
+                "cactus",
+                "frog",
+                "panda",
+                "cupcake",
+                "pizza",
+                "icecream",
+                "octopus",
+                "knight",
+                "bear",
+                "penguin",
+                "dragon",
+                "ninja",
+                "astronaut",
+                "diamond",
+                "coffee-cup",
+                "shield",
             ]
         );
 
@@ -9116,7 +10562,18 @@ mod tests {
             .iter()
             .map(|format| format.as_str())
             .collect();
-        assert_eq!(format_labels, ["webp", "png", "jpg", "gif"]);
+        assert_eq!(
+            format_labels,
+            [
+                "webp",
+                #[cfg(feature = "png")]
+                "png",
+                #[cfg(feature = "jpeg")]
+                "jpg",
+                #[cfg(feature = "gif")]
+                "gif",
+            ]
+        );
 
         let accessory_labels: Vec<_> = AvatarAccessory::ALL
             .iter()
@@ -9208,14 +10665,6 @@ mod tests {
             AvatarOutputFormat::ALL[0]
         );
 
-        for (index, &algorithm) in AvatarHashAlgorithm::ALL.iter().enumerate() {
-            assert_eq!(AvatarHashAlgorithm::from_byte(index as u8), algorithm);
-        }
-        assert_eq!(
-            AvatarHashAlgorithm::from_byte(AvatarHashAlgorithm::ALL.len() as u8),
-            AvatarHashAlgorithm::ALL[0]
-        );
-
         for (index, &accessory) in AvatarAccessory::ALL.iter().enumerate() {
             assert_eq!(AvatarAccessory::from_byte(index as u8), accessory);
         }
@@ -9247,6 +10696,25 @@ mod tests {
             AvatarShape::from_byte(AvatarShape::ALL.len() as u8),
             AvatarShape::ALL[0]
         );
+    }
+
+    #[test]
+    #[cfg(feature = "gif")]
+    fn gif_variant_has_rustdoc_security_warning() {
+        let source = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/src/lib.rs"));
+        let variant_docs = source
+            .split("Gif,")
+            .next()
+            .and_then(|before_variant| before_variant.rsplit_once("/// Optional GIF output."))
+            .map(|(_, docs)| docs)
+            .expect("gif variant docs should be present");
+
+        assert!(variant_docs.contains("# Warning"));
+        assert!(variant_docs.contains("256-color quantization"));
+        assert!(variant_docs.contains("not zeroized"));
+        assert!(variant_docs.contains("high-assurance deployments"));
+        assert!(variant_docs.contains("AvatarOutputFormat::WebP"));
+        assert!(variant_docs.contains("PNG output"));
     }
 
     #[test]
@@ -9417,6 +10885,11 @@ mod tests {
             AvatarKind::Panda,
             AvatarKind::Octopus,
             AvatarKind::Knight,
+            AvatarKind::Bear,
+            AvatarKind::Penguin,
+            AvatarKind::Dragon,
+            AvatarKind::Ninja,
+            AvatarKind::Astronaut,
         ];
 
         for &kind in AvatarKind::ALL {
@@ -9625,6 +11098,53 @@ mod tests {
     }
 
     #[test]
+    fn render_resource_budget_makes_concurrency_memory_math_explicit() {
+        let spec = valid_spec(256, 128, 0);
+        let budget = spec.render_resource_budget(8);
+
+        assert_eq!(budget.spec(), spec);
+        assert_eq!(budget.concurrent_renders(), 8);
+        assert_eq!(budget.raw_rgba_bytes_per_render(), 256 * 128 * 4);
+        assert_eq!(
+            budget.raw_rgba_bytes_for_concurrent_renders(),
+            8 * 256 * 128 * 4
+        );
+        assert_eq!(
+            AvatarRenderResourceBudget::max_concurrent_renders_for_memory_budget(
+                spec,
+                16 * 256 * 128 * 4
+            ),
+            16
+        );
+    }
+
+    #[test]
+    fn render_resource_budget_saturates_concurrent_byte_estimates() {
+        let spec = valid_spec(MAX_AVATAR_DIMENSION, MAX_AVATAR_DIMENSION, 0);
+        let budget = spec.render_resource_budget(usize::MAX);
+
+        assert_eq!(budget.raw_rgba_bytes_for_concurrent_renders(), usize::MAX);
+        assert_eq!(
+            AvatarRenderResourceBudget::max_supported_raw_rgba_bytes_for_concurrent_renders(
+                usize::MAX
+            ),
+            usize::MAX
+        );
+    }
+
+    #[test]
+    fn avatar_spec_default_is_fixed_and_supported() {
+        let default = AvatarSpec::default();
+        let explicit = valid_spec(256, 256, 1);
+
+        assert_eq!(default, explicit);
+        assert!(default.is_supported());
+        assert_eq!(default.width(), 256);
+        assert_eq!(default.height(), 256);
+        assert_eq!(default.seed(), 1);
+    }
+
+    #[test]
     fn rect_edges_saturate_on_extreme_coordinates() {
         let rect = Rect {
             left: i32::MAX,
@@ -9635,6 +11155,25 @@ mod tests {
 
         assert_eq!(rect.right(), i32::MAX);
         assert_eq!(rect.bottom(), i32::MAX);
+    }
+
+    #[test]
+    fn rect_intersection_size_saturates_on_extreme_coordinates() {
+        let rect = Rect {
+            left: i32::MIN,
+            top: i32::MIN,
+            width: u32::MAX,
+            height: u32::MAX,
+        };
+
+        let intersection = rect
+            .intersect(rect)
+            .expect("extreme rectangles should intersect");
+
+        assert_eq!(intersection.left(), i32::MIN);
+        assert_eq!(intersection.top(), i32::MIN);
+        assert_eq!(intersection.width(), i32::MAX as u32);
+        assert_eq!(intersection.height(), i32::MAX as u32);
     }
 
     #[test]
@@ -9683,6 +11222,20 @@ mod tests {
     }
 
     #[test]
+    fn polygon_rasterizer_skips_zero_sized_images() {
+        let mut zero_width = RgbaImage::new(0, 8);
+        let mut zero_height = RgbaImage::new(8, 0);
+        let color = Rgba([255, 0, 0, 255]);
+        let poly = [Point::new(0, 0), Point::new(4, 0), Point::new(0, 4)];
+
+        draw_polygon_mut(&mut zero_width, &poly, color);
+        draw_polygon_mut(&mut zero_height, &poly, color);
+
+        assert!(zero_width.is_empty());
+        assert!(zero_height.is_empty());
+    }
+
+    #[test]
     fn ellipse_rasterizer_handles_max_supported_radius() {
         let mut image = RgbaImage::new(1, 1);
         let mut render_calls = 0;
@@ -9724,6 +11277,23 @@ mod tests {
                 10, 20, 30,
             ]
         );
+    }
+
+    #[test]
+    fn rgba_pixel_zeroizer_scrubs_owned_render_buffers() {
+        let mut image = RgbaImage::from_vec(
+            2,
+            1,
+            vec![
+                10, 20, 30, 255, // opaque pixel
+                40, 50, 60, 128, // translucent pixel
+            ],
+        )
+        .expect("test image should be valid");
+
+        zeroize_rgba_pixels(&mut image);
+
+        assert!(image.as_raw().iter().all(|byte| *byte == 0));
     }
 
     #[test]
@@ -9816,6 +11386,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(not(any(feature = "blake3", feature = "xxh3")))]
     fn visual_fingerprints_are_stable() {
         for (label, options) in regression_scenarios() {
             let image =
@@ -9849,6 +11420,7 @@ mod tests {
 
     #[ignore]
     #[test]
+    #[cfg(not(any(feature = "blake3", feature = "xxh3")))]
     fn print_visual_fingerprints() {
         for (label, options) in [
             (
@@ -9939,6 +11511,38 @@ mod tests {
                 "knight-themed",
                 AvatarOptions::new(AvatarKind::Knight, AvatarBackground::Themed),
             ),
+            (
+                "bear-themed",
+                AvatarOptions::new(AvatarKind::Bear, AvatarBackground::Themed),
+            ),
+            (
+                "penguin-themed",
+                AvatarOptions::new(AvatarKind::Penguin, AvatarBackground::Themed),
+            ),
+            (
+                "dragon-themed",
+                AvatarOptions::new(AvatarKind::Dragon, AvatarBackground::Themed),
+            ),
+            (
+                "ninja-themed",
+                AvatarOptions::new(AvatarKind::Ninja, AvatarBackground::Themed),
+            ),
+            (
+                "astronaut-themed",
+                AvatarOptions::new(AvatarKind::Astronaut, AvatarBackground::Themed),
+            ),
+            (
+                "diamond-themed",
+                AvatarOptions::new(AvatarKind::Diamond, AvatarBackground::Themed),
+            ),
+            (
+                "coffee-cup-themed",
+                AvatarOptions::new(AvatarKind::CoffeeCup, AvatarBackground::Themed),
+            ),
+            (
+                "shield-themed",
+                AvatarOptions::new(AvatarKind::Shield, AvatarBackground::Themed),
+            ),
         ] {
             let image =
                 render_avatar_for_id(valid_spec(128, 128, 0), "snapshot@example.com", options);
@@ -9957,7 +11561,8 @@ mod tests {
         println!("auto-layered: {}", image_fingerprint(&auto));
     }
 
-    fn regression_scenarios() -> [(&'static str, AvatarOptions); 22] {
+    #[cfg(not(any(feature = "blake3", feature = "xxh3")))]
+    fn regression_scenarios() -> [(&'static str, AvatarOptions); 30] {
         [
             (
                 "cat-themed",
@@ -10047,9 +11652,42 @@ mod tests {
                 "knight-themed",
                 AvatarOptions::new(AvatarKind::Knight, AvatarBackground::Themed),
             ),
+            (
+                "bear-themed",
+                AvatarOptions::new(AvatarKind::Bear, AvatarBackground::Themed),
+            ),
+            (
+                "penguin-themed",
+                AvatarOptions::new(AvatarKind::Penguin, AvatarBackground::Themed),
+            ),
+            (
+                "dragon-themed",
+                AvatarOptions::new(AvatarKind::Dragon, AvatarBackground::Themed),
+            ),
+            (
+                "ninja-themed",
+                AvatarOptions::new(AvatarKind::Ninja, AvatarBackground::Themed),
+            ),
+            (
+                "astronaut-themed",
+                AvatarOptions::new(AvatarKind::Astronaut, AvatarBackground::Themed),
+            ),
+            (
+                "diamond-themed",
+                AvatarOptions::new(AvatarKind::Diamond, AvatarBackground::Themed),
+            ),
+            (
+                "coffee-cup-themed",
+                AvatarOptions::new(AvatarKind::CoffeeCup, AvatarBackground::Themed),
+            ),
+            (
+                "shield-themed",
+                AvatarOptions::new(AvatarKind::Shield, AvatarBackground::Themed),
+            ),
         ]
     }
 
+    #[cfg(not(any(feature = "blake3", feature = "xxh3")))]
     fn style_regression_scenarios() -> [(&'static str, AvatarStyleOptions); 4] {
         [
             (
@@ -10099,6 +11737,7 @@ mod tests {
         ]
     }
 
+    #[cfg(not(any(feature = "blake3", feature = "xxh3")))]
     fn regression_fingerprint_for(label: &str) -> Option<&'static str> {
         include_str!("../tests/golden_fingerprints.txt")
             .lines()
@@ -10110,7 +11749,7 @@ mod tests {
     }
 
     fn image_fingerprint(image: &RgbaImage) -> String {
-        let digest = Sha512::digest(image.as_raw());
+        let digest = <TestSha512 as sha2::Digest>::digest(image.as_raw());
         digest[..12]
             .iter()
             .map(|byte| format!("{byte:02x}"))

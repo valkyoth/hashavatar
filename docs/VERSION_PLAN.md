@@ -33,35 +33,23 @@ the stable default.
 
 ### Scope
 
-- Add an `AvatarHashAlgorithm` enum.
-- Add an `AvatarIdentityOptions` or equivalent options type.
-- Keep `Sha512` as the default hash algorithm.
+- Keep SHA-512 as the default crate-wide identity hash mode.
 - Add optional `BLAKE3` support behind an explicit Cargo feature.
 - Add optional `XXH3-128` support behind an explicit Cargo feature.
-- Include the selected algorithm in the length-prefixed hash domain input.
-- Preserve existing default SHA-512 output unless the caller opts into another
-  algorithm.
+- Keep optional hash modes mutually exclusive so feature unification cannot
+  silently mix identity derivation algorithms.
+- Include the active non-default hash mode in the length-prefixed hash domain
+  input.
+- Preserve existing default SHA-512 output unless the crate is built with a
+  different hash-mode feature.
 - Document that `XXH3-128` is non-cryptographic and intended only for
   non-adversarial identity distribution.
 
-### Candidate API Shape
+### API Shape
 
-```rust
-pub enum AvatarHashAlgorithm {
-    Sha512,
-    Blake3,
-    Xxh3_128,
-}
-
-pub struct AvatarIdentityOptions {
-    pub namespace: AvatarNamespace<'static>,
-    pub algorithm: AvatarHashAlgorithm,
-}
-```
-
-The exact lifetime/API shape can change during implementation. The important
-contract is that algorithm choice is explicit, typed, and included in the
-deterministic identity input.
+Hash choice is not a runtime public API. `AvatarIdentityOptions` carries
+namespace configuration only; the active identity hash is selected for the
+whole crate by Cargo features.
 
 ### Dependency Policy
 
@@ -88,11 +76,11 @@ deterministic identity input.
 
 - Default SHA-512 fingerprints are unchanged from `0.6.0`.
 - BLAKE3 and XXH3 identity modes have dedicated tests.
-- Oversized identity and namespace inputs are rejected for every algorithm.
-- Algorithm separation tests prove the same identity does not collide across
-  algorithm domains.
+- Oversized identity and namespace inputs are rejected for the active hash mode.
+- Optional hash-mode tests prove non-default modes add an explicit algorithm
+  domain component.
 - README, release notes, dependency docs, and security controls document the
-  default and optional hash algorithms.
+  default and optional crate-wide hash modes.
 - `scripts/stable_release_gate.sh check` passes.
 - crates.io publish dry run passes.
 
@@ -108,7 +96,7 @@ concerns internally so later visual-layer work can stay organized.
 - Identify the minimum deterministic core:
   - validated avatar specs
   - identity and namespace validation
-  - hash algorithm selection
+  - crate-wide hash mode
   - avatar genome derivation
   - geometry/layout primitives
   - color values
@@ -148,8 +136,8 @@ concerns internally so later visual-layer work can stay organized.
 
 - Public enum variant lists use `ALL` slices rather than array constants with
   duplicated lengths.
-- `from_byte` helpers derive variants from `ALL.len()` for hash algorithms,
-  avatar kinds, backgrounds, and output formats.
+- `from_byte` helpers derive variants from `ALL.len()` for avatar kinds,
+  backgrounds, and output formats.
 - Tests cover parser/display drift and byte-to-variant behavior for public
   enums.
 - Raster and SVG rendering now share an internal render plan before output
@@ -370,6 +358,9 @@ than merely supported by the API.
 
 ## 0.12.0: Variant Expansion
 
+Status: implemented in `0.12.0` for the accepted avatar-family set.
+Candidate background variants remain deferred.
+
 Goal: broaden the built-in avatar and background catalog once the visual layer
 model is in place and tested.
 
@@ -378,25 +369,25 @@ model is in place and tested.
 - Add new `AvatarKind` families where they can be rendered with the same
   deterministic, asset-free approach as the existing variants.
 - Candidate animal variants:
-  - `Bear`
-  - `Monkey`
-  - `Penguin`
+  - `Bear` (accepted)
+  - `Monkey` (deferred)
+  - `Penguin` (accepted)
   - `Dinosaur`
   - `Unicorn`
   - `Bat`
   - `Turtle`
 - Candidate fantasy and sci-fi variants:
-  - `Dragon`
-  - `Ninja`
+  - `Dragon` (accepted)
+  - `Ninja` (accepted)
   - `Vampire`
   - `Cyborg`
-  - `Astronaut`
+  - `Astronaut` (accepted)
 - Candidate object variants:
-  - `Diamond`
+  - `Diamond` (accepted)
   - `Gemstone`
-  - `CoffeeCup`
+  - `CoffeeCup` (accepted)
   - `Sword`
-  - `Shield`
+  - `Shield` (accepted)
   - `Crown`
 - Add new `AvatarBackground` modes where they do not require external assets
   or unbounded procedural work.
@@ -414,6 +405,12 @@ model is in place and tested.
   - `Starry`
   - `Pixel`
   - `Cloudy`
+
+Accepted `0.12.0` families are `Bear`, `Penguin`, `Dragon`, `Ninja`,
+`Astronaut`, `Diamond`, `CoffeeCup`, and `Shield`. Pattern, gradient, and
+environment backgrounds are deferred because they need a separate bounded
+raster/SVG texture implementation and contrast review before they are safe
+public API.
 
 ### Admission Policy
 

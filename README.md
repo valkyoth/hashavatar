@@ -6,7 +6,7 @@ The crate starts conservative: validated avatar dimensions, bounded identity inp
 
 ## Current Status
 
-The current crate version is `0.11.0`.
+The current crate version is `0.12.0`.
 
 Implemented now:
 
@@ -22,16 +22,15 @@ Implemented now:
   background, accessory, color, expression, and shape.
 - Namespace-aware identity derivation for tenant isolation and visual rollouts.
 - Length-prefixed hash components to avoid delimiter ambiguity.
-- Avatar families through `AvatarKind`: `cat`, `dog`, `robot`, `fox`,
-  `alien`, `monster`, `ghost`, `slime`, `bird`, `wizard`, `skull`, `paws`,
-  `planet`, `rocket`, `mushroom`, `cactus`, `frog`, `panda`, `cupcake`,
-  `pizza`, `icecream`, `octopus`, and `knight`.
+- Avatar families through `AvatarKind`: animals, characters, fantasy/sci-fi
+  faces, playful objects, and symbols. Current labels are listed in the public
+  option catalog below.
 - Background modes through `AvatarBackground`: `themed`, `white`, `black`,
   `dark`, `light`, and `transparent`.
 - Visual layers through `AvatarAccessory`, `AvatarColor`,
   `AvatarExpression`, and `AvatarShape`.
-- In-memory `WebP`, `PNG`, `JPEG`, and `GIF` encoding through
-  `AvatarOutputFormat`.
+- In-memory `WebP` encoding through `AvatarOutputFormat`; `PNG`, `JPEG`, and
+  single-frame `GIF` export are explicit opt-in features.
 - Compact SVG string rendering.
 - Typed errors for invalid dimensions and oversized identity inputs.
 - Private `AvatarSpec` fields so dimensions must pass construction-time validation.
@@ -54,7 +53,7 @@ Planned or intentionally external:
 | License | `MIT OR Apache-2.0` |
 | MSRV | Rust `1.95.0` |
 | Crate shape | Library only |
-| Runtime dependencies | `image`, `palette`, `rand`, `sha2`, `subtle`, `zeroize`; optional `blake3`, `xxhash-rust` |
+| Runtime dependencies | `image`, `palette`, `rand`, `sha2`, `subtle`, `zeroize`; optional `blake3`, `xxhash-rust`, `image/png`, `image/jpeg`, `image/gif` |
 | Unsafe policy | `#![forbid(unsafe_code)]` |
 | Filesystem policy | No public path-writing APIs |
 | Dimension limits | `64..=2048` pixels per side |
@@ -75,15 +74,32 @@ future release has a concrete image-generation reason to split it.
 
 ```toml
 [dependencies]
-hashavatar = "0.11.0"
+hashavatar = "0.12.0"
 ```
 
-Optional identity hash algorithms are disabled by default:
+Optional identity hash modes and extra raster encoders are disabled by default.
+Hash modes are mutually exclusive, so enable at most one of `blake3` or `xxh3`:
 
 ```toml
 [dependencies]
-hashavatar = { version = "0.11.0", features = ["blake3", "xxh3"] }
+hashavatar = { version = "0.12.0", features = ["blake3"] }
 ```
+
+Enable additional raster formats explicitly:
+
+```toml
+[dependencies]
+hashavatar = { version = "0.12.0", features = ["png", "jpeg", "gif"] }
+```
+
+Or enable every optional raster encoder at once:
+
+```toml
+[dependencies]
+hashavatar = { version = "0.12.0", features = ["all-formats"] }
+```
+
+Combine these as needed, for example `features = ["blake3", "png"]`.
 
 For a local checkout:
 
@@ -112,6 +128,11 @@ license = "MIT OR Apache-2.0"
 
 These limits are enforced by constructors and render entry points. They are intended to make the safe path the normal path for public web endpoints.
 
+`AvatarSpec::default()` is a fixed deterministic convenience value:
+`256x256` with seed `1`. Public services should normally construct
+`AvatarSpec` from validated request parameters with `AvatarSpec::new(...)`
+rather than treating `Default` as a production policy or source of randomness.
+
 ## Public Option Catalog
 
 All public option enums expose an `ALL` slice, `from_byte`, `as_str`,
@@ -121,13 +142,13 @@ in caller code.
 
 | Enum | Controls | Values |
 | --- | --- | --- |
-| `AvatarKind` | Base avatar family | `cat`, `dog`, `robot`, `fox`, `alien`, `monster`, `ghost`, `slime`, `bird`, `wizard`, `skull`, `paws`, `planet`, `rocket`, `mushroom`, `cactus`, `frog`, `panda`, `cupcake`, `pizza`, `icecream`, `octopus`, `knight` |
+| `AvatarKind` | Base avatar family | `cat`, `dog`, `robot`, `fox`, `alien`, `monster`, `ghost`, `slime`, `bird`, `wizard`, `skull`, `paws`, `planet`, `rocket`, `mushroom`, `cactus`, `frog`, `panda`, `cupcake`, `pizza`, `icecream`, `octopus`, `knight`, `bear`, `penguin`, `dragon`, `ninja`, `astronaut`, `diamond`, `coffee-cup`, `shield` |
 | `AvatarBackground` | Canvas/background treatment | `themed`, `white`, `black`, `dark`, `light`, `transparent` |
 | `AvatarAccessory` | Optional accessory layer | `none`, `glasses`, `hat`, `headphones`, `crown`, `bowtie`, `eyepatch`, `scarf`, `halo`, `horns` |
 | `AvatarColor` | Optional accent palette | `default`, `neon-mint`, `pastel-pink`, `crimson`, `gold`, `deep-sea-blue` |
 | `AvatarExpression` | Optional expression overlay | `default`, `happy`, `grumpy`, `surprised`, `sleepy`, `winking`, `cool`, `crying` |
 | `AvatarShape` | Optional frame shape | `square`, `circle`, `squircle`, `hexagon`, `octagon` |
-| `AvatarOutputFormat` | Raster encoding format | `webp`, `png`, `jpg`, `gif` |
+| `AvatarOutputFormat` | Raster encoding format | `webp`; optional `png`, `jpg`, and `gif` with matching Cargo features |
 
 `AvatarOptions` is the stable baseline option type for callers that only need
 `kind` and `background`. `AvatarStyleOptions` carries the full visual style
@@ -142,10 +163,11 @@ facewear.
 Accessories and expressions require face anchors. These families currently have
 calibrated face-layer anchors: `cat`, `dog`, `robot`, `fox`, `alien`,
 `monster`, `ghost`, `slime`, `bird`, `wizard`, `skull`, `frog`, `panda`,
-`octopus`, and `knight`. Non-face families such as `paws`, `planet`, and
-`rocket` skip accessory/expression layers deterministically instead of placing
-them at arbitrary canvas coordinates. Accent colors and frame shapes are
-canvas-level layers and still apply.
+`octopus`, `knight`, `bear`, `penguin`, `dragon`, `ninja`, and `astronaut`.
+Non-face families such as `paws`, `planet`, `rocket`, `diamond`,
+`coffee-cup`, and `shield` skip accessory/expression layers deterministically
+instead of placing them at arbitrary canvas coordinates. Accent colors and
+frame shapes are canvas-level layers and still apply.
 
 Use `AvatarKind::supports_face_layers()` when mapping public endpoint query
 parameters. If it returns `false`, requested accessories and expressions are
@@ -248,7 +270,7 @@ let bytes = encode_avatar_for_namespace(
     spec,
     namespace,
     "user-123",
-    AvatarOutputFormat::Png,
+    AvatarOutputFormat::WebP,
     AvatarOptions::new(AvatarKind::Cat, AvatarBackground::Themed),
 )?;
 
@@ -341,59 +363,38 @@ want multiple accessory concepts should model that at the product layer for now
 and choose the single most important `AvatarAccessory` before calling this
 crate.
 
-## Example: Optional Hash Algorithm
+## Identity Hash Mode
 
-```rust
-use hashavatar::{
-    AvatarBackground, AvatarHashAlgorithm, AvatarIdentityOptions, AvatarKind,
-    AvatarNamespace, AvatarOptions, AvatarSpec, render_avatar_with_identity_options,
-};
+The default build uses SHA-512 identity derivation. Optional hash modes are
+crate-wide Cargo feature choices, not runtime API choices:
 
-let namespace = AvatarNamespace::new("customer-a", "v3")?;
-let identity_options = AvatarIdentityOptions::new(
-    namespace,
-    AvatarHashAlgorithm::Sha512,
-);
-let spec = AvatarSpec::new(128, 128, 0)?;
+- Default features: SHA-512.
+- `blake3`: BLAKE3.
+- `xxh3`: XXH3-128.
 
-let image = render_avatar_with_identity_options(
-    spec,
-    identity_options,
-    "user-123",
-    AvatarOptions::new(AvatarKind::Robot, AvatarBackground::Themed),
-)?;
-
-assert_eq!(image.width(), 128);
-
-# Ok::<(), Box<dyn std::error::Error>>(())
-```
-
-`AvatarHashAlgorithm::Sha512` is always available and is the security-sensitive
-default. `AvatarHashAlgorithm::Blake3` is available with the `blake3` feature.
-`AvatarHashAlgorithm::Xxh3_128` is available with the `xxh3` feature and is
-non-cryptographic. Do not use XXH3-128 for adversarial or user-controlled
-identifiers unless the application first maps those identifiers through its own
-cryptographic boundary.
+The `blake3` and `xxh3` features are mutually exclusive. Enabling both is a
+compile-time error. Changing hash mode changes generated identities, so bump
+your namespace style version when intentionally migrating output.
 
 ### BLAKE3 Feature Example
 
 ```toml
 [dependencies]
-hashavatar = { version = "0.11.0", features = ["blake3"] }
+hashavatar = { version = "0.12.0", features = ["blake3"] }
 ```
 
 ```rust
 use hashavatar::{
-    AvatarBackground, AvatarHashAlgorithm, AvatarIdentityOptions, AvatarKind,
-    AvatarNamespace, AvatarOptions, AvatarSpec, render_avatar_svg_with_identity_options,
+    AvatarBackground, AvatarKind, AvatarNamespace, AvatarOptions, AvatarSpec,
+    render_avatar_svg_for_namespace,
 };
 
 let namespace = AvatarNamespace::new("customer-a", "v3")?;
 let spec = AvatarSpec::new(256, 256, 0)?;
 
-let svg = render_avatar_svg_with_identity_options(
+let svg = render_avatar_svg_for_namespace(
     spec,
-    AvatarIdentityOptions::new(namespace, AvatarHashAlgorithm::Blake3),
+    namespace,
     "user-123",
     AvatarOptions::new(AvatarKind::Alien, AvatarBackground::Themed),
 )?;
@@ -407,22 +408,21 @@ assert!(svg.contains("alien avatar"));
 
 ```toml
 [dependencies]
-hashavatar = { version = "0.11.0", features = ["xxh3"] }
+hashavatar = { version = "0.12.0", features = ["xxh3"] }
 ```
 
 ```rust
 use hashavatar::{
-    AvatarBackground, AvatarHashAlgorithm, AvatarIdentityOptions, AvatarKind,
-    AvatarNamespace, AvatarOptions, AvatarOutputFormat, AvatarSpec,
-    encode_avatar_with_identity_options,
+    AvatarBackground, AvatarKind, AvatarNamespace, AvatarOptions,
+    AvatarOutputFormat, AvatarSpec, encode_avatar_for_namespace,
 };
 
 let namespace = AvatarNamespace::new("public-demo", "v3")?;
 let spec = AvatarSpec::new(256, 256, 0)?;
 
-let bytes = encode_avatar_with_identity_options(
+let bytes = encode_avatar_for_namespace(
     spec,
-    AvatarIdentityOptions::new(namespace, AvatarHashAlgorithm::Xxh3_128),
+    namespace,
     "demo-user-123",
     AvatarOutputFormat::WebP,
     AvatarOptions::new(AvatarKind::Robot, AvatarBackground::Themed),
@@ -527,13 +527,18 @@ a semaphore around render work:
 use std::sync::Arc;
 
 use hashavatar::{
-    AvatarBackground, AvatarKind, AvatarOptions, AvatarSpec, MAX_AVATAR_RGBA_BYTES,
+    AvatarBackground, AvatarKind, AvatarOptions, AvatarRenderResourceBudget, AvatarSpec,
     render_avatar_for_id,
 };
 use tokio::sync::Semaphore;
 
 fn render_permits_for_budget(memory_budget_bytes: usize) -> usize {
-    (memory_budget_bytes / MAX_AVATAR_RGBA_BYTES).max(1)
+    let max_spec = AvatarSpec::new(2048, 2048, 0).expect("maximum avatar spec is valid");
+    AvatarRenderResourceBudget::max_concurrent_renders_for_memory_budget(
+        max_spec,
+        memory_budget_bytes,
+    )
+    .max(1)
 }
 
 async fn render_with_limit(
@@ -541,11 +546,20 @@ async fn render_with_limit(
     id: &str,
     requested_size: u32,
 ) -> Result<image::RgbaImage, Box<dyn std::error::Error>> {
-    let _permit = semaphore.acquire().await?;
     let spec = AvatarSpec::new(requested_size, requested_size, 0)?;
+    let budget = spec.render_resource_budget(1);
+    if budget.raw_rgba_bytes_per_render() > memory_budget_bytes_for_one_request() {
+        return Err("requested avatar exceeds per-request render budget".into());
+    }
+
+    let _permit = semaphore.acquire().await?;
     let options = AvatarOptions::new(AvatarKind::Cat, AvatarBackground::Transparent);
 
     Ok(render_avatar_for_id(spec, id, options)?)
+}
+
+fn memory_budget_bytes_for_one_request() -> usize {
+    32 * 1024 * 1024
 }
 ```
 
@@ -558,9 +572,11 @@ accounts for all concurrent requests.
 Important public entry points:
 
 - `AvatarSpec::new(width, height, seed) -> Result<AvatarSpec, AvatarSpecError>`
+- `AvatarSpec::render_resource_budget(concurrent_renders) -> AvatarRenderResourceBudget`
+- `AvatarRenderResourceBudget::max_concurrent_renders_for_memory_budget(spec, memory_budget_bytes) -> usize`
 - `AvatarIdentity::new(input) -> Result<AvatarIdentity, AvatarIdentityError>`
 - `AvatarIdentity::new_with_options(options, input) -> Result<AvatarIdentity, AvatarIdentityError>`
-- `AvatarIdentityOptions::new(namespace, algorithm)`
+- `AvatarIdentityOptions::new(namespace)`
 - `AvatarNamespace::new(tenant, style_version) -> Result<AvatarNamespace, AvatarIdentityError>`
 - `AvatarOptions::new(kind, background)`
 - `AvatarKind::supports_face_layers()`
@@ -587,10 +603,10 @@ Lower-level identity-specific renderers are available for callers that want dire
 
 | Format | API value | Notes |
 | --- | --- | --- |
-| WebP | `AvatarOutputFormat::WebP` | Recommended default for modern web delivery. |
-| PNG | `AvatarOutputFormat::Png` | Lossless and broadly compatible. |
-| JPEG | `AvatarOutputFormat::Jpeg` | Transparent pixels are composited over white. |
-| GIF | `AvatarOutputFormat::Gif` | Legacy-compatible single-frame output. |
+| WebP | `AvatarOutputFormat::WebP` | Default encoder and recommended format for modern web delivery. |
+| PNG | `AvatarOutputFormat::Png` | Optional `png` feature. Lossless and broadly compatible. |
+| JPEG | `AvatarOutputFormat::Jpeg` | Optional `jpeg` feature. Transparent pixels are composited over white. |
+| GIF | `AvatarOutputFormat::Gif` | Optional `gif` feature. Legacy-compatible single-frame output; the encoder performs internal quantization buffers that `hashavatar` cannot zeroize, so prefer WebP or PNG for high-assurance deployments. |
 | SVG | `render_avatar_svg_*` | Returns a string rather than raster bytes. |
 
 AVIF and JPEG XL are not exposed because they add dependency or encoder maturity tradeoffs that have not cleared the crate's dependency policy.
@@ -600,17 +616,21 @@ AVIF and JPEG XL are not exposed because they add dependency or encoder maturity
 The output is deterministic for the tuple:
 
 ```text
-identity hash algorithm + namespace tenant + namespace style version + identity bytes + avatar kind + background + dimensions + seed
+crate identity hash mode + namespace tenant + namespace style version + identity bytes + avatar kind + background + dimensions + seed
 ```
 
-This makes the crate suitable for stable CDN-backed avatar URLs and golden regression tests. Namespace hashing uses length-prefixed components, so embedded separator bytes cannot create tenant/style-version ambiguity. The default SHA-512 path keeps the pre-0.7 identity preimage stable; non-default algorithms are domain-separated.
+This makes the crate suitable for stable CDN-backed avatar URLs and golden regression tests. Namespace hashing uses length-prefixed components, so embedded separator bytes cannot create tenant/style-version ambiguity. The default SHA-512 path keeps the pre-0.7 identity preimage stable; optional crate-wide hash modes are domain-separated.
 
 For style-aware rendering, the deterministic tuple also includes
 `accessory`, `color`, `expression`, and `shape`. Existing `AvatarOptions`
 entry points keep those extra layer choices at `none`, `default`, `default`,
-and `square`, so their default visual output remains unchanged in `0.11.0`.
-Some family/layer combinations are deterministic no-ops when the layer has no
-sensible anchor for that family.
+and `square`, so explicitly selected `AvatarOptions` output remains stable
+unless the selected family renderer changes. `0.12.0` adds new `AvatarKind`
+values, so automatic style derivation can map some identities to different
+families than `0.11.0`; services that need the old automatic distribution
+should keep their existing namespace style version until they intentionally
+migrate. Some family/layer combinations are deterministic no-ops when the
+layer has no sensible anchor for that family.
 
 Frame shapes are applied as masks in raster output and as SVG clip paths in SVG
 output. Non-square shapes therefore trim the background, avatar body, color

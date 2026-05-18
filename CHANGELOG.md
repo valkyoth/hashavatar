@@ -1,5 +1,64 @@
 # Changelog
 
+## 0.12.0
+
+- Bumped the crate to `0.12.0`.
+- Added eight built-in avatar families: `bear`, `penguin`, `dragon`,
+  `ninja`, `astronaut`, `diamond`, `coffee-cup`, and `shield`.
+- Implemented each new family in both raster and SVG rendering paths.
+- Added face-layer anchor coverage for `bear`, `penguin`, `dragon`, `ninja`,
+  and `astronaut`.
+- Kept object/symbol families such as `diamond`, `coffee-cup`, and `shield`
+  as deterministic no-ops for accessories and expressions.
+- Updated enum drift tests, parser/display coverage, golden visual
+  fingerprints, README catalog, and release notes for the expanded family list.
+- Documented that automatic style derivation can map some identities to
+  different families because `AvatarKind::ALL` now contains more variants.
+- Removed the public `AvatarIdentity::seed()` helper and made the internal
+  256-bit RNG seed helper private so callers do not accidentally depend on raw
+  digest-derived seed material.
+- Removed the public `AvatarIdentity::as_digest()` helper so normal rendering
+  callers cannot copy or log full identity digests through the public API.
+- Added a regression test and documentation that lock `AvatarSpec::default()`
+  to the deterministic `256x256` seed-`1` convenience spec.
+- Removed ad-hoc SVG string minification and added parser-backed SVG
+  well-formedness coverage across avatar families, visual layers, representative
+  identities, and the fuzz harness.
+- Added `AvatarRenderResourceBudget` and `AvatarSpec::render_resource_budget`
+  so service integrations can size render concurrency limits from API-visible
+  memory estimates instead of only README prose.
+- Hardened polygon scanline interpolation against debug-build integer overflow
+  and added a dedicated fuzz target for arbitrary polygon rasterizer inputs.
+- Removed runtime identity hash algorithm selection. SHA-512 remains the
+  default crate-wide mode, while `blake3` and `xxh3` select mutually exclusive
+  crate-wide optional modes.
+- Replaced derived `AvatarIdentity` debug formatting with a redacted
+  implementation so accidental `{:?}` logging does not expose identity digests.
+- Added rustdoc and security-control guidance that `AvatarIdentity` clones are
+  independently zeroized on drop, but high-assurance callers should keep clone
+  lifetimes short to limit extra live digest copies.
+- Enabled upstream hasher-state zeroization features for SHA-512 and BLAKE3,
+  and explicitly zeroized BLAKE3 hasher/XOF reader state after digest
+  derivation.
+- Wrapped digest-derived renderer RNG seed copies in `zeroize::Zeroizing` so
+  the temporary mixed seed is scrubbed after RNG initialization.
+- Wrapped owned RGBA encode buffers and JPEG RGB flattening buffers in RAII
+  zeroization guards so temporary pixel data is scrubbed during normal returns,
+  encoder errors, and unwinding panics.
+- Added a zero-dimension guard to polygon rasterization so fuzz-only zero-width
+  or zero-height image inputs return cleanly instead of panicking.
+- Moved PNG, JPEG, and GIF output behind explicit `png`, `jpeg`, and `gif`
+  Cargo features, leaving WebP as the only default raster encoder.
+- Added rustdoc plus security documentation warning that `image`'s internal GIF
+  quantization buffers are not zeroized by `hashavatar`.
+- Hardened rectangle intersection size calculation with saturating arithmetic
+  for extreme internal coordinate ranges.
+- Added a compile-time guard so the internal `fuzzing` feature cannot be used
+  in ordinary non-fuzzing release builds.
+- Documented that XXH3-128 is non-cryptographic and must not be used with
+  adversarial, user-controlled, or sensitive identifiers unless the application
+  first maps those identifiers through its own cryptographic boundary.
+
 ## 0.11.0
 
 - Bumped the crate to `0.11.0`.

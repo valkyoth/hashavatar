@@ -1,9 +1,9 @@
 [package]
 name = "hashavatar"
-version = "0.11.0"
+version = "0.12.0"
 edition = "2024"
 rust-version = "1.95"
-description = "Deterministic procedural avatars in Rust with configurable identity hashing and WebP, PNG, JPEG, GIF, and SVG export"
+description = "Deterministic procedural avatars in Rust with configurable identity hashing and WebP, optional PNG/JPEG/GIF, and SVG export"
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/valkyoth/hashavatar"
 homepage = "https://github.com/valkyoth/hashavatar"
@@ -13,17 +13,28 @@ keywords = ["avatar", "identicon", "procedural", "webp", "svg"]
 categories = ["multimedia::images", "graphics"]
 exclude = ["Screenshot_*.png", "fuzz/**", "target/**"]
 
+[lints.rust]
+unexpected_cfgs = { level = "warn", check-cfg = ["cfg(fuzzing)"] }
+
 [dependencies]
-blake3 = { version = "1.8.5", default-features = true, optional = true }
-image = { version = "0.25.10", default-features = false, features = ["gif", "jpeg", "png", "webp"] }
+blake3 = { version = "1.8.5", default-features = true, features = ["zeroize"], optional = true }
+image = { version = "0.25.10", default-features = false, features = ["webp"] }
 palette = { version = "0.7.6", default-features = false, features = ["std"] }
 rand = { version = "0.10.1", default-features = false, features = ["std", "std_rng"] }
-sha2 = { version = "0.11.0", default-features = false, features = ["alloc"] }
+sha2 = { version = "0.11.0", default-features = false, features = ["alloc", "zeroize"] }
 subtle = { version = "2.6.1", default-features = false }
 xxhash-rust = { version = "0.8.15", default-features = false, features = ["xxh3"], optional = true }
 zeroize = { version = "1.8.2", default-features = false, features = ["alloc"] }
 
+[dev-dependencies]
+roxmltree = "0.21.1"
+
 [features]
 default = []
+all-formats = ["png", "jpeg", "gif"]
 blake3 = ["dep:blake3"]
+fuzzing = []
+gif = ["image/gif"]
+jpeg = ["image/jpeg"]
+png = ["image/png"]
 xxh3 = ["dep:xxhash-rust"]

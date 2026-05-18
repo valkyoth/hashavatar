@@ -26,6 +26,8 @@ fuzz_target!(|data: &[u8]| {
     };
     let style = AvatarStyleOptions::new(kind, background, accessory, color, expression, shape);
 
-    let _ = render_avatar_svg_style_for_id(spec, identity, style);
-    let _ = encode_avatar_style_for_id(spec, identity, AvatarOutputFormat::Png, style);
+    if let Ok(svg) = render_avatar_svg_style_for_id(spec, identity, style) {
+        assert!(roxmltree::Document::parse(&svg).is_ok());
+    }
+    let _ = encode_avatar_style_for_id(spec, identity, AvatarOutputFormat::WebP, style);
 });
