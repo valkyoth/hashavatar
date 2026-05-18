@@ -60,6 +60,7 @@ test -s docs/DEPENDENCIES.md
 test -s docs/PANIC_POLICY.md
 test -s docs/RELEASE.md
 test -s docs/SECURITY_CONTROLS.md
+test -s docs/STABILITY.md
 test -s "docs/release-notes/RELEASE_NOTES_${cargo_version}.md"
 
 for required_script in \
@@ -113,6 +114,7 @@ for required_package_file in \
     "docs/PANIC_POLICY.md" \
     "docs/RELEASE.md" \
     "docs/SECURITY_CONTROLS.md" \
+    "docs/STABILITY.md" \
     "LICENSE-APACHE" \
     "LICENSE-MIT" \
     "README.md" \

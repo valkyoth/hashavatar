@@ -1,5 +1,21 @@
 # Changelog
 
+## 1.0.0
+
+- Bumped the crate to `1.0.0`.
+- Declared the first stable public API and rendering contract for
+  `hashavatar`.
+- Added `docs/STABILITY.md` covering Cargo semver expectations, visual output
+  stability, automatic-style distribution, security/resource contracts, and
+  known residual risks.
+- Updated README guidance for the stable contract and controlled visual
+  rollouts through namespace `style_version` values.
+- Added `docs/STABILITY.md` to release metadata/package validation so future
+  releases keep the stability policy in the published crate.
+- Added 1.0 release notes.
+- No avatar families, backgrounds, visual layers, hash modes, output formats,
+  or runtime dependencies were added in this release.
+
 ## 0.13.0
 
 - Bumped the crate to `0.13.0`.

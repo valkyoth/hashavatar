@@ -489,6 +489,8 @@ reduce platform-sensitive geometry in frame-shape masking before `1.0`.
 
 ## 1.0.0: Stability Contract
 
+Status: release candidate.
+
 Goal: freeze a professional, security-oriented public API and rendering
 contract.
 

@@ -6,7 +6,7 @@ The crate starts conservative: validated avatar dimensions, bounded identity inp
 
 ## Current Status
 
-The current crate version is `0.13.0`.
+The current crate version is `1.0.0`.
 
 Implemented now:
 
@@ -64,18 +64,18 @@ Planned or intentionally external:
 | SVG posture | Generated numeric markup only; caller input is not inserted into SVG fragments |
 | Release evidence | fmt, clippy, tests, docs, deny, audit, fuzz harness compile, package check, SBOM, reproducibility |
 
-Security-control details live in [docs/SECURITY_CONTROLS.md](docs/SECURITY_CONTROLS.md). Dependency policy lives in [docs/DEPENDENCIES.md](docs/DEPENDENCIES.md). Panic policy lives in [docs/PANIC_POLICY.md](docs/PANIC_POLICY.md).
+Security-control details live in [docs/SECURITY_CONTROLS.md](docs/SECURITY_CONTROLS.md). Dependency policy lives in [docs/DEPENDENCIES.md](docs/DEPENDENCIES.md). Panic policy lives in [docs/PANIC_POLICY.md](docs/PANIC_POLICY.md). Stable API and rendering policy lives in [docs/STABILITY.md](docs/STABILITY.md).
 
-Future version planning for variant expansion and 1.0 stabilization lives in
-[docs/VERSION_PLAN.md](docs/VERSION_PLAN.md). `hashavatar` remains a single
-image-generation crate; low-level core planning is kept internal unless a
-future release has a concrete image-generation reason to split it.
+Future version planning lives in [docs/VERSION_PLAN.md](docs/VERSION_PLAN.md).
+`hashavatar` remains a single image-generation crate; low-level core planning
+is kept internal unless a future release has a concrete image-generation reason
+to split it.
 
 ## Install
 
 ```toml
 [dependencies]
-hashavatar = "0.13.0"
+hashavatar = "1.0.0"
 ```
 
 Optional identity hash modes and extra raster encoders are disabled by default.
@@ -83,21 +83,21 @@ Hash modes are mutually exclusive, so enable at most one of `blake3` or `xxh3`:
 
 ```toml
 [dependencies]
-hashavatar = { version = "0.13.0", features = ["blake3"] }
+hashavatar = { version = "1.0.0", features = ["blake3"] }
 ```
 
 Enable additional raster formats explicitly:
 
 ```toml
 [dependencies]
-hashavatar = { version = "0.13.0", features = ["png", "jpeg", "gif"] }
+hashavatar = { version = "1.0.0", features = ["png", "jpeg", "gif"] }
 ```
 
 Or enable every optional raster encoder at once:
 
 ```toml
 [dependencies]
-hashavatar = { version = "0.13.0", features = ["all-formats"] }
+hashavatar = { version = "1.0.0", features = ["all-formats"] }
 ```
 
 Combine these as needed, for example `features = ["blake3", "png"]`.
@@ -114,6 +114,20 @@ The crate is dual-licensed:
 ```toml
 license = "MIT OR Apache-2.0"
 ```
+
+## Stable Contract
+
+`1.0.0` freezes the crate's public API shape and documented rendering contract.
+Patch releases should not intentionally change output for the same explicit
+rendering tuple except for correctness or security fixes. Minor releases may
+add opt-in features, output formats, avatar families, backgrounds, or visual
+layer variants when they are documented and tested. Automatic style rendering
+can change distribution when public enum `ALL` lists grow, so services that
+need precise visual rollout control should use namespace `style_version`
+values deliberately.
+
+See [docs/STABILITY.md](docs/STABILITY.md) for the full semver and rendering
+policy.
 
 ## Limits
 
@@ -381,7 +395,7 @@ your namespace style version when intentionally migrating output.
 
 ```toml
 [dependencies]
-hashavatar = { version = "0.13.0", features = ["blake3"] }
+hashavatar = { version = "1.0.0", features = ["blake3"] }
 ```
 
 ```rust
@@ -409,7 +423,7 @@ assert!(svg.contains("alien avatar"));
 
 ```toml
 [dependencies]
-hashavatar = { version = "0.13.0", features = ["xxh3"] }
+hashavatar = { version = "1.0.0", features = ["xxh3"] }
 ```
 
 ```rust
@@ -614,24 +628,31 @@ AVIF and JPEG XL are not exposed because they add dependency or encoder maturity
 
 ## Determinism
 
-The output is deterministic for the tuple:
+For a concrete crate release, the output is deterministic for the tuple:
 
 ```text
 crate identity hash mode + namespace tenant + namespace style version + identity bytes + avatar kind + background + dimensions + seed
 ```
 
-This makes the crate suitable for stable CDN-backed avatar URLs and golden regression tests. Namespace hashing uses length-prefixed components, so embedded separator bytes cannot create tenant/style-version ambiguity. The default SHA-512 path keeps the pre-0.7 identity preimage stable; optional crate-wide hash modes are domain-separated.
+Within the `1.x` series, explicit output for that tuple should remain stable
+except for documented correctness or security fixes. This makes the crate
+suitable for stable CDN-backed avatar URLs and golden regression tests.
+Namespace hashing uses length-prefixed components, so embedded separator bytes
+cannot create tenant/style-version ambiguity. The default SHA-512 path keeps the
+pre-0.7 identity preimage stable; optional crate-wide hash modes are
+domain-separated.
 
 For style-aware rendering, the deterministic tuple also includes
 `accessory`, `color`, `expression`, and `shape`. Existing `AvatarOptions`
 entry points keep those extra layer choices at `none`, `default`, `default`,
 and `square`, so explicitly selected `AvatarOptions` output remains stable
-unless the selected family renderer changes. `0.13.0` adds new
-`AvatarBackground` values, so automatic style derivation can map some
-identities to different backgrounds than `0.12.0`; services that need the old
-automatic distribution should keep their existing namespace style version until
-they intentionally migrate. Some family/layer combinations are deterministic
-no-ops when the layer has no sensible anchor for that family.
+within a major release unless a documented correctness or security fix requires
+new output. Automatic style rendering derives choices through public `ALL`
+variant lists, so adding variants in a future minor release can change
+automatic distribution. Services that need controlled rollouts should keep
+their existing namespace style version until they intentionally migrate. Some
+family/layer combinations are deterministic no-ops when the layer has no
+sensible anchor for that family.
 
 Frame shapes are applied as masks in raster output and as SVG clip paths in SVG
 output. Non-square shapes therefore trim the background, avatar body, color
@@ -639,7 +660,7 @@ accent, accessory layer, and expression layer consistently before drawing the
 frame border.
 
 The renderer still uses floating-point geometry in family-specific drawing
-paths. Frame-shape raster hit-testing uses integer arithmetic as of `0.13.0`,
+paths. Frame-shape raster hit-testing uses integer arithmetic as of `1.0.0`,
 which reduces one source of platform rounding variance. The project tests
 golden fingerprints on the release platform, but it does not yet claim formal
 bit-identical raster output across every CPU architecture, compiler backend,
