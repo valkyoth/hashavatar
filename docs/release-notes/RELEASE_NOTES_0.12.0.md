@@ -61,8 +61,9 @@ single, asset-free image-generation crate.
   BLAKE3 hasher plus XOF reader are explicitly zeroized after digest
   derivation.
 - Digest-derived renderer RNG seed copies are now wrapped in
-  `zeroize::Zeroizing`, so the temporary mixed seed is scrubbed after RNG
-  initialization.
+  `zeroize::Zeroizing`, so the temporary mixed seed is scrubbed immediately
+  after RNG initialization. The security controls also document `StdRng`'s
+  non-zeroized expanded internal state as a known residual.
 - Owned RGBA encode buffers and JPEG RGB flattening buffers now use RAII
   zeroization guards, so temporary pixel data is scrubbed during normal
   returns, encoder errors, and unwinding panics.

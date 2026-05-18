@@ -41,7 +41,9 @@
   and explicitly zeroized BLAKE3 hasher/XOF reader state after digest
   derivation.
 - Wrapped digest-derived renderer RNG seed copies in `zeroize::Zeroizing` so
-  the temporary mixed seed is scrubbed after RNG initialization.
+  the temporary mixed seed is scrubbed immediately after RNG initialization,
+  and documented `StdRng`'s non-zeroized expanded internal state as a known
+  residual.
 - Wrapped owned RGBA encode buffers and JPEG RGB flattening buffers in RAII
   zeroization guards so temporary pixel data is scrubbed during normal returns,
   encoder errors, and unwinding panics.

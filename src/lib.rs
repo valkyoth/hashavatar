@@ -4156,16 +4156,24 @@ pub fn render_cat_avatar_for_identity_with_background(
     Ok(render_cat_avatar_with_identity(spec, identity, background))
 }
 
+fn seeded_renderer_rng(spec: AvatarSpec, identity: &AvatarIdentity) -> StdRng {
+    let mut rng_seed = identity.rng_seed();
+    for (index, byte) in spec.seed.to_le_bytes().iter().enumerate() {
+        rng_seed[index] ^= *byte;
+    }
+    let mut rng_seed_value = *rng_seed;
+    drop(rng_seed);
+    let rng = StdRng::from_seed(rng_seed_value);
+    rng_seed_value.zeroize();
+    rng
+}
+
 fn render_cat_avatar_with_identity(
     spec: AvatarSpec,
     identity: &AvatarIdentity,
     background: AvatarBackground,
 ) -> RgbaImage {
-    let mut rng_seed = identity.rng_seed();
-    for (index, byte) in spec.seed.to_le_bytes().iter().enumerate() {
-        rng_seed[index] ^= *byte;
-    }
-    let mut rng = StdRng::from_seed(*rng_seed);
+    let mut rng = seeded_renderer_rng(spec, identity);
     let genome = CatGenome::from_identity(identity, &mut rng);
     let palette = CatPalette::from_genome(&genome);
     let mut image = ImageBuffer::from_pixel(
@@ -9893,6 +9901,25 @@ mod tests {
         let rng_seed: Zeroizing<[u8; 32]> = identity.rng_seed();
 
         assert_eq!(rng_seed.len(), 32);
+    }
+
+    #[test]
+    fn renderer_rng_seed_copy_is_zeroized_before_rng_use() {
+        let source = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/src/lib.rs"));
+        let helper = source
+            .split("fn seeded_renderer_rng")
+            .nth(1)
+            .and_then(|after_name| {
+                after_name
+                    .split("fn render_cat_avatar_with_identity")
+                    .next()
+            })
+            .expect("seeded renderer rng helper should exist");
+
+        assert!(helper.contains("let mut rng_seed_value = *rng_seed;"));
+        assert!(helper.contains("drop(rng_seed);"));
+        assert!(helper.contains("let rng = StdRng::from_seed(rng_seed_value);"));
+        assert!(helper.contains("rng_seed_value.zeroize();"));
     }
 
     #[test]
