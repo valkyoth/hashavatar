@@ -172,7 +172,7 @@ dependencies = [
 
 [[package]]
 name = "hashavatar"
-version = "0.12.0"
+version = "0.13.0"
 dependencies = [
  "image",
  "palette",

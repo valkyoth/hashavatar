@@ -34,4 +34,4 @@ style-robot-glasses-gold-happy-circle=375fb2f72fd2365c6d51f763
 style-fox-halo-neon-cool-squircle=c1305e54f6f418ed173d24e1
 style-monster-horns-crimson-grumpy-hexagon=82a9b607c06a04c526f0ba11
 style-knight-scarf-deepsea-winking-octagon=2a10b57d102920a15c052923
-auto-layered=7d72bb5b3da891a110545d9b
+auto-layered=a03014e7373681b6db85e7c2

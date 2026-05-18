@@ -91,6 +91,9 @@
   async/runtime boundary.
 - Internal rectangle helpers use saturating or clamping arithmetic for edge and
   intersection calculations.
+- Raster frame-shape hit-testing uses integer arithmetic for circle, squircle,
+  hexagon, and octagon masks, reducing platform-specific floating-point
+  rounding in clipping decisions.
 - Polygon rasterization returns immediately for empty polygons and zero-sized
   images, widens scanline interpolation math before rounding, and is covered by
   a dedicated fuzz harness for arbitrary image dimensions, degenerate polygons,

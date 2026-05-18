@@ -64,8 +64,9 @@ Dependency changes should be reviewed for:
   identity hash, and do not recommend it for user-controlled identifiers unless
   the application first maps those identifiers through its own cryptographic
   boundary.
-- Optional dependency features must be tested with `cargo test --all-features`
-  before release.
+- Optional dependency features must be tested in valid feature combinations
+  before release. Do not use `cargo test --all-features` because the `blake3`
+  and `xxh3` identity-hash modes are intentionally mutually exclusive.
 
 `scripts/validate-dependencies.sh` enforces the current direct dependency allowlist.
 

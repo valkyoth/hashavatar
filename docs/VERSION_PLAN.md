@@ -446,6 +446,47 @@ public API.
 - `scripts/stable_release_gate.sh check` passes.
 - crates.io publish dry run passes.
 
+## 0.13.0: Background Expansion And Determinism Hardening
+
+Status: implemented in `0.13.0`.
+
+Goal: improve the background catalog without adding new avatar families, and
+reduce platform-sensitive geometry in frame-shape masking before `1.0`.
+
+### Scope
+
+- Add a small accepted background set:
+  - `PolkaDot`
+  - `Striped`
+  - `Checkerboard`
+  - `Grid`
+  - `Sunrise`
+  - `Ocean`
+  - `Starry`
+- Keep background rendering deterministic, bounded, asset-free, and represented
+  in both raster and SVG output.
+- Avoid admitting busier backgrounds such as `Wavy`, `Synthwave`, `Pixel`, and
+  `Cloudy` until they have a clearer contrast and readability story.
+- Replace selected float-based frame-shape raster hit-testing with integer
+  arithmetic.
+- Fix stale documentation around feature-combination testing and fuzz encoder
+  coverage.
+
+### Finish Line
+
+`0.13.0` is done when:
+
+- Every accepted background has `as_str`, `Display`, `FromStr`, and `ALL`
+  coverage.
+- Raster tests prove the new background canvases are distinct and bounded.
+- SVG tests parse every new background as well-formed XML.
+- Golden fingerprints document the automatic-output impact from expanding
+  `AvatarBackground::ALL`.
+- README, dependency docs, changelog, and release notes describe the new
+  background catalog and the feature-testing policy.
+- `scripts/stable_release_gate.sh check` passes.
+- crates.io publish dry run passes.
+
 ## 1.0.0: Stability Contract
 
 Goal: freeze a professional, security-oriented public API and rendering

@@ -6,7 +6,7 @@ The crate starts conservative: validated avatar dimensions, bounded identity inp
 
 ## Current Status
 
-The current crate version is `0.12.0`.
+The current crate version is `0.13.0`.
 
 Implemented now:
 
@@ -25,8 +25,8 @@ Implemented now:
 - Avatar families through `AvatarKind`: animals, characters, fantasy/sci-fi
   faces, playful objects, and symbols. Current labels are listed in the public
   option catalog below.
-- Background modes through `AvatarBackground`: `themed`, `white`, `black`,
-  `dark`, `light`, and `transparent`.
+- Background modes through `AvatarBackground`: fixed, transparent, patterned,
+  gradient, and star-field canvas treatments.
 - Visual layers through `AvatarAccessory`, `AvatarColor`,
   `AvatarExpression`, and `AvatarShape`.
 - In-memory `WebP` encoding through `AvatarOutputFormat`; `PNG`, `JPEG`, and
@@ -37,7 +37,8 @@ Implemented now:
 - No public path-writing helpers; callers own their storage and filesystem boundary.
 - `#![forbid(unsafe_code)]` in library code.
 - Golden visual regression fingerprints.
-- Isolated fuzz harness for avatar identities, families, backgrounds, SVG rendering, and PNG encoding.
+- Isolated fuzz harness for avatar identities, families, backgrounds, SVG
+  rendering, default WebP encoding, and feature-gated encoder paths.
 - Local release gates for formatting, clippy, tests, docs, dependency policy, RustSec advisories, package contents, SBOM generation, reproducible build checks, and crates.io publish dry runs.
 
 Planned or intentionally external:
@@ -74,7 +75,7 @@ future release has a concrete image-generation reason to split it.
 
 ```toml
 [dependencies]
-hashavatar = "0.12.0"
+hashavatar = "0.13.0"
 ```
 
 Optional identity hash modes and extra raster encoders are disabled by default.
@@ -82,21 +83,21 @@ Hash modes are mutually exclusive, so enable at most one of `blake3` or `xxh3`:
 
 ```toml
 [dependencies]
-hashavatar = { version = "0.12.0", features = ["blake3"] }
+hashavatar = { version = "0.13.0", features = ["blake3"] }
 ```
 
 Enable additional raster formats explicitly:
 
 ```toml
 [dependencies]
-hashavatar = { version = "0.12.0", features = ["png", "jpeg", "gif"] }
+hashavatar = { version = "0.13.0", features = ["png", "jpeg", "gif"] }
 ```
 
 Or enable every optional raster encoder at once:
 
 ```toml
 [dependencies]
-hashavatar = { version = "0.12.0", features = ["all-formats"] }
+hashavatar = { version = "0.13.0", features = ["all-formats"] }
 ```
 
 Combine these as needed, for example `features = ["blake3", "png"]`.
@@ -143,7 +144,7 @@ in caller code.
 | Enum | Controls | Values |
 | --- | --- | --- |
 | `AvatarKind` | Base avatar family | `cat`, `dog`, `robot`, `fox`, `alien`, `monster`, `ghost`, `slime`, `bird`, `wizard`, `skull`, `paws`, `planet`, `rocket`, `mushroom`, `cactus`, `frog`, `panda`, `cupcake`, `pizza`, `icecream`, `octopus`, `knight`, `bear`, `penguin`, `dragon`, `ninja`, `astronaut`, `diamond`, `coffee-cup`, `shield` |
-| `AvatarBackground` | Canvas/background treatment | `themed`, `white`, `black`, `dark`, `light`, `transparent` |
+| `AvatarBackground` | Canvas/background treatment | `themed`, `white`, `black`, `dark`, `light`, `transparent`, `polka-dot`, `striped`, `checkerboard`, `grid`, `sunrise`, `ocean`, `starry` |
 | `AvatarAccessory` | Optional accessory layer | `none`, `glasses`, `hat`, `headphones`, `crown`, `bowtie`, `eyepatch`, `scarf`, `halo`, `horns` |
 | `AvatarColor` | Optional accent palette | `default`, `neon-mint`, `pastel-pink`, `crimson`, `gold`, `deep-sea-blue` |
 | `AvatarExpression` | Optional expression overlay | `default`, `happy`, `grumpy`, `surprised`, `sleepy`, `winking`, `cool`, `crying` |
@@ -380,7 +381,7 @@ your namespace style version when intentionally migrating output.
 
 ```toml
 [dependencies]
-hashavatar = { version = "0.12.0", features = ["blake3"] }
+hashavatar = { version = "0.13.0", features = ["blake3"] }
 ```
 
 ```rust
@@ -408,7 +409,7 @@ assert!(svg.contains("alien avatar"));
 
 ```toml
 [dependencies]
-hashavatar = { version = "0.12.0", features = ["xxh3"] }
+hashavatar = { version = "0.13.0", features = ["xxh3"] }
 ```
 
 ```rust
@@ -625,23 +626,24 @@ For style-aware rendering, the deterministic tuple also includes
 `accessory`, `color`, `expression`, and `shape`. Existing `AvatarOptions`
 entry points keep those extra layer choices at `none`, `default`, `default`,
 and `square`, so explicitly selected `AvatarOptions` output remains stable
-unless the selected family renderer changes. `0.12.0` adds new `AvatarKind`
-values, so automatic style derivation can map some identities to different
-families than `0.11.0`; services that need the old automatic distribution
-should keep their existing namespace style version until they intentionally
-migrate. Some family/layer combinations are deterministic no-ops when the
-layer has no sensible anchor for that family.
+unless the selected family renderer changes. `0.13.0` adds new
+`AvatarBackground` values, so automatic style derivation can map some
+identities to different backgrounds than `0.12.0`; services that need the old
+automatic distribution should keep their existing namespace style version until
+they intentionally migrate. Some family/layer combinations are deterministic
+no-ops when the layer has no sensible anchor for that family.
 
 Frame shapes are applied as masks in raster output and as SVG clip paths in SVG
 output. Non-square shapes therefore trim the background, avatar body, color
 accent, accessory layer, and expression layer consistently before drawing the
 frame border.
 
-The renderer uses floating-point geometry internally. The project tests golden
-fingerprints on the release platform, but it does not yet claim formal
+The renderer still uses floating-point geometry in family-specific drawing
+paths. Frame-shape raster hit-testing uses integer arithmetic as of `0.13.0`,
+which reduces one source of platform rounding variance. The project tests
+golden fingerprints on the release platform, but it does not yet claim formal
 bit-identical raster output across every CPU architecture, compiler backend,
-and optimization mode. Future core-boundary work tracks fixed-point geometry
-as the path to a stricter cross-platform determinism contract.
+and optimization mode.
 
 The procedural cat renderer seeds its internal RNG from bytes `32..64` of the
 identity digest and uses the lower digest bytes for direct visual parameters.

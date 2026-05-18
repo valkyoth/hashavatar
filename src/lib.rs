@@ -1580,6 +1580,20 @@ pub enum AvatarBackground {
     Light,
     /// Fully transparent background.
     Transparent,
+    /// Light dotted pattern.
+    PolkaDot,
+    /// Subtle diagonal stripe pattern.
+    Striped,
+    /// Small checkerboard pattern.
+    Checkerboard,
+    /// Fine grid pattern.
+    Grid,
+    /// Warm sunrise gradient.
+    Sunrise,
+    /// Cool ocean gradient.
+    Ocean,
+    /// Dark star-field background.
+    Starry,
 }
 
 impl AvatarBackground {
@@ -1590,6 +1604,13 @@ impl AvatarBackground {
         Self::Dark,
         Self::Light,
         Self::Transparent,
+        Self::PolkaDot,
+        Self::Striped,
+        Self::Checkerboard,
+        Self::Grid,
+        Self::Sunrise,
+        Self::Ocean,
+        Self::Starry,
     ];
 
     pub fn from_byte(value: u8) -> Self {
@@ -1604,6 +1625,13 @@ impl AvatarBackground {
             Self::Dark => "dark",
             Self::Light => "light",
             Self::Transparent => "transparent",
+            Self::PolkaDot => "polka-dot",
+            Self::Striped => "striped",
+            Self::Checkerboard => "checkerboard",
+            Self::Grid => "grid",
+            Self::Sunrise => "sunrise",
+            Self::Ocean => "ocean",
+            Self::Starry => "starry",
         }
     }
 }
@@ -1619,6 +1647,13 @@ impl FromStr for AvatarBackground {
             "dark" => Ok(Self::Dark),
             "light" => Ok(Self::Light),
             "transparent" => Ok(Self::Transparent),
+            "polka-dot" | "polka_dot" | "polkadot" => Ok(Self::PolkaDot),
+            "striped" | "stripes" => Ok(Self::Striped),
+            "checkerboard" | "checker-board" | "checker_board" => Ok(Self::Checkerboard),
+            "grid" => Ok(Self::Grid),
+            "sunrise" => Ok(Self::Sunrise),
+            "ocean" => Ok(Self::Ocean),
+            "starry" | "stars" => Ok(Self::Starry),
             _ => Err("unsupported avatar background"),
         }
     }
@@ -2549,6 +2584,13 @@ impl AvatarRenderPlan {
             AvatarBackground::Dark => Color::rgb(17, 24, 39),
             AvatarBackground::Light => Color::rgb(248, 250, 247),
             AvatarBackground::Transparent => Color::rgba(255, 255, 255, 0),
+            AvatarBackground::PolkaDot
+            | AvatarBackground::Striped
+            | AvatarBackground::Checkerboard
+            | AvatarBackground::Grid => Color::rgb(248, 250, 247),
+            AvatarBackground::Sunrise => Color::rgb(255, 247, 212),
+            AvatarBackground::Ocean => Color::rgb(220, 248, 252),
+            AvatarBackground::Starry => Color::rgb(17, 24, 39),
         }
     }
 
@@ -2589,19 +2631,7 @@ impl AvatarRenderPlan {
     }
 
     fn render_svg(&self) -> String {
-        let background = match self.style.background {
-            AvatarBackground::Transparent => String::new(),
-            AvatarBackground::Themed
-            | AvatarBackground::White
-            | AvatarBackground::Black
-            | AvatarBackground::Dark
-            | AvatarBackground::Light => {
-                format!(
-                    r#"<rect width="100%" height="100%" fill="{}"/>"#,
-                    color_hex(self.svg_background_color())
-                )
-            }
-        };
+        let background = self.render_svg_background();
 
         let content = format!(
             "{}{}{}",
@@ -2626,6 +2656,43 @@ impl AvatarRenderPlan {
             body = clipped_content,
             shape_layer = shape_layer,
         )
+    }
+
+    fn render_svg_background(&self) -> String {
+        match self.style.background {
+            AvatarBackground::Transparent => String::new(),
+            AvatarBackground::Themed
+            | AvatarBackground::White
+            | AvatarBackground::Black
+            | AvatarBackground::Dark
+            | AvatarBackground::Light => {
+                format!(
+                    r#"<rect width="100%" height="100%" fill="{}"/>"#,
+                    color_hex(self.svg_background_color())
+                )
+            }
+            AvatarBackground::PolkaDot => {
+                r##"<defs><pattern id="hashavatar-bg-polka-dot" width="16" height="16" patternUnits="userSpaceOnUse"><rect width="16" height="16" fill="#f8faf7"/><circle cx="8" cy="8" r="2" fill="#d1d5db"/></pattern></defs><rect width="100%" height="100%" fill="url(#hashavatar-bg-polka-dot)"/>"##.to_owned()
+            }
+            AvatarBackground::Striped => {
+                r##"<defs><pattern id="hashavatar-bg-striped" width="18" height="18" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="18" height="18" fill="#f8faf7"/><rect width="9" height="18" fill="#e5e7eb"/></pattern></defs><rect width="100%" height="100%" fill="url(#hashavatar-bg-striped)"/>"##.to_owned()
+            }
+            AvatarBackground::Checkerboard => {
+                r##"<defs><pattern id="hashavatar-bg-checkerboard" width="24" height="24" patternUnits="userSpaceOnUse"><rect width="24" height="24" fill="#f8faf7"/><rect width="12" height="12" fill="#e8ece7"/><rect x="12" y="12" width="12" height="12" fill="#e8ece7"/></pattern></defs><rect width="100%" height="100%" fill="url(#hashavatar-bg-checkerboard)"/>"##.to_owned()
+            }
+            AvatarBackground::Grid => {
+                r##"<defs><pattern id="hashavatar-bg-grid" width="16" height="16" patternUnits="userSpaceOnUse"><rect width="16" height="16" fill="#f8faf7"/><path d="M 16 0 L 0 0 0 16" fill="none" stroke="#dde2dd" stroke-width="1"/></pattern></defs><rect width="100%" height="100%" fill="url(#hashavatar-bg-grid)"/>"##.to_owned()
+            }
+            AvatarBackground::Sunrise => {
+                r##"<defs><linearGradient id="hashavatar-bg-sunrise" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#fff7d4"/><stop offset="100%" stop-color="#ffb86b"/></linearGradient></defs><rect width="100%" height="100%" fill="url(#hashavatar-bg-sunrise)"/>"##.to_owned()
+            }
+            AvatarBackground::Ocean => {
+                r##"<defs><linearGradient id="hashavatar-bg-ocean" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#dcf8fc"/><stop offset="100%" stop-color="#4b91be"/></linearGradient></defs><rect width="100%" height="100%" fill="url(#hashavatar-bg-ocean)"/>"##.to_owned()
+            }
+            AvatarBackground::Starry => {
+                r##"<defs><pattern id="hashavatar-bg-starry" width="40" height="40" patternUnits="userSpaceOnUse"><rect width="40" height="40" fill="#111827"/><circle cx="8" cy="9" r="1.2" fill="#ffffff" opacity="0.7"/><circle cx="28" cy="14" r="1" fill="#ffffff" opacity="0.55"/><circle cx="18" cy="31" r="1.4" fill="#ffffff" opacity="0.65"/></pattern></defs><rect width="100%" height="100%" fill="url(#hashavatar-bg-starry)"/>"##.to_owned()
+            }
+        }
     }
 }
 
@@ -3577,91 +3644,89 @@ fn point_inside_avatar_shape(x: i32, y: i32, spec: AvatarSpec, shape: AvatarShap
         return false;
     }
 
-    let w = spec.width as f32;
-    let h = spec.height as f32;
-    let xf = x as f32 + 0.5;
-    let yf = y as f32 + 0.5;
+    let w = i64::from(spec.width);
+    let h = i64::from(spec.height);
+    let x2 = i64::from(x) * 2 + 1;
+    let y2 = i64::from(y) * 2 + 1;
 
     match shape {
         AvatarShape::Square => true,
         AvatarShape::Circle => {
-            let nx = (xf - w / 2.0) / (w / 2.0);
-            let ny = (yf - h / 2.0) / (h / 2.0);
-            nx * nx + ny * ny <= 1.0
+            let dx = x2 - w;
+            let dy = y2 - h;
+            dx * dx * h * h + dy * dy * w * w <= w * w * h * h
         }
         AvatarShape::Squircle => {
-            let r = w.min(h) * 0.18;
+            let r = (w.min(h) * 18 / 100).max(1);
             let inner_left = r;
             let inner_right = w - r;
             let inner_top = r;
             let inner_bottom = h - r;
-            if (xf >= inner_left && xf <= inner_right) || (yf >= inner_top && yf <= inner_bottom) {
+            if (x2 >= inner_left * 2 && x2 <= inner_right * 2)
+                || (y2 >= inner_top * 2 && y2 <= inner_bottom * 2)
+            {
                 true
             } else {
-                let cx = if xf < inner_left {
+                let cx = if x2 < inner_left * 2 {
                     inner_left
                 } else {
                     inner_right
                 };
-                let cy = if yf < inner_top {
+                let cy = if y2 < inner_top * 2 {
                     inner_top
                 } else {
                     inner_bottom
                 };
-                (xf - cx).powi(2) + (yf - cy).powi(2) <= r.powi(2)
+                let dx = x2 - cx * 2;
+                let dy = y2 - cy * 2;
+                dx * dx + dy * dy <= (r * 2) * (r * 2)
             }
         }
-        AvatarShape::Hexagon => point_inside_normalized_polygon(
-            xf,
-            yf,
-            w,
-            h,
-            &[
-                (0.25, 0.0),
-                (0.75, 0.0),
-                (1.0, 0.5),
-                (0.75, 1.0),
-                (0.25, 1.0),
-                (0.0, 0.5),
-            ],
+        AvatarShape::Hexagon => point_inside_percent_polygon(
+            x,
+            y,
+            spec,
+            &[(25, 0), (75, 0), (100, 50), (75, 100), (25, 100), (0, 50)],
         ),
-        AvatarShape::Octagon => point_inside_normalized_polygon(
-            xf,
-            yf,
-            w,
-            h,
+        AvatarShape::Octagon => point_inside_percent_polygon(
+            x,
+            y,
+            spec,
             &[
-                (0.30, 0.0),
-                (0.70, 0.0),
-                (1.0, 0.30),
-                (1.0, 0.70),
-                (0.70, 1.0),
-                (0.30, 1.0),
-                (0.0, 0.70),
-                (0.0, 0.30),
+                (30, 0),
+                (70, 0),
+                (100, 30),
+                (100, 70),
+                (70, 100),
+                (30, 100),
+                (0, 70),
+                (0, 30),
             ],
         ),
     }
 }
 
-fn point_inside_normalized_polygon(
-    x: f32,
-    y: f32,
-    width: f32,
-    height: f32,
-    points: &[(f32, f32)],
-) -> bool {
+fn point_inside_percent_polygon(x: i32, y: i32, spec: AvatarSpec, points: &[(i64, i64)]) -> bool {
     let mut inside = false;
-    let mut previous = points[points.len() - 1];
+    let width = i64::from(spec.width);
+    let height = i64::from(spec.height);
+    let px = (i64::from(x) * 2 + 1) * 50;
+    let py = (i64::from(y) * 2 + 1) * 50;
+    let Some(&last) = points.last() else {
+        return false;
+    };
+    let mut previous = last;
     for &current in points {
         let xi = current.0 * width;
         let yi = current.1 * height;
         let xj = previous.0 * width;
         let yj = previous.1 * height;
-        let crosses = (yi > y) != (yj > y);
+        let crosses = (yi > py) != (yj > py);
         if crosses {
-            let at_x = (xj - xi) * (y - yi) / (yj - yi) + xi;
-            if x < at_x {
+            let lhs = (px - xi) * (yj - yi);
+            let rhs = (xj - xi) * (py - yi);
+            let is_left = if yj > yi { lhs < rhs } else { lhs > rhs };
+            if is_left {
                 inside = !inside;
             }
         }
@@ -5881,6 +5946,8 @@ pub fn render_planet_avatar_for_identity(
                 Color::rgba(255, 255, 255, 170).into(),
             );
         }
+    } else {
+        draw_decorative_background(&mut image, background, ring);
     }
 
     let radius = (width.min(height) as f32 * (0.18 + identity.unit_f32(20) * 0.08)) as i32;
@@ -7408,6 +7475,8 @@ pub fn render_paws_avatar_for_identity(
                 Color::rgba(accent.0[0], accent.0[1], accent.0[2], 70).into(),
             );
         }
+    } else {
+        draw_decorative_background(&mut image, background, accent);
     }
 
     let primary_x = width / 2;
@@ -7738,6 +7807,7 @@ fn draw_background_accent(
     background: AvatarBackground,
 ) {
     if background != AvatarBackground::Themed {
+        draw_decorative_background(image, background, accent);
         return;
     }
     let width = image.width() as i32;
@@ -7977,7 +8047,162 @@ fn background_fill(background: AvatarBackground, themed: Color) -> Color {
         AvatarBackground::Dark => Color::rgb(17, 24, 39),
         AvatarBackground::Light => Color::rgb(248, 250, 247),
         AvatarBackground::Transparent => Color::rgba(255, 255, 255, 0),
+        AvatarBackground::PolkaDot
+        | AvatarBackground::Striped
+        | AvatarBackground::Checkerboard
+        | AvatarBackground::Grid => Color::rgb(248, 250, 247),
+        AvatarBackground::Sunrise => Color::rgb(255, 244, 214),
+        AvatarBackground::Ocean => Color::rgb(221, 246, 252),
+        AvatarBackground::Starry => Color::rgb(17, 24, 39),
     }
+}
+
+fn draw_decorative_background(image: &mut RgbaImage, background: AvatarBackground, accent: Color) {
+    match background {
+        AvatarBackground::PolkaDot => draw_polka_dot_background(image, accent),
+        AvatarBackground::Striped => draw_striped_background(image, accent),
+        AvatarBackground::Checkerboard => draw_checkerboard_background(image),
+        AvatarBackground::Grid => draw_grid_background(image),
+        AvatarBackground::Sunrise => draw_vertical_gradient_background(
+            image,
+            Color::rgb(255, 247, 212),
+            Color::rgb(255, 184, 107),
+        ),
+        AvatarBackground::Ocean => draw_vertical_gradient_background(
+            image,
+            Color::rgb(220, 248, 252),
+            Color::rgb(75, 145, 190),
+        ),
+        AvatarBackground::Starry => draw_starry_background(image),
+        AvatarBackground::Themed
+        | AvatarBackground::White
+        | AvatarBackground::Black
+        | AvatarBackground::Dark
+        | AvatarBackground::Light
+        | AvatarBackground::Transparent => {}
+    }
+}
+
+fn draw_polka_dot_background(image: &mut RgbaImage, accent: Color) {
+    let base = Color::rgb(248, 250, 247);
+    let dot = rgba_over(base, Color::rgba(accent.0[0], accent.0[1], accent.0[2], 62));
+    fill_image(image, base);
+
+    let min_side = image.width().min(image.height()).max(1);
+    let step = (min_side / 8).clamp(8, 44) as i32;
+    let radius = (step / 5).max(1);
+    for y in (step / 2..image.height() as i32).step_by(step as usize) {
+        for x in (step / 2..image.width() as i32).step_by(step as usize) {
+            draw_filled_circle_mut(image, (x, y), radius, dot.into());
+        }
+    }
+}
+
+fn draw_striped_background(image: &mut RgbaImage, accent: Color) {
+    let base = Color::rgb(248, 250, 247);
+    let stripe = rgba_over(base, Color::rgba(accent.0[0], accent.0[1], accent.0[2], 42));
+    let min_side = image.width().min(image.height()).max(1);
+    let width = (min_side / 10).clamp(6, 36);
+
+    for y in 0..image.height() {
+        for x in 0..image.width() {
+            let band = ((x + y) / width).is_multiple_of(2);
+            image.put_pixel(x, y, if band { stripe.into() } else { base.into() });
+        }
+    }
+}
+
+fn draw_checkerboard_background(image: &mut RgbaImage) {
+    let light = Color::rgb(248, 250, 247);
+    let dark = Color::rgb(232, 236, 231);
+    let min_side = image.width().min(image.height()).max(1);
+    let tile = (min_side / 8).clamp(8, 48);
+
+    for y in 0..image.height() {
+        for x in 0..image.width() {
+            let even = ((x / tile) + (y / tile)).is_multiple_of(2);
+            image.put_pixel(x, y, if even { light.into() } else { dark.into() });
+        }
+    }
+}
+
+fn draw_grid_background(image: &mut RgbaImage) {
+    let base = Color::rgb(248, 250, 247);
+    let line = Color::rgb(221, 226, 221);
+    let min_side = image.width().min(image.height()).max(1);
+    let step = (min_side / 8).clamp(8, 48);
+
+    for y in 0..image.height() {
+        for x in 0..image.width() {
+            let grid_line = x.is_multiple_of(step) || y.is_multiple_of(step);
+            image.put_pixel(x, y, if grid_line { line.into() } else { base.into() });
+        }
+    }
+}
+
+fn draw_vertical_gradient_background(image: &mut RgbaImage, top: Color, bottom: Color) {
+    let max_y = image.height().saturating_sub(1).max(1);
+    for y in 0..image.height() {
+        let color = lerp_color_u32(top, bottom, y, max_y);
+        for x in 0..image.width() {
+            image.put_pixel(x, y, color.into());
+        }
+    }
+}
+
+fn draw_starry_background(image: &mut RgbaImage) {
+    let base = Color::rgb(17, 24, 39);
+    fill_image(image, base);
+
+    let min_side = image.width().min(image.height()).max(1);
+    let star_count = (min_side / 7).clamp(10, 180);
+    let mut state = 0x9e37_79b9_u32
+        ^ image.width().wrapping_mul(0x85eb_ca6b)
+        ^ image.height().wrapping_mul(0xc2b2_ae35);
+    for index in 0..star_count {
+        state = state.wrapping_mul(1_664_525).wrapping_add(1_013_904_223);
+        let x = state % image.width().max(1);
+        state = state.wrapping_mul(1_664_525).wrapping_add(1_013_904_223);
+        let y = state % image.height().max(1);
+        let radius = if index.is_multiple_of(7) { 2 } else { 1 };
+        draw_filled_circle_mut(
+            image,
+            (x as i32, y as i32),
+            radius,
+            Rgba([255, 255, 255, 170]),
+        );
+    }
+}
+
+fn fill_image(image: &mut RgbaImage, color: Color) {
+    for pixel in image.pixels_mut() {
+        *pixel = color.into();
+    }
+}
+
+fn rgba_over(bottom: Color, top: Color) -> Color {
+    let alpha = u32::from(top.0[3]);
+    let inverse = 255 - alpha;
+    Color::rgb(
+        ((u32::from(top.0[0]) * alpha + u32::from(bottom.0[0]) * inverse + 127) / 255) as u8,
+        ((u32::from(top.0[1]) * alpha + u32::from(bottom.0[1]) * inverse + 127) / 255) as u8,
+        ((u32::from(top.0[2]) * alpha + u32::from(bottom.0[2]) * inverse + 127) / 255) as u8,
+    )
+}
+
+fn lerp_color_u32(start: Color, end: Color, position: u32, max_position: u32) -> Color {
+    let max = max_position.max(1);
+    Color::rgb(
+        lerp_channel_u32(start.0[0], end.0[0], position, max),
+        lerp_channel_u32(start.0[1], end.0[1], position, max),
+        lerp_channel_u32(start.0[2], end.0[2], position, max),
+    )
+}
+
+fn lerp_channel_u32(start: u8, end: u8, position: u32, max_position: u32) -> u8 {
+    let start = u32::from(start);
+    let end = u32::from(end);
+    ((start * (max_position - position) + end * position + max_position / 2) / max_position) as u8
 }
 
 fn color_hex(color: Color) -> String {
@@ -10284,6 +10509,60 @@ mod tests {
     }
 
     #[test]
+    fn decorative_background_modes_render_distinct_raster_canvases() {
+        let spec = valid_spec(128, 128, 0);
+        let identity = valid_identity("backgrounds@hashavatar.app");
+        let mut fingerprints = Vec::new();
+
+        for background in [
+            AvatarBackground::PolkaDot,
+            AvatarBackground::Striped,
+            AvatarBackground::Checkerboard,
+            AvatarBackground::Grid,
+            AvatarBackground::Sunrise,
+            AvatarBackground::Ocean,
+            AvatarBackground::Starry,
+        ] {
+            let image = render_cat_avatar_for_identity_with_background(spec, &identity, background);
+            assert_eq!(image.width(), 128);
+            assert_eq!(image.height(), 128);
+            assert!(
+                image.pixels().any(|pixel| pixel.0[3] == 255),
+                "{background}"
+            );
+            fingerprints.push(image_fingerprint(&image));
+        }
+
+        fingerprints.sort();
+        fingerprints.dedup();
+        assert_eq!(fingerprints.len(), 7);
+    }
+
+    #[test]
+    fn decorative_svg_backgrounds_use_structured_defs() {
+        let spec = valid_spec(128, 128, 0);
+        for background in [
+            AvatarBackground::PolkaDot,
+            AvatarBackground::Striped,
+            AvatarBackground::Checkerboard,
+            AvatarBackground::Grid,
+            AvatarBackground::Sunrise,
+            AvatarBackground::Ocean,
+            AvatarBackground::Starry,
+        ] {
+            let svg = render_avatar_svg_for_id(
+                spec,
+                "backgrounds@hashavatar.app",
+                AvatarOptions::new(AvatarKind::Robot, background),
+            );
+
+            assert_svg_is_well_formed(&svg);
+            assert!(svg.contains("hashavatar-bg-"), "{background}");
+            assert!(!svg.contains("<script"), "{background}");
+        }
+    }
+
+    #[test]
     fn dog_and_robot_variants_generate_distinct_images() {
         let spec = valid_spec(128, 128, 0);
         let id = valid_identity("alice@example.com");
@@ -10582,7 +10861,21 @@ mod tests {
             .collect();
         assert_eq!(
             background_labels,
-            ["themed", "white", "black", "dark", "light", "transparent"]
+            [
+                "themed",
+                "white",
+                "black",
+                "dark",
+                "light",
+                "transparent",
+                "polka-dot",
+                "striped",
+                "checkerboard",
+                "grid",
+                "sunrise",
+                "ocean",
+                "starry",
+            ]
         );
 
         let format_labels: Vec<_> = AvatarOutputFormat::ALL

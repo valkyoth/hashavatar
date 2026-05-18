@@ -1,5 +1,25 @@
 # Changelog
 
+## 0.13.0
+
+- Bumped the crate to `0.13.0`.
+- Added seven `AvatarBackground` variants: `polka-dot`, `striped`,
+  `checkerboard`, `grid`, `sunrise`, `ocean`, and `starry`.
+- Implemented the new backgrounds for raster and SVG output with bounded,
+  asset-free drawing paths.
+- Added parser/display/`ALL` coverage, raster distinctness tests, and
+  parser-backed SVG well-formedness coverage for the expanded background
+  catalog.
+- Replaced raster frame-shape hit-testing with integer arithmetic for circle,
+  squircle, hexagon, and octagon masks, reducing floating-point sensitivity in
+  shape clipping.
+- Updated automatic visual golden fingerprints because the expanded
+  `AvatarBackground::ALL` list changes automatic background distribution.
+- Fixed documentation that still referenced `cargo test --all-features`; the
+  `blake3` and `xxh3` feature modes are intentionally mutually exclusive.
+- Refreshed README wording for feature-gated encoder testing and the expanded
+  background catalog.
+
 ## 0.12.0
 
 - Bumped the crate to `0.12.0`.
