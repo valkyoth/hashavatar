@@ -224,6 +224,8 @@ struct RectPosition {
 }
 
 impl RectPosition {
+    // Zero-size rectangles are promoted to one pixel so drawing helpers remain
+    // non-panicking when integer layout rounds a narrow feature down to zero.
     const fn of_size(self, width: u32, height: u32) -> Rect {
         Rect {
             left: self.left,
@@ -933,8 +935,8 @@ impl std::fmt::Display for AvatarIdentityError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
-            "{} must be at most {} bytes, got {} bytes",
-            self.component, self.max, self.length
+            "{} exceeds the maximum allowed size of {} bytes",
+            self.component, self.max
         )
     }
 }
@@ -1064,7 +1066,12 @@ impl AvatarIdentity {
     }
 
     fn byte(&self, index: usize) -> u8 {
-        self.digest[index]
+        // Keep future renderer additions non-panicking if a digest offset is
+        // miscomputed; tests still cover the currently used offset range.
+        match self.digest.get(index) {
+            Some(byte) => *byte,
+            None => 0,
+        }
     }
 
     fn unit_f32(&self, index: usize) -> f32 {
@@ -1116,9 +1123,9 @@ fn validate_identity_component(
 
 fn derive_identity_digest(options: AvatarIdentityOptions<'_>, input: &[u8]) -> [u8; 64] {
     let mut preimage = identity_hash_preimage(options, input);
-    let digest = active_identity_digest(&preimage);
+    let digest = Zeroizing::new(active_identity_digest(&preimage));
     preimage.zeroize();
-    digest
+    *digest
 }
 
 fn identity_hash_preimage(options: AvatarIdentityOptions<'_>, input: &[u8]) -> Vec<u8> {
@@ -1179,7 +1186,8 @@ fn update_hash_input_component(preimage: &mut Vec<u8>, bytes: &[u8]) {
 fn sha512_digest(preimage: &[u8]) -> [u8; 64] {
     let mut hasher = Sha512::new();
     hasher.update(preimage);
-    hasher.finalize().into()
+    let digest = Zeroizing::new(hasher.finalize().into());
+    *digest
 }
 
 #[cfg(feature = "blake3")]
@@ -4226,11 +4234,9 @@ fn seeded_renderer_rng(spec: AvatarSpec, identity: &AvatarIdentity) -> StdRng {
     for (index, byte) in spec.seed.to_le_bytes().iter().enumerate() {
         rng_seed[index] ^= *byte;
     }
-    let mut rng_seed_value = *rng_seed;
+    let rng_seed_value = Zeroizing::new(*rng_seed);
     drop(rng_seed);
-    let rng = StdRng::from_seed(rng_seed_value);
-    rng_seed_value.zeroize();
-    rng
+    StdRng::from_seed(*rng_seed_value)
 }
 
 fn render_cat_avatar_with_identity(
@@ -4266,6 +4272,7 @@ fn render_cat_avatar_with_identity(
         palette.accent,
         genome.accent_band_height,
         background,
+        identity,
     );
     draw_ear(
         &mut image,
@@ -4391,7 +4398,7 @@ pub fn render_dog_avatar_for_identity(
     let bg_fill = background_fill(background, accent);
     image.pixels_mut().for_each(|pixel| *pixel = bg_fill.into());
     draw_background_accent(
-        &mut image, center_x, center_y, head_rx, head_ry, accent, 0.45, background,
+        &mut image, center_x, center_y, head_rx, head_ry, accent, 0.45, background, identity,
     );
 
     draw_filled_ellipse_mut(
@@ -4533,6 +4540,7 @@ pub fn render_robot_avatar_for_identity(
         accent,
         0.5,
         background,
+        identity,
     );
 
     draw_filled_rect_mut(
@@ -4667,6 +4675,7 @@ pub fn render_fox_avatar_for_identity(
         deep_orange,
         0.35,
         background,
+        identity,
     );
     draw_ear(
         &mut image,
@@ -4789,7 +4798,7 @@ pub fn render_alien_avatar_for_identity(
     let head_rx = (width as f32 * (0.20 + identity.unit_f32(4) * 0.08)) as i32;
     let head_ry = (height as f32 * (0.28 + identity.unit_f32(5) * 0.10)) as i32;
     draw_background_accent(
-        &mut image, center_x, center_y, head_rx, head_ry, shade, 0.28, background,
+        &mut image, center_x, center_y, head_rx, head_ry, shade, 0.28, background, identity,
     );
     draw_filled_ellipse_mut(
         &mut image,
@@ -4891,6 +4900,7 @@ pub fn render_monster_avatar_for_identity(
         shade,
         0.30 + identity.unit_f32(17) * 0.25,
         background,
+        identity,
     );
 
     match body_style {
@@ -5312,6 +5322,7 @@ pub fn render_ghost_avatar_for_identity(
         shade,
         0.28,
         background,
+        identity,
     );
     if background == AvatarBackground::Themed && identity.byte(11).is_multiple_of(2) {
         draw_filled_ellipse_mut(
@@ -5433,6 +5444,7 @@ pub fn render_slime_avatar_for_identity(
         dark,
         0.32,
         background,
+        identity,
     );
     draw_filled_ellipse_mut(
         &mut image,
@@ -5530,6 +5542,7 @@ pub fn render_bird_avatar_for_identity(
         wing,
         0.24,
         background,
+        identity,
     );
     draw_filled_circle_mut(
         &mut image,
@@ -5658,6 +5671,7 @@ pub fn render_wizard_avatar_for_identity(
         hat_band,
         0.20,
         background,
+        identity,
     );
     draw_polygon_mut(
         &mut image,
@@ -5809,6 +5823,7 @@ pub fn render_skull_avatar_for_identity(
         crack,
         0.16,
         background,
+        identity,
     );
     draw_filled_ellipse_mut(
         &mut image,
@@ -5947,7 +5962,7 @@ pub fn render_planet_avatar_for_identity(
             );
         }
     } else {
-        draw_decorative_background(&mut image, background, ring);
+        draw_decorative_background(&mut image, background, ring, identity);
     }
 
     let radius = (width.min(height) as f32 * (0.18 + identity.unit_f32(20) * 0.08)) as i32;
@@ -6022,6 +6037,7 @@ pub fn render_rocket_avatar_for_identity(
         trim,
         0.18,
         background,
+        identity,
     );
 
     let body_w = (width as f32 * (0.18 + identity.unit_f32(5) * 0.05)) as i32;
@@ -6124,7 +6140,7 @@ pub fn render_mushroom_avatar_for_identity(
     let stem_rx = (width as f32 * (0.09 + identity.unit_f32(6) * 0.04)) as i32;
     let stem_ry = (height as f32 * (0.18 + identity.unit_f32(7) * 0.05)) as i32;
     draw_background_accent(
-        &mut image, center_x, center_y, cap_rx, cap_ry, gill, 0.24, background,
+        &mut image, center_x, center_y, cap_rx, cap_ry, gill, 0.24, background, identity,
     );
     draw_filled_ellipse_mut(
         &mut image,
@@ -6199,6 +6215,7 @@ pub fn render_cactus_avatar_for_identity(
         shadow,
         0.20,
         background,
+        identity,
     );
     draw_filled_rect_mut(
         &mut image,
@@ -6293,7 +6310,7 @@ pub fn render_frog_avatar_for_identity(
     let head_rx = (width as f32 * (0.24 + identity.unit_f32(4) * 0.06)) as i32;
     let head_ry = (height as f32 * (0.18 + identity.unit_f32(5) * 0.05)) as i32;
     draw_background_accent(
-        &mut image, center_x, center_y, head_rx, head_ry, dark, 0.20, background,
+        &mut image, center_x, center_y, head_rx, head_ry, dark, 0.20, background, identity,
     );
     let eye_offset = (head_rx as f32 * 0.50) as i32;
     let eye_r = (head_rx as f32 * (0.18 + identity.unit_f32(7) * 0.04)) as i32;
@@ -6403,7 +6420,7 @@ pub fn render_panda_avatar_for_identity(
     let head_ry = (height as f32 * (0.22 + identity.unit_f32(7) * 0.04)) as i32;
     let ear_r = (head_rx as f32 * (0.28 + identity.unit_f32(8) * 0.08)) as i32;
     draw_background_accent(
-        &mut image, center_x, center_y, head_rx, head_ry, black, 0.16, background,
+        &mut image, center_x, center_y, head_rx, head_ry, black, 0.16, background, identity,
     );
     for side in [-1, 1] {
         draw_filled_circle_mut(
@@ -6508,6 +6525,7 @@ pub fn render_cupcake_avatar_for_identity(
         shadow,
         0.24,
         background,
+        identity,
     );
     draw_polygon_mut(
         &mut image,
@@ -6597,6 +6615,7 @@ pub fn render_pizza_avatar_for_identity(
         sauce,
         0.16,
         background,
+        identity,
     );
     draw_polygon_mut(
         &mut image,
@@ -6678,6 +6697,7 @@ pub fn render_icecream_avatar_for_identity(
         waffle,
         0.18,
         background,
+        identity,
     );
     draw_polygon_mut(
         &mut image,
@@ -6751,7 +6771,7 @@ pub fn render_octopus_avatar_for_identity(
     let head_rx = (width as f32 * (0.21 + identity.unit_f32(3) * 0.06)) as i32;
     let head_ry = (height as f32 * (0.20 + identity.unit_f32(4) * 0.06)) as i32;
     draw_background_accent(
-        &mut image, center_x, center_y, head_rx, head_ry, shade, 0.22, background,
+        &mut image, center_x, center_y, head_rx, head_ry, shade, 0.22, background, identity,
     );
     draw_filled_ellipse_mut(
         &mut image,
@@ -6832,7 +6852,7 @@ pub fn render_knight_avatar_for_identity(
     let helm_rx = (width as f32 * (0.20 + identity.unit_f32(4) * 0.05)) as i32;
     let helm_ry = (height as f32 * (0.24 + identity.unit_f32(5) * 0.05)) as i32;
     draw_background_accent(
-        &mut image, center_x, center_y, helm_rx, helm_ry, plume, 0.18, background,
+        &mut image, center_x, center_y, helm_rx, helm_ry, plume, 0.18, background, identity,
     );
     draw_filled_ellipse_mut(
         &mut image,
@@ -6907,7 +6927,7 @@ pub fn render_bear_avatar_for_identity(
         background_fill(background, bg).into(),
     );
     draw_background_accent(
-        &mut image, center_x, center_y, head_rx, head_ry, inner, 0.42, background,
+        &mut image, center_x, center_y, head_rx, head_ry, inner, 0.42, background, identity,
     );
 
     let ear_r = (head_rx as f32 * 0.28) as i32;
@@ -6976,7 +6996,7 @@ pub fn render_penguin_avatar_for_identity(
         background_fill(background, bg).into(),
     );
     draw_background_accent(
-        &mut image, center_x, center_y, body_rx, body_ry, orange, 0.36, background,
+        &mut image, center_x, center_y, body_rx, body_ry, orange, 0.36, background, identity,
     );
 
     draw_filled_ellipse_mut(
@@ -7063,7 +7083,7 @@ pub fn render_dragon_avatar_for_identity(
         background_fill(background, bg).into(),
     );
     draw_background_accent(
-        &mut image, center_x, center_y, head_rx, head_ry, flame, 0.40, background,
+        &mut image, center_x, center_y, head_rx, head_ry, flame, 0.40, background, identity,
     );
 
     for side in [-1, 1] {
@@ -7146,7 +7166,7 @@ pub fn render_ninja_avatar_for_identity(
         background_fill(background, bg).into(),
     );
     draw_background_accent(
-        &mut image, center_x, center_y, head_r, head_r, band, 0.38, background,
+        &mut image, center_x, center_y, head_r, head_r, band, 0.38, background, identity,
     );
 
     draw_filled_circle_mut(&mut image, (center_x, center_y), head_r, cloth.into());
@@ -7203,7 +7223,7 @@ pub fn render_astronaut_avatar_for_identity(
         background_fill(background, bg).into(),
     );
     draw_background_accent(
-        &mut image, center_x, center_y, helmet_r, helmet_r, trim, 0.40, background,
+        &mut image, center_x, center_y, helmet_r, helmet_r, trim, 0.40, background, identity,
     );
 
     draw_filled_rect_mut(
@@ -7265,7 +7285,7 @@ pub fn render_diamond_avatar_for_identity(
         background_fill(background, bg).into(),
     );
     draw_background_accent(
-        &mut image, center_x, center_y, rx, ry, highlight, 0.32, background,
+        &mut image, center_x, center_y, rx, ry, highlight, 0.32, background, identity,
     );
 
     let outer = [
@@ -7339,6 +7359,7 @@ pub fn render_coffee_cup_avatar_for_identity(
         cream,
         0.30,
         background,
+        identity,
     );
 
     draw_filled_rect_mut(
@@ -7402,7 +7423,7 @@ pub fn render_shield_avatar_for_identity(
         background_fill(background, bg).into(),
     );
     draw_background_accent(
-        &mut image, center_x, center_y, rx, ry, accent, 0.36, background,
+        &mut image, center_x, center_y, rx, ry, accent, 0.36, background, identity,
     );
 
     let shield = [
@@ -7476,7 +7497,7 @@ pub fn render_paws_avatar_for_identity(
             );
         }
     } else {
-        draw_decorative_background(&mut image, background, accent);
+        draw_decorative_background(&mut image, background, accent, identity);
     }
 
     let primary_x = width / 2;
@@ -7805,9 +7826,10 @@ fn draw_background_accent(
     accent: Color,
     accent_band_height: f32,
     background: AvatarBackground,
+    identity: &AvatarIdentity,
 ) {
     if background != AvatarBackground::Themed {
-        draw_decorative_background(image, background, accent);
+        draw_decorative_background(image, background, accent, identity);
         return;
     }
     let width = image.width() as i32;
@@ -8057,7 +8079,12 @@ fn background_fill(background: AvatarBackground, themed: Color) -> Color {
     }
 }
 
-fn draw_decorative_background(image: &mut RgbaImage, background: AvatarBackground, accent: Color) {
+fn draw_decorative_background(
+    image: &mut RgbaImage,
+    background: AvatarBackground,
+    accent: Color,
+    identity: &AvatarIdentity,
+) {
     match background {
         AvatarBackground::PolkaDot => draw_polka_dot_background(image, accent),
         AvatarBackground::Striped => draw_striped_background(image, accent),
@@ -8073,7 +8100,7 @@ fn draw_decorative_background(image: &mut RgbaImage, background: AvatarBackgroun
             Color::rgb(220, 248, 252),
             Color::rgb(75, 145, 190),
         ),
-        AvatarBackground::Starry => draw_starry_background(image),
+        AvatarBackground::Starry => draw_starry_background(image, identity),
         AvatarBackground::Themed
         | AvatarBackground::White
         | AvatarBackground::Black
@@ -8150,7 +8177,7 @@ fn draw_vertical_gradient_background(image: &mut RgbaImage, top: Color, bottom: 
     }
 }
 
-fn draw_starry_background(image: &mut RgbaImage) {
+fn draw_starry_background(image: &mut RgbaImage, identity: &AvatarIdentity) {
     let base = Color::rgb(17, 24, 39);
     fill_image(image, base);
 
@@ -8158,7 +8185,20 @@ fn draw_starry_background(image: &mut RgbaImage) {
     let star_count = (min_side / 7).clamp(10, 180);
     let mut state = 0x9e37_79b9_u32
         ^ image.width().wrapping_mul(0x85eb_ca6b)
-        ^ image.height().wrapping_mul(0xc2b2_ae35);
+        ^ image.height().wrapping_mul(0xc2b2_ae35)
+        ^ u32::from_le_bytes([
+            identity.byte(40),
+            identity.byte(41),
+            identity.byte(42),
+            identity.byte(43),
+        ])
+        ^ u32::from_le_bytes([
+            identity.byte(44),
+            identity.byte(45),
+            identity.byte(46),
+            identity.byte(47),
+        ])
+        .rotate_left(13);
     for index in 0..star_count {
         state = state.wrapping_mul(1_664_525).wrapping_add(1_013_904_223);
         let x = state % image.width().max(1);
@@ -8202,7 +8242,9 @@ fn lerp_color_u32(start: Color, end: Color, position: u32, max_position: u32) ->
 fn lerp_channel_u32(start: u8, end: u8, position: u32, max_position: u32) -> u8 {
     let start = u32::from(start);
     let end = u32::from(end);
-    ((start * (max_position - position) + end * position + max_position / 2) / max_position) as u8
+    let max = max_position.max(1);
+    let position = position.min(max);
+    ((start * (max - position) + end * position + max / 2) / max) as u8
 }
 
 fn color_hex(color: Color) -> String {
@@ -10129,6 +10171,14 @@ mod tests {
     }
 
     #[test]
+    fn identity_byte_access_falls_back_for_out_of_range_indices() {
+        let identity = valid_identity("alice@example.com");
+
+        assert_eq!(identity.byte(64), 0);
+        assert_eq!(identity.unit_f32(64), 0.0);
+    }
+
+    #[test]
     fn renderer_rng_seed_copy_is_zeroized_before_rng_use() {
         let source = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/src/lib.rs"));
         let helper = source
@@ -10141,10 +10191,23 @@ mod tests {
             })
             .expect("seeded renderer rng helper should exist");
 
-        assert!(helper.contains("let mut rng_seed_value = *rng_seed;"));
+        assert!(helper.contains("let rng_seed_value = Zeroizing::new(*rng_seed);"));
         assert!(helper.contains("drop(rng_seed);"));
-        assert!(helper.contains("let rng = StdRng::from_seed(rng_seed_value);"));
-        assert!(helper.contains("rng_seed_value.zeroize();"));
+        assert!(helper.contains("StdRng::from_seed(*rng_seed_value)"));
+        assert!(!helper.contains("let mut rng_seed_value = *rng_seed;"));
+    }
+
+    #[test]
+    fn identity_digest_intermediate_uses_zeroizing_guard() {
+        let source = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/src/lib.rs"));
+        let helper = source
+            .split("fn derive_identity_digest")
+            .nth(1)
+            .and_then(|after_name| after_name.split("fn identity_hash_preimage").next())
+            .expect("identity digest helper should exist");
+
+        assert!(helper.contains("Zeroizing::new(active_identity_digest(&preimage))"));
+        assert!(helper.contains("preimage.zeroize();"));
     }
 
     #[test]
@@ -10288,6 +10351,17 @@ mod tests {
         assert_eq!(error.component(), AvatarIdentityComponent::Input);
         assert_eq!(error.length(), MAX_AVATAR_ID_BYTES + 1);
         assert_eq!(error.max(), MAX_AVATAR_ID_BYTES);
+    }
+
+    #[test]
+    fn avatar_identity_error_display_omits_exact_rejected_length() {
+        let too_long = vec![b'a'; MAX_AVATAR_ID_BYTES + 1];
+        let error = AvatarIdentity::new(&too_long).expect_err("oversized identity should fail");
+        let message = error.to_string();
+
+        assert!(message.contains("identity input"));
+        assert!(message.contains(&MAX_AVATAR_ID_BYTES.to_string()));
+        assert!(!message.contains(&(MAX_AVATAR_ID_BYTES + 1).to_string()));
     }
 
     #[test]
@@ -11505,6 +11579,22 @@ mod tests {
     }
 
     #[test]
+    fn minimum_size_renders_all_avatar_families_without_artifact_panics() {
+        let spec = valid_spec(MIN_AVATAR_DIMENSION, MIN_AVATAR_DIMENSION, 0);
+        for kind in AvatarKind::ALL {
+            let image = render_avatar_for_id(
+                spec,
+                "minimum-size@example.com",
+                AvatarOptions::new(*kind, AvatarBackground::Themed),
+            );
+
+            assert_eq!(image.width(), MIN_AVATAR_DIMENSION, "{kind}");
+            assert_eq!(image.height(), MIN_AVATAR_DIMENSION, "{kind}");
+            assert!(image.pixels().any(|pixel| pixel.0[3] != 0), "{kind}");
+        }
+    }
+
+    #[test]
     fn avatar_identity_implements_zeroize() {
         fn assert_zeroize<T: Zeroize>() {}
 
@@ -11597,6 +11687,23 @@ mod tests {
                 10, 20, 30,
             ]
         );
+    }
+
+    #[test]
+    fn starry_background_pattern_depends_on_identity() {
+        let mut left = RgbaImage::new(128, 128);
+        let mut right = RgbaImage::new(128, 128);
+
+        draw_starry_background(&mut left, &valid_identity("alice@example.com"));
+        draw_starry_background(&mut right, &valid_identity("bob@example.com"));
+
+        assert_ne!(left.as_raw(), right.as_raw());
+    }
+
+    #[test]
+    fn lerp_channel_clamps_position_to_prevent_underflow() {
+        assert_eq!(lerp_channel_u32(0, 255, 10, 5), 255);
+        assert_eq!(lerp_channel_u32(255, 0, 10, 5), 0);
     }
 
     #[test]

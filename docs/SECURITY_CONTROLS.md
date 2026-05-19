@@ -37,8 +37,9 @@
   digest, separate from the lower digest bytes commonly used for direct visual
   parameters.
 - The temporary 256-bit RNG seed copy is stored in `zeroize::Zeroizing`, so the
-  digest-derived seed copy is scrubbed immediately after seeding the renderer
-  RNG.
+  digest-derived seed copy is scrubbed on scope exit. The final value passed to
+  `StdRng::from_seed` is also held in a `Zeroizing` guard before the copy into
+  `StdRng`.
 - The procedural RNG itself is `rand::rngs::StdRng`. Its expanded internal
   state is not zeroized on drop because `StdRng` does not currently implement
   `ZeroizeOnDrop`. In the default SHA-512 mode, recovering the original
@@ -54,18 +55,33 @@
   short-lived so digest bytes do not remain live in multiple memory locations
   longer than necessary.
 - Derived identity digests and temporary hash preimage buffers are zeroized
-  when dropped.
+  when dropped. The intermediate 64-byte digest returned by each hash backend is
+  held in `Zeroizing` guards before being copied into `AvatarIdentity`.
 - The SHA-512 dependency is built with its `zeroize` feature so its block
-  buffer uses upstream `ZeroizeOnDrop`. The optional BLAKE3 dependency is built
-  with its `zeroize` feature, and `hashavatar` explicitly zeroizes the BLAKE3
-  hasher and XOF reader after deriving the 64-byte digest. Tests assert these
-  upstream zeroization traits remain available.
+  buffer uses upstream `ZeroizeOnDrop`. SHA-512 `finalize()` still returns the
+  digest output by value, so the output bytes have the same unavoidable
+  by-value-copy caveats as the BLAKE3 and XXH3 paths. `hashavatar` wraps that
+  returned digest in `Zeroizing` immediately. The optional BLAKE3 dependency is
+  built with its `zeroize` feature, and `hashavatar` explicitly zeroizes the
+  BLAKE3 hasher and XOF reader after deriving the 64-byte digest. Tests assert
+  these upstream zeroization traits remain available.
 - Identity hash preimage allocation is sized from the tenant, style-version,
   and identity input lengths. The crate bounds and zeroizes those temporary
   buffers, but it does not hide input length from the allocator, OS-level heap
   profilers, or other same-process memory-observation tools. Very
   high-assurance callers that treat identifier length as sensitive should
   normalize or pad identifiers to a fixed length before calling this crate.
+- The optional XXH3-128 mode derives the crate's 64-byte identity digest by
+  hashing four domain-separated chunks. Each chunk temporarily copies the
+  bounded preimage into a zeroized buffer, so peak preimage memory is higher
+  than SHA-512 or BLAKE3. Keep XXH3 for low-stakes, non-adversarial workloads
+  where its non-cryptographic collision profile and extra temporary preimage
+  copy are acceptable.
+- The crate seeds its own rendering RNG deterministically from identity digest
+  bytes and does not use OS entropy for avatar rendering. The `rand` dependency
+  may still bring a transitive `getrandom` dependency into the lockfile; WASM
+  and embedded applications that use OS-backed randomness elsewhere in the same
+  binary must configure and test `getrandom` for their target explicitly.
 - Encode APIs wrap temporary owned raster buffers in RAII zeroization guards, so
   pixel data is cleared during normal returns, encoder errors, and unwinding
   panics. JPEG export also wraps the temporary RGB flattening buffer in
@@ -90,10 +106,15 @@
   semaphore wrapper because concurrency primitives belong to the caller's
   async/runtime boundary.
 - Internal rectangle helpers use saturating or clamping arithmetic for edge and
-  intersection calculations.
+  intersection calculations. Rectangle size construction promotes zero
+  dimensions to a one-pixel rectangle so rounded-down decorative features remain
+  non-panicking; minimum-size rendering is covered by regression tests.
 - Raster frame-shape hit-testing uses integer arithmetic for circle, squircle,
   hexagon, and octagon masks, reducing platform-specific floating-point
   rounding in clipping decisions.
+- Decorative raster backgrounds are deterministic. Pattern and gradient modes
+  are explicit by design, while the starry background now incorporates identity
+  digest bytes in its local deterministic star-position generator.
 - Polygon rasterization returns immediately for empty polygons and zero-sized
   images, widens scanline interpolation math before rounding, and is covered by
   a dedicated fuzz harness for arbitrary image dimensions, degenerate polygons,

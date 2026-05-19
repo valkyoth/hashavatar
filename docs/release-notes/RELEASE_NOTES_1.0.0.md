@@ -36,6 +36,16 @@ series.
 - Public dimensions, identity inputs, and namespace components remain bounded.
 - Public render APIs return typed errors for invalid inputs instead of
   panicking.
+- `AvatarIdentityError` keeps the rejected length available through structured
+  accessors, but its display text no longer prints the exact rejected byte
+  count.
+- Temporary renderer seed and intermediate identity digest copies are guarded
+  with `zeroize::Zeroizing` before their final required by-value copies.
+- Starry raster backgrounds incorporate identity digest bytes in their
+  deterministic local star-position generator.
+- Internal identity digest byte access is defensive against future
+  out-of-range renderer mistakes, and the avatar fuzz harness now samples the
+  full supported dimension range.
 - The default build remains SHA-512 identity hashing plus WebP encoding.
 - Optional BLAKE3, XXH3-128, PNG, JPEG, and GIF support remain explicit Cargo
   features.

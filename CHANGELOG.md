@@ -13,6 +13,15 @@
 - Added `docs/STABILITY.md` to release metadata/package validation so future
   releases keep the stability policy in the published crate.
 - Added 1.0 release notes.
+- Hardened the 1.0 candidate after pentest review by keeping the renderer RNG
+  seed copy in a `Zeroizing` guard until seeding, guarding the intermediate
+  identity digest copy, making starry raster backgrounds identity-dependent,
+  clamping gradient interpolation inputs, and removing the exact rejected byte
+  count from `AvatarIdentityError` display text.
+- Documented target-specific `getrandom` considerations, XXH3 temporary
+  preimage-copy overhead, and rectangle zero-size clamping behavior.
+- Added defensive digest-byte indexing and widened the avatar fuzz harness so it
+  covers the full supported `64..=2048` dimension range.
 - No avatar families, backgrounds, visual layers, hash modes, output formats,
   or runtime dependencies were added in this release.
 
