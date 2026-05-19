@@ -13,7 +13,7 @@
 - Added `docs/STABILITY.md` to release metadata/package validation so future
   releases keep the stability policy in the published crate.
 - Added 1.0 release notes.
-- Hardened the 1.0 candidate after pentest review by keeping the renderer RNG
+- Hardened the 1.0 release after pentest review by keeping the renderer RNG
   seed copy in a `Zeroizing` guard until seeding, guarding the intermediate
   identity digest copy, making starry raster backgrounds identity-dependent,
   clamping gradient interpolation inputs, and removing the exact rejected byte
