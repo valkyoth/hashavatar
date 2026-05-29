@@ -1,3 +1,26 @@
+<p align="center">
+  <b>Secure deterministic procedural avatars for Rust.</b><br>
+  Stable identity hashing, safe Rust rendering, in-memory WebP/SVG output, and release-gated security evidence.
+</p>
+
+<div align="center">
+  <a href="https://docs.rs/hashavatar">Docs.rs</a>
+  |
+  <a href="docs/SECURITY_CONTROLS.md">Security Controls</a>
+  |
+  <a href="docs/STABILITY.md">Stability Policy</a>
+  |
+  <a href="docs/VERSION_PLAN.md">Roadmap</a>
+  |
+  <a href="SECURITY.md">Security</a>
+</div>
+
+<br>
+
+<p align="center">
+  <img src="https://raw.githubusercontent.com/valkyoth/hashavatar/main/.github/images/hashavatar.webp" alt="hashavatar Rust crate overview">
+</p>
+
 # hashavatar
 
 `hashavatar` is a Rust crate for deterministic, procedural avatar generation. It is designed for services that need stable user or tenant avatars without bundled artwork, sprite sheets, external asset packs, or filesystem-side effects.
@@ -52,7 +75,7 @@ Planned or intentionally external:
 | Area | Status |
 | --- | --- |
 | License | `MIT OR Apache-2.0` |
-| MSRV | Rust `1.95.0` |
+| MSRV | Rust `1.90.0` |
 | Crate shape | Library only |
 | Runtime dependencies | `image`, `palette`, `rand`, `sha2`, `subtle`, `zeroize`; optional `blake3`, `xxhash-rust`, `image/png`, `image/jpeg`, `image/gif` |
 | Unsafe policy | `#![forbid(unsafe_code)]` |
@@ -70,6 +93,28 @@ Future version planning lives in [docs/VERSION_PLAN.md](docs/VERSION_PLAN.md).
 `hashavatar` remains a single image-generation crate; low-level core planning
 is kept internal unless a future release has a concrete image-generation reason
 to split it.
+
+## Rust Version Support
+
+The minimum supported Rust version is Rust `1.90.0`. New deployments should
+prefer the latest stable Rust; as of May 29, 2026, that is Rust `1.96.0`.
+
+Compatibility evidence for `1.0.0`:
+
+| Rust | Local Evidence |
+| --- | --- |
+| `1.90.0` | ✓ full release gate |
+| `1.91.0` | ✓ `cargo check --features all-formats` |
+| `1.92.0` | ✓ `cargo check --features all-formats` |
+| `1.93.0` | ✓ `cargo check --features all-formats` |
+| `1.94.0` | ✓ `cargo check --features all-formats` |
+| `1.95.0` | ✓ `cargo check --features all-formats` |
+| `1.96.0` | ✓ `cargo check --features all-formats` |
+
+Optional hash modes are mutually exclusive, so `hashavatar` cannot use a single
+`--all-features` evidence run. The `1.90.0` MSRV was also checked with
+`cargo check --features "blake3 all-formats"` and
+`cargo check --features "xxh3 all-formats"`.
 
 ## Install
 

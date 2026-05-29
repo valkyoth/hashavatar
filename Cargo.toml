@@ -2,7 +2,7 @@
 name = "hashavatar"
 version = "1.0.0"
 edition = "2024"
-rust-version = "1.95"
+rust-version = "1.90"
 description = "Stable deterministic procedural avatars in Rust with configurable identity hashing, WebP, optional PNG/JPEG/GIF, and SVG export"
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/valkyoth/hashavatar"
@@ -11,7 +11,7 @@ documentation = "https://docs.rs/hashavatar/latest/hashavatar/"
 readme = "README.md"
 keywords = ["avatar", "identicon", "procedural", "webp", "svg"]
 categories = ["multimedia::images", "graphics"]
-exclude = ["Screenshot_*.png", "fuzz/**", "target/**"]
+exclude = ["Screenshot_*.png", ".github/images/**", "fuzz/**", "target/**"]
 
 [lints.rust]
 unexpected_cfgs = { level = "warn", check-cfg = ["cfg(fuzzing)"] }
