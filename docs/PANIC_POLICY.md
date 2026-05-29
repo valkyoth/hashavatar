@@ -6,6 +6,11 @@ Library code should return `Result` for caller-controlled invalid input. Panics 
 
 - Public rendering APIs return `AvatarSpecError` for unsupported dimensions instead of panicking.
 - Rectangle helpers use saturating or clamping arithmetic so future internal placement changes cannot overflow or panic in these helpers.
+- `AvatarIdentity::byte` uses a debug-only assertion to catch internal digest
+  offset mistakes in tests and debug builds. Release builds keep the
+  non-panicking fallback for defense in depth.
 - Tests may use `expect`, `panic`, and related assertions freely.
 
-New production `unwrap`, `expect`, `panic`, or `unreachable` sites should be added only with a concrete invariant and a matching update to the validation script.
+New production `unwrap`, `expect`, `panic`, `debug_assert`, or `unreachable`
+sites should be added only with a concrete invariant and a matching update to
+the validation script.

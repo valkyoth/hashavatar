@@ -17,6 +17,9 @@ check_file() {
             if ($0 ~ /unreachable!\("SVG is handled outside AvatarOutputFormat"\)/) {
                 allowed = 1
             }
+            if ($0 ~ /debug_assert!\(/) {
+                allowed = 1
+            }
             if (!allowed) {
                 printf "panic policy: unreviewed panic-like site in %s:%d: %s\n", FILENAME, FNR, $0 > "/dev/stderr"
                 failed = 1

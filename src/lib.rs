@@ -742,11 +742,12 @@ impl AvatarSpec {
     }
 
     pub const fn pixel_count(self) -> usize {
-        (self.width as usize) * (self.height as usize)
+        (self.width as usize).saturating_mul(self.height as usize)
     }
 
     pub const fn rgba_buffer_len(self) -> usize {
-        self.pixel_count() * AVATAR_RGBA_BYTES_PER_PIXEL
+        self.pixel_count()
+            .saturating_mul(AVATAR_RGBA_BYTES_PER_PIXEL)
     }
 
     pub const fn render_resource_budget(
@@ -1066,6 +1067,10 @@ impl AvatarIdentity {
     }
 
     fn byte(&self, index: usize) -> u8 {
+        debug_assert!(
+            index < self.digest.len(),
+            "identity digest byte index {index} out of range"
+        );
         // Keep future renderer additions non-panicking if a digest offset is
         // miscomputed; tests still cover the currently used offset range.
         match self.digest.get(index) {
@@ -10171,11 +10176,15 @@ mod tests {
     }
 
     #[test]
-    fn identity_byte_access_falls_back_for_out_of_range_indices() {
+    fn identity_byte_access_debug_asserts_for_out_of_range_indices() {
         let identity = valid_identity("alice@example.com");
 
-        assert_eq!(identity.byte(64), 0);
-        assert_eq!(identity.unit_f32(64), 0.0);
+        if cfg!(debug_assertions) {
+            assert!(std::panic::catch_unwind(|| identity.byte(64)).is_err());
+        } else {
+            assert_eq!(identity.byte(64), 0);
+            assert_eq!(identity.unit_f32(64), 0.0);
+        }
     }
 
     #[test]
@@ -11489,6 +11498,17 @@ mod tests {
             MAX_AVATAR_RGBA_BYTES,
             2048_usize * 2048_usize * AVATAR_RGBA_BYTES_PER_PIXEL
         );
+    }
+
+    #[test]
+    fn avatar_spec_size_helpers_saturate_for_unchecked_future_values() {
+        let spec = AvatarSpec::new_unchecked(u32::MAX, u32::MAX, 0);
+
+        assert_eq!(
+            spec.pixel_count(),
+            (u32::MAX as usize).saturating_mul(u32::MAX as usize)
+        );
+        assert_eq!(spec.rgba_buffer_len(), usize::MAX);
     }
 
     #[test]

@@ -29,7 +29,7 @@ The crate starts conservative: validated avatar dimensions, bounded identity inp
 
 ## Current Status
 
-The current crate version is `1.0.0`.
+The current crate version is `1.0.1`.
 
 Implemented now:
 
@@ -99,7 +99,7 @@ to split it.
 The minimum supported Rust version is Rust `1.90.0`. New deployments should
 prefer the latest stable Rust; as of May 29, 2026, that is Rust `1.96.0`.
 
-Compatibility evidence for `1.0.0`:
+Compatibility evidence for `1.0.1`:
 
 | Rust | Local Evidence |
 | --- | --- |
@@ -120,7 +120,7 @@ Optional hash modes are mutually exclusive, so `hashavatar` cannot use a single
 
 ```toml
 [dependencies]
-hashavatar = "1.0.0"
+hashavatar = "1.0.1"
 ```
 
 Optional identity hash modes and extra raster encoders are disabled by default.
@@ -128,21 +128,21 @@ Hash modes are mutually exclusive, so enable at most one of `blake3` or `xxh3`:
 
 ```toml
 [dependencies]
-hashavatar = { version = "1.0.0", features = ["blake3"] }
+hashavatar = { version = "1.0.1", features = ["blake3"] }
 ```
 
 Enable additional raster formats explicitly:
 
 ```toml
 [dependencies]
-hashavatar = { version = "1.0.0", features = ["png", "jpeg", "gif"] }
+hashavatar = { version = "1.0.1", features = ["png", "jpeg", "gif"] }
 ```
 
 Or enable every optional raster encoder at once:
 
 ```toml
 [dependencies]
-hashavatar = { version = "1.0.0", features = ["all-formats"] }
+hashavatar = { version = "1.0.1", features = ["all-formats"] }
 ```
 
 Combine these as needed, for example `features = ["blake3", "png"]`.
@@ -162,7 +162,7 @@ license = "MIT OR Apache-2.0"
 
 ## Stable Contract
 
-`1.0.0` freezes the crate's public API shape and documented rendering contract.
+The `1.x` series keeps the crate's public API shape and documented rendering contract stable.
 Patch releases should not intentionally change output for the same explicit
 rendering tuple except for correctness or security fixes. Minor releases may
 add opt-in features, output formats, avatar families, backgrounds, or visual
@@ -440,7 +440,7 @@ your namespace style version when intentionally migrating output.
 
 ```toml
 [dependencies]
-hashavatar = { version = "1.0.0", features = ["blake3"] }
+hashavatar = { version = "1.0.1", features = ["blake3"] }
 ```
 
 ```rust
@@ -468,7 +468,7 @@ assert!(svg.contains("alien avatar"));
 
 ```toml
 [dependencies]
-hashavatar = { version = "1.0.0", features = ["xxh3"] }
+hashavatar = { version = "1.0.1", features = ["xxh3"] }
 ```
 
 ```rust

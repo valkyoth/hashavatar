@@ -39,7 +39,9 @@
 - The temporary 256-bit RNG seed copy is stored in `zeroize::Zeroizing`, so the
   digest-derived seed copy is scrubbed on scope exit. The final value passed to
   `StdRng::from_seed` is also held in a `Zeroizing` guard before the copy into
-  `StdRng`.
+  `StdRng`. `StdRng::from_seed` still takes the seed by value, so a transient
+  unguarded argument copy is part of the crate's documented by-value-copy
+  zeroization caveat.
 - The procedural RNG itself is `rand::rngs::StdRng`. Its expanded internal
   state is not zeroized on drop because `StdRng` does not currently implement
   `ZeroizeOnDrop`. In the default SHA-512 mode, recovering the original

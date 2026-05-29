@@ -1,5 +1,22 @@
 # Changelog
 
+## 1.0.1
+
+- Bumped the crate to `1.0.1`.
+- Refreshed compatible transitive dependencies in `Cargo.lock` and the fuzz
+  harness lockfile.
+- Updated the GitHub CI `taiki-e/install-action` pin to `v2.79.14`.
+- Lowered the documented and manifest MSRV to Rust `1.90.0` after running the
+  full release gate on `1.90.0` and compatibility checks through Rust `1.96.0`.
+- Added the README header artwork and Rust version support table. The README
+  image is kept in the repository but excluded from the published crate package.
+- Added a debug assertion for future out-of-range identity digest byte access
+  while keeping release builds non-panicking.
+- Changed public avatar size helper arithmetic to saturating multiplication for
+  future-proofing.
+- Clarified that the `StdRng::from_seed` by-value seed argument copy is part of
+  the documented zeroization residual.
+
 ## 1.0.0
 
 - Bumped the crate to `1.0.0`.
