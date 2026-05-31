@@ -238,13 +238,15 @@ dependencies = [
 
 [[package]]
 name = "hashavatar"
-version = "1.0.1"
+version = "1.0.2"
 dependencies = [
  "blake3",
  "image",
  "palette",
  "rand",
  "roxmltree",
+ "serde",
+ "serde_json",
  "sha2",
  "subtle",
  "xxhash-rust",

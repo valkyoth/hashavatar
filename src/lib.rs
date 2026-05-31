@@ -6,21 +6,13 @@
 //!
 //! Typical usage:
 //! ```no_run
-//! use hashavatar::{
-//!     AvatarBackground, AvatarKind, AvatarOptions, AvatarOutputFormat, AvatarSpec,
-//!     encode_avatar_for_id,
-//! };
+//! use hashavatar::prelude::*;
 //!
-//! let spec = AvatarSpec::new(256, 256, 0)?;
-//! let bytes = encode_avatar_for_id(
-//!     spec,
-//!     "robot@hashavatar.app",
-//!     AvatarOutputFormat::WebP,
-//!     AvatarOptions {
-//!         kind: AvatarKind::Robot,
-//!         background: AvatarBackground::Transparent,
-//!     },
-//! )?;
+//! let bytes = AvatarBuilder::for_id("robot@hashavatar.app")
+//!     .size(256, 256)
+//!     .kind(AvatarKind::Robot)
+//!     .background(AvatarBackground::Transparent)
+//!     .encode(AvatarOutputFormat::WebP)?;
 //! # Ok::<(), Box<dyn std::error::Error>>(())
 //! ```
 
@@ -53,8 +45,9 @@ use image::{
 };
 use palette::{FromColor, Hsl, Srgb};
 use rand::{RngExt, SeedableRng, rngs::StdRng};
+use sha2::Digest;
 #[cfg(not(any(feature = "blake3", feature = "xxh3")))]
-use sha2::{Digest, Sha512};
+use sha2::Sha512;
 use subtle::ConstantTimeEq;
 use zeroize::{Zeroize, Zeroizing};
 
@@ -116,8 +109,18 @@ pub const AVATAR_STYLE_EXPRESSION_BYTE: usize = 4;
 /// Identity digest byte used for automatic frame-shape selection.
 pub const AVATAR_STYLE_SHAPE_BYTE: usize = 5;
 
+/// Common imports for application code using the high-level avatar APIs.
+pub mod prelude {
+    pub use crate::{
+        AvatarAccessory, AvatarBackground, AvatarBuilder, AvatarColor, AvatarError,
+        AvatarExpression, AvatarIdentity, AvatarIdentityOptions, AvatarKind, AvatarNamespace,
+        AvatarOptions, AvatarOutputFormat, AvatarShape, AvatarSpec, AvatarStyleOptions,
+    };
+}
+
 const HASH_DOMAIN: &[u8] = b"hashavatar";
 const HASH_DOMAIN_ALGORITHM_COMPONENT: &[u8] = b"identity-hash";
+const CACHE_KEY_DOMAIN: &[u8] = b"hashavatar-cache-key-v1";
 #[cfg(feature = "blake3")]
 const ACTIVE_HASH_ALGORITHM_LABEL: &[u8] = b"blake3";
 #[cfg(all(not(feature = "blake3"), feature = "xxh3"))]
@@ -709,6 +712,12 @@ pub struct AvatarSpec {
 }
 
 impl AvatarSpec {
+    /// Creates a validated avatar specification.
+    ///
+    /// The `seed` is a caller-controlled style variant mixed into the
+    /// identity-derived renderer RNG. It does not replace identity hashing:
+    /// the same `(namespace, identity, style, size, seed)` tuple is stable, and
+    /// changing only `seed` deliberately produces a different visual variant.
     pub const fn new(width: u32, height: u32, seed: u64) -> Result<Self, AvatarSpecError> {
         if Self::dimensions_are_supported(width, height) {
             Ok(Self {
@@ -980,6 +989,66 @@ impl std::error::Error for AvatarRenderError {
     }
 }
 
+/// Unified error type for high-level avatar APIs.
+///
+/// Lower-level functions keep their more specific error types for existing
+/// callers. New convenience APIs such as [`AvatarBuilder`] return
+/// `AvatarError` so `?` works across identity validation, dimension validation,
+/// rendering, and encoding.
+#[derive(Debug)]
+pub enum AvatarError {
+    Spec(AvatarSpecError),
+    Identity(AvatarIdentityError),
+    Render(AvatarRenderError),
+    Image(ImageError),
+}
+
+impl From<AvatarSpecError> for AvatarError {
+    fn from(error: AvatarSpecError) -> Self {
+        Self::Spec(error)
+    }
+}
+
+impl From<AvatarIdentityError> for AvatarError {
+    fn from(error: AvatarIdentityError) -> Self {
+        Self::Identity(error)
+    }
+}
+
+impl From<AvatarRenderError> for AvatarError {
+    fn from(error: AvatarRenderError) -> Self {
+        Self::Render(error)
+    }
+}
+
+impl From<ImageError> for AvatarError {
+    fn from(error: ImageError) -> Self {
+        Self::Image(error)
+    }
+}
+
+impl std::fmt::Display for AvatarError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Spec(error) => error.fmt(f),
+            Self::Identity(error) => error.fmt(f),
+            Self::Render(error) => error.fmt(f),
+            Self::Image(error) => error.fmt(f),
+        }
+    }
+}
+
+impl std::error::Error for AvatarError {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        match self {
+            Self::Spec(error) => Some(error),
+            Self::Identity(error) => Some(error),
+            Self::Render(error) => Some(error),
+            Self::Image(error) => Some(error),
+        }
+    }
+}
+
 /// Options for deriving a stable avatar identity.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct AvatarIdentityOptions<'a> {
@@ -1058,6 +1127,33 @@ impl AvatarIdentity {
         Self {
             digest: derive_identity_digest(options, input),
         }
+    }
+
+    /// Returns an opaque, display-safe cache key for this identity.
+    ///
+    /// The returned string is a 64-character lowercase hexadecimal key derived
+    /// by hashing the internal identity digest under a cache-key domain. It is
+    /// stable for the same identity and active hash mode, but it does not expose
+    /// the raw 64-byte identity digest.
+    ///
+    /// # Security
+    ///
+    /// Cache keys still enable correlation: the same identity produces the same
+    /// cache key. Treat cache keys as public identifiers for cache lookup, not
+    /// as authentication secrets.
+    pub fn cache_key(&self) -> String {
+        let mut preimage = Vec::with_capacity(
+            length_prefixed_component_size(CACHE_KEY_DOMAIN)
+                + length_prefixed_component_size(&self.digest),
+        );
+        update_hash_input_component(&mut preimage, CACHE_KEY_DOMAIN);
+        update_hash_input_component(&mut preimage, &self.digest);
+
+        let mut hasher = sha2::Sha512::new();
+        hasher.update(&preimage);
+        let digest = Zeroizing::new(<[u8; 64]>::from(hasher.finalize()));
+        preimage.zeroize();
+        hex_lower(&digest[..32])
     }
 
     fn rng_seed(&self) -> Zeroizing<[u8; 32]> {
@@ -1185,6 +1281,16 @@ const fn length_prefixed_component_size(bytes: &[u8]) -> usize {
 fn update_hash_input_component(preimage: &mut Vec<u8>, bytes: &[u8]) {
     preimage.extend_from_slice(&(bytes.len() as u64).to_le_bytes());
     preimage.extend_from_slice(bytes);
+}
+
+fn hex_lower(bytes: &[u8]) -> String {
+    const HEX: &[u8; 16] = b"0123456789abcdef";
+    let mut encoded = String::with_capacity(bytes.len().saturating_mul(2));
+    for byte in bytes {
+        encoded.push(HEX[usize::from(byte >> 4)] as char);
+        encoded.push(HEX[usize::from(byte & 0x0f)] as char);
+    }
+    encoded
 }
 
 #[cfg(not(any(feature = "blake3", feature = "xxh3")))]
@@ -1967,6 +2073,45 @@ impl std::fmt::Display for AvatarShape {
     }
 }
 
+#[cfg(feature = "serde")]
+macro_rules! impl_serde_string_enum {
+    ($ty:ty) => {
+        impl serde::Serialize for $ty {
+            fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+            where
+                S: serde::Serializer,
+            {
+                serializer.serialize_str(self.as_str())
+            }
+        }
+
+        impl<'de> serde::Deserialize<'de> for $ty {
+            fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+            where
+                D: serde::Deserializer<'de>,
+            {
+                let value = <&str as serde::Deserialize>::deserialize(deserializer)?;
+                value.parse().map_err(serde::de::Error::custom)
+            }
+        }
+    };
+}
+
+#[cfg(feature = "serde")]
+impl_serde_string_enum!(AvatarOutputFormat);
+#[cfg(feature = "serde")]
+impl_serde_string_enum!(AvatarKind);
+#[cfg(feature = "serde")]
+impl_serde_string_enum!(AvatarBackground);
+#[cfg(feature = "serde")]
+impl_serde_string_enum!(AvatarAccessory);
+#[cfg(feature = "serde")]
+impl_serde_string_enum!(AvatarColor);
+#[cfg(feature = "serde")]
+impl_serde_string_enum!(AvatarExpression);
+#[cfg(feature = "serde")]
+impl_serde_string_enum!(AvatarShape);
+
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 pub struct AvatarOptions {
     pub kind: AvatarKind,
@@ -2036,6 +2181,10 @@ impl AvatarStyleOptions {
         AvatarOptions::new(self.kind, self.background)
     }
 
+    pub fn summary(self) -> String {
+        self.to_string()
+    }
+
     const fn has_extra_layers(self) -> bool {
         !matches!(self.accessory, AvatarAccessory::None)
             || !matches!(self.color, AvatarColor::Default)
@@ -2053,6 +2202,16 @@ impl From<AvatarOptions> for AvatarStyleOptions {
 impl From<AvatarStyleOptions> for AvatarOptions {
     fn from(options: AvatarStyleOptions) -> Self {
         options.legacy_options()
+    }
+}
+
+impl std::fmt::Display for AvatarStyleOptions {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "{} / {} / {} / {} / {} / {}",
+            self.kind, self.background, self.accessory, self.color, self.expression, self.shape
+        )
     }
 }
 
@@ -2705,6 +2864,178 @@ impl AvatarRenderPlan {
             AvatarBackground::Starry => {
                 r##"<defs><pattern id="hashavatar-bg-starry" width="40" height="40" patternUnits="userSpaceOnUse"><rect width="40" height="40" fill="#111827"/><circle cx="8" cy="9" r="1.2" fill="#ffffff" opacity="0.7"/><circle cx="28" cy="14" r="1" fill="#ffffff" opacity="0.55"/><circle cx="18" cy="31" r="1.4" fill="#ffffff" opacity="0.65"/></pattern></defs><rect width="100%" height="100%" fill="url(#hashavatar-bg-starry)"/>"##.to_owned()
             }
+        }
+    }
+}
+
+/// Fluent high-level API for common avatar rendering paths.
+///
+/// The builder is additive over the lower-level free functions. It stores
+/// validation failures and returns them from render/encode methods, so invalid
+/// size or namespace input remains non-panicking.
+#[derive(Clone)]
+pub struct AvatarBuilder<'a, T> {
+    id: T,
+    spec: Result<AvatarSpec, AvatarSpecError>,
+    namespace: Result<AvatarNamespace<'a>, AvatarIdentityError>,
+    style: Option<AvatarStyleOptions>,
+}
+
+impl<T> std::fmt::Debug for AvatarBuilder<'_, T> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("AvatarBuilder")
+            .field("id", &"[REDACTED]")
+            .field("spec", &self.spec)
+            .field("namespace", &self.namespace)
+            .field("style", &self.style)
+            .finish()
+    }
+}
+
+impl<T> AvatarBuilder<'static, T> {
+    /// Starts a builder for an identity input.
+    pub fn for_id(id: T) -> Self {
+        Self {
+            id,
+            spec: Ok(AvatarSpec::default()),
+            namespace: Ok(AvatarNamespace::default()),
+            style: Some(AvatarStyleOptions::default()),
+        }
+    }
+}
+
+impl<'a, T> AvatarBuilder<'a, T> {
+    /// Uses an already validated avatar specification.
+    pub fn spec(mut self, spec: AvatarSpec) -> Self {
+        self.spec = Ok(spec);
+        self
+    }
+
+    /// Sets the avatar dimensions while preserving the current style variant
+    /// seed when possible.
+    pub fn size(mut self, width: u32, height: u32) -> Self {
+        let seed = self.spec.ok().map(AvatarSpec::seed).unwrap_or_default();
+        self.spec = AvatarSpec::new(width, height, seed);
+        self
+    }
+
+    /// Sets the caller-controlled style variant seed.
+    ///
+    /// The seed is mixed into the identity-derived renderer RNG. It is useful
+    /// when an application wants a second deterministic variant for the same
+    /// identity without changing tenant or namespace style-version values.
+    pub fn style_variant(mut self, seed: u64) -> Self {
+        self.spec = match self.spec {
+            Ok(spec) => Ok(AvatarSpec::new_unchecked(spec.width, spec.height, seed)),
+            Err(error) => Err(error),
+        };
+        self
+    }
+
+    /// Alias for [`AvatarBuilder::style_variant`].
+    pub fn seed(self, seed: u64) -> Self {
+        self.style_variant(seed)
+    }
+
+    /// Sets the identity namespace used for tenant isolation and visual
+    /// rollout control.
+    pub fn namespace<'b>(self, tenant: &'b str, style_version: &'b str) -> AvatarBuilder<'b, T> {
+        AvatarBuilder {
+            id: self.id,
+            spec: self.spec,
+            namespace: AvatarNamespace::new(tenant, style_version),
+            style: self.style,
+        }
+    }
+
+    /// Uses automatic style derivation from distinct identity digest bytes.
+    pub fn automatic_style(mut self) -> Self {
+        self.style = None;
+        self
+    }
+
+    pub fn style(mut self, style: AvatarStyleOptions) -> Self {
+        self.style = Some(style);
+        self
+    }
+
+    pub fn options(self, options: AvatarOptions) -> Self {
+        self.style(AvatarStyleOptions::from_options(options))
+    }
+
+    pub fn kind(self, kind: AvatarKind) -> Self {
+        self.with_style(|style| style.kind = kind)
+    }
+
+    pub fn background(self, background: AvatarBackground) -> Self {
+        self.with_style(|style| style.background = background)
+    }
+
+    pub fn accessory(self, accessory: AvatarAccessory) -> Self {
+        self.with_style(|style| style.accessory = accessory)
+    }
+
+    pub fn color(self, color: AvatarColor) -> Self {
+        self.with_style(|style| style.color = color)
+    }
+
+    pub fn expression(self, expression: AvatarExpression) -> Self {
+        self.with_style(|style| style.expression = expression)
+    }
+
+    pub fn shape(self, shape: AvatarShape) -> Self {
+        self.with_style(|style| style.shape = shape)
+    }
+
+    fn with_style(mut self, update: impl FnOnce(&mut AvatarStyleOptions)) -> Self {
+        let style = self.style.get_or_insert_with(AvatarStyleOptions::default);
+        update(style);
+        self
+    }
+}
+
+impl<'a, T: AsRef<[u8]>> AvatarBuilder<'a, T> {
+    pub fn identity(&self) -> Result<AvatarIdentity, AvatarError> {
+        let namespace = self.namespace?;
+        Ok(AvatarIdentity::new_with_namespace(
+            namespace,
+            self.id.as_ref(),
+        )?)
+    }
+
+    pub fn cache_key(&self) -> Result<String, AvatarError> {
+        Ok(self.identity()?.cache_key())
+    }
+
+    pub fn render(self) -> Result<RgbaImage, AvatarError> {
+        self.render_plan()?.render_rgba().map_err(AvatarError::from)
+    }
+
+    pub fn render_svg(self) -> Result<String, AvatarError> {
+        Ok(self.render_plan()?.render_svg())
+    }
+
+    pub fn encode(self, format: AvatarOutputFormat) -> Result<Vec<u8>, AvatarError> {
+        let image = self.render_plan()?.render_rgba()?;
+        Ok(encode_owned_rgba_image(image, format)?)
+    }
+
+    fn render_plan(&self) -> Result<AvatarRenderPlan, AvatarError> {
+        let spec = self.spec?;
+        let namespace = self.namespace?;
+        let identity_options = AvatarIdentityOptions::new(namespace);
+        match self.style {
+            Some(style) => Ok(AvatarRenderPlan::new_with_style(
+                spec,
+                identity_options,
+                self.id.as_ref(),
+                style,
+            )?),
+            None => Ok(AvatarRenderPlan::new_auto(
+                spec,
+                identity_options,
+                self.id.as_ref(),
+            )?),
         }
     }
 }
@@ -10230,6 +10561,20 @@ mod tests {
     }
 
     #[test]
+    fn avatar_identity_cache_key_is_stable_and_not_raw_digest_hex() {
+        let identity = valid_identity("alice@example.com");
+        let same = valid_identity("alice@example.com");
+        let different = valid_identity("bob@example.com");
+
+        let key = identity.cache_key();
+        assert_eq!(key.len(), 64);
+        assert!(key.bytes().all(|byte| byte.is_ascii_hexdigit()));
+        assert_eq!(key, same.cache_key());
+        assert_ne!(key, different.cache_key());
+        assert_ne!(key, hex_lower(&identity.digest[..32]));
+    }
+
+    #[test]
     fn default_identity_options_match_namespace_constructor() {
         let namespace = valid_namespace("tenant-a", "v2");
         let default = AvatarIdentity::new_with_namespace(namespace, "alice@example.com")
@@ -10696,6 +11041,64 @@ mod tests {
     }
 
     #[test]
+    fn avatar_builder_renders_svg_and_encoded_webp() {
+        let svg = AvatarBuilder::for_id("builder@example.com")
+            .size(96, 96)
+            .namespace("tenant-a", "v2")
+            .kind(AvatarKind::Robot)
+            .background(AvatarBackground::Transparent)
+            .accessory(AvatarAccessory::Glasses)
+            .shape(AvatarShape::Circle)
+            .render_svg()
+            .expect("builder svg should render");
+        assert!(svg.contains("robot avatar"));
+
+        let bytes = AvatarBuilder::for_id("builder@example.com")
+            .size(96, 96)
+            .kind(AvatarKind::Robot)
+            .encode(AvatarOutputFormat::WebP)
+            .expect("builder webp should encode");
+        let decoded = image::load_from_memory_with_format(&bytes, ImageFormat::WebP)
+            .expect("builder webp should decode");
+        assert_eq!(decoded.width(), 96);
+        assert_eq!(decoded.height(), 96);
+    }
+
+    #[test]
+    fn avatar_builder_returns_unified_errors_without_panicking() {
+        let error = AvatarBuilder::for_id("builder@example.com")
+            .size(1, 256)
+            .render_svg()
+            .expect_err("invalid size should be rejected");
+
+        assert!(matches!(error, AvatarError::Spec(_)));
+    }
+
+    #[test]
+    fn avatar_builder_debug_redacts_identity_input() {
+        let debug = format!("{:?}", AvatarBuilder::for_id("secret@example.com"));
+
+        assert!(debug.contains("[REDACTED]"));
+        assert!(!debug.contains("secret@example.com"));
+    }
+
+    #[test]
+    fn avatar_builder_can_use_automatic_style_and_cache_key() {
+        let image = AvatarBuilder::for_id("auto@example.com")
+            .size(96, 96)
+            .automatic_style()
+            .render()
+            .expect("automatic builder style should render");
+        let cache_key = AvatarBuilder::for_id("auto@example.com")
+            .cache_key()
+            .expect("cache key should be derived");
+
+        assert_eq!(image.width(), 96);
+        assert_eq!(image.height(), 96);
+        assert_eq!(cache_key.len(), 64);
+    }
+
+    #[test]
     fn svg_export_contains_svg_root_and_kind_label() {
         let svg = render_avatar_svg_for_id(
             valid_spec(128, 128, 0),
@@ -11102,6 +11505,50 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "serde")]
+    fn serde_feature_round_trips_public_style_enums_as_strings() {
+        assert_eq!(
+            serde_json::to_string(&AvatarKind::Robot).expect("kind should serialize"),
+            "\"robot\""
+        );
+        assert_eq!(
+            serde_json::from_str::<AvatarKind>("\"coffee-cup\"").expect("kind should deserialize"),
+            AvatarKind::CoffeeCup
+        );
+        assert_eq!(
+            serde_json::from_str::<AvatarBackground>("\"polka-dot\"")
+                .expect("background should deserialize"),
+            AvatarBackground::PolkaDot
+        );
+        assert_eq!(
+            serde_json::from_str::<AvatarAccessory>("\"eyepatch\"")
+                .expect("accessory should deserialize"),
+            AvatarAccessory::Eyepatch
+        );
+        assert_eq!(
+            serde_json::from_str::<AvatarColor>("\"deep-sea-blue\"")
+                .expect("color should deserialize"),
+            AvatarColor::DeepSeaBlue
+        );
+        assert_eq!(
+            serde_json::from_str::<AvatarExpression>("\"winking\"")
+                .expect("expression should deserialize"),
+            AvatarExpression::Winking
+        );
+        assert_eq!(
+            serde_json::from_str::<AvatarShape>("\"hexagon\"").expect("shape should deserialize"),
+            AvatarShape::Hexagon
+        );
+        let source = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/src/lib.rs"));
+        let library_source = source
+            .split("#[cfg(test)]")
+            .next()
+            .expect("library source should precede tests");
+        assert!(!library_source.contains("impl serde::Serialize for AvatarIdentity"));
+        assert!(!library_source.contains("impl<'de> serde::Deserialize<'de> for AvatarIdentity"));
+    }
+
+    #[test]
     #[cfg(feature = "gif")]
     fn gif_variant_has_rustdoc_security_warning() {
         let source = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/src/lib.rs"));
@@ -11156,6 +11603,24 @@ mod tests {
         let legacy_svg = render_avatar_svg_for_id(spec, "style@example.com", options);
         let styled_svg = render_avatar_svg_style_for_id(spec, "style@example.com", style);
         assert_eq!(legacy_svg, styled_svg);
+    }
+
+    #[test]
+    fn avatar_style_options_has_human_readable_summary() {
+        let style = AvatarStyleOptions::new(
+            AvatarKind::Robot,
+            AvatarBackground::Ocean,
+            AvatarAccessory::Glasses,
+            AvatarColor::Gold,
+            AvatarExpression::Happy,
+            AvatarShape::Circle,
+        );
+
+        assert_eq!(
+            style.summary(),
+            "robot / ocean / glasses / gold / happy / circle"
+        );
+        assert_eq!(style.summary(), style.to_string());
     }
 
     #[test]

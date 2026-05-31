@@ -52,6 +52,13 @@
 - `AvatarIdentity` equality uses constant-time digest comparison.
 - `AvatarIdentity` has a redacted `Debug` implementation so accidental
   `{:?}` logging does not print the raw digest.
+- `AvatarBuilder` has a redacted `Debug` implementation so accidental builder
+  logging does not print the raw identity input.
+- `AvatarIdentity::cache_key()` derives an opaque display key by hashing the
+  internal identity digest under a cache-key domain instead of returning raw
+  digest bytes. Cache keys are still stable correlators for the same identity
+  and should be treated as public cache identifiers, not authentication
+  secrets.
 - `AvatarIdentity` implements `Clone`; every clone is zeroized independently
   on drop. High-assurance integrations should keep identity clones
   short-lived so digest bytes do not remain live in multiple memory locations

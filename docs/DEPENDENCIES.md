@@ -5,6 +5,8 @@
 - `image` for raster buffers and WebP encoding
 - `palette` for color conversion
 - `rand` for deterministic seeded variation
+- optional `serde` for string serialization/deserialization of public style
+  enums when the `serde` feature is enabled
 - `sha2` for identity hashing, with its `zeroize` feature enabled so hasher
   block buffers participate in upstream `ZeroizeOnDrop` cleanup
 - `subtle` for constant-time identity digest comparison
@@ -21,11 +23,12 @@ Dev-only test dependencies:
 
 - `roxmltree` for parser-backed SVG well-formedness tests and fuzz harness
   validation
+- `serde_json` for feature-gated serde round-trip tests
 
 `sha2` remains the default identity dependency, and WebP remains the default
-raster encoder. `blake3`, `xxhash-rust`, `image/png`, `image/jpeg`, and
-`image/gif` are explicit opt-in features so default users keep the smaller
-conservative dependency graph and only compile extra codecs they use. The
+raster encoder. `blake3`, `xxhash-rust`, `serde`, `image/png`, `image/jpeg`,
+and `image/gif` are explicit opt-in features so default users keep the smaller
+conservative dependency graph and only compile extra support they use. The
 `blake3` and `xxh3` features are mutually exclusive because identity hashing is
 a crate-wide mode, not a runtime selection.
 

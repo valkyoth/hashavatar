@@ -1,5 +1,21 @@
 # Changelog
 
+## 1.0.2
+
+- Bumped the crate to `1.0.2`.
+- Added `AvatarBuilder` as a fluent, validation-preserving entry point for
+  rendering SVG, raster images, encoded WebP/optional formats, and cache keys.
+- Added `AvatarError` as a unified high-level error type for builder callers.
+- Added `AvatarIdentity::cache_key()` for stable opaque cache identifiers
+  without exposing the raw identity digest.
+- Added a `prelude` module for common application imports.
+- Added an optional `serde` feature for public style enums only. `AvatarIdentity`
+  intentionally remains non-serializable.
+- Added `AvatarStyleOptions::summary()` and `Display` for UI/log labels.
+- Expanded `AvatarSpec::new` and builder docs around the style-variant seed.
+- Added runnable `examples/` for the builder and cache-key workflows.
+- Removed the temporary gap analysis report from the tree.
+
 ## 1.0.1
 
 - Bumped the crate to `1.0.1`.

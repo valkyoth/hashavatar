@@ -29,7 +29,7 @@ The crate starts conservative: validated avatar dimensions, bounded identity inp
 
 ## Current Status
 
-The current crate version is `1.0.1`.
+The current crate version is `1.0.2`.
 
 Implemented now:
 
@@ -55,7 +55,14 @@ Implemented now:
 - In-memory `WebP` encoding through `AvatarOutputFormat`; `PNG`, `JPEG`, and
   single-frame `GIF` export are explicit opt-in features.
 - Compact SVG string rendering.
-- Typed errors for invalid dimensions and oversized identity inputs.
+- Fluent `AvatarBuilder` API for common render, encode, SVG, and cache-key
+  workflows.
+- Typed low-level errors plus unified `AvatarError` for high-level builder
+  calls.
+- Optional `serde` feature for public style enums only. `AvatarIdentity` is
+  intentionally not serializable.
+- Opaque identity cache keys through `AvatarIdentity::cache_key()` and
+  `AvatarBuilder::cache_key()`.
 - Private `AvatarSpec` fields so dimensions must pass construction-time validation.
 - No public path-writing helpers; callers own their storage and filesystem boundary.
 - `#![forbid(unsafe_code)]` in library code.
@@ -99,7 +106,7 @@ to split it.
 The minimum supported Rust version is Rust `1.90.0`. New deployments should
 prefer the latest stable Rust; as of May 29, 2026, that is Rust `1.96.0`.
 
-Compatibility evidence for `1.0.1`:
+Compatibility evidence for `1.0.2`:
 
 | Rust | Local Evidence |
 | --- | --- |
@@ -120,7 +127,7 @@ Optional hash modes are mutually exclusive, so `hashavatar` cannot use a single
 
 ```toml
 [dependencies]
-hashavatar = "1.0.1"
+hashavatar = "1.0.2"
 ```
 
 Optional identity hash modes and extra raster encoders are disabled by default.
@@ -128,24 +135,31 @@ Hash modes are mutually exclusive, so enable at most one of `blake3` or `xxh3`:
 
 ```toml
 [dependencies]
-hashavatar = { version = "1.0.1", features = ["blake3"] }
+hashavatar = { version = "1.0.2", features = ["blake3"] }
 ```
 
 Enable additional raster formats explicitly:
 
 ```toml
 [dependencies]
-hashavatar = { version = "1.0.1", features = ["png", "jpeg", "gif"] }
+hashavatar = { version = "1.0.2", features = ["png", "jpeg", "gif"] }
 ```
 
 Or enable every optional raster encoder at once:
 
 ```toml
 [dependencies]
-hashavatar = { version = "1.0.1", features = ["all-formats"] }
+hashavatar = { version = "1.0.2", features = ["all-formats"] }
 ```
 
-Combine these as needed, for example `features = ["blake3", "png"]`.
+Enable string serialization/deserialization for public style enums:
+
+```toml
+[dependencies]
+hashavatar = { version = "1.0.2", features = ["serde"] }
+```
+
+Combine these as needed, for example `features = ["blake3", "png", "serde"]`.
 
 For a local checkout:
 
@@ -159,6 +173,66 @@ The crate is dual-licensed:
 ```toml
 license = "MIT OR Apache-2.0"
 ```
+
+## Builder API
+
+`AvatarBuilder` is the recommended entry point for application code. It keeps
+the same validation and security boundaries as the lower-level functions while
+avoiding long positional argument lists.
+
+```rust
+use hashavatar::prelude::*;
+
+fn main() -> Result<(), AvatarError> {
+    let svg = AvatarBuilder::for_id("user@example.com")
+        .size(256, 256)
+        .namespace("tenant-a", "v2")
+        .kind(AvatarKind::Robot)
+        .background(AvatarBackground::Transparent)
+        .accessory(AvatarAccessory::Glasses)
+        .shape(AvatarShape::Circle)
+        .render_svg()?;
+
+    println!("{svg}");
+    Ok(())
+}
+```
+
+Use `.automatic_style()` when you want kind, background, accessory, color,
+expression, and shape to be derived from distinct identity digest bytes.
+
+```rust
+use hashavatar::prelude::*;
+
+fn main() -> Result<(), AvatarError> {
+    let bytes = AvatarBuilder::for_id("user@example.com")
+        .size(256, 256)
+        .automatic_style()
+        .encode(AvatarOutputFormat::WebP)?;
+
+    println!("{} bytes", bytes.len());
+    Ok(())
+}
+```
+
+For cache storage, prefer the opaque cache-key API over deriving keys from
+internal digest bytes.
+
+```rust
+use hashavatar::prelude::*;
+
+fn main() -> Result<(), AvatarError> {
+    let cache_key = AvatarBuilder::for_id("user@example.com")
+        .namespace("tenant-a", "v2")
+        .cache_key()?;
+
+    println!("{cache_key}");
+    Ok(())
+}
+```
+
+Cache keys are stable and display-safe, but they still allow correlation: the
+same identity maps to the same key.
 
 ## Stable Contract
 
@@ -192,13 +266,18 @@ These limits are enforced by constructors and render entry points. They are inte
 `256x256` with seed `1`. Public services should normally construct
 `AvatarSpec` from validated request parameters with `AvatarSpec::new(...)`
 rather than treating `Default` as a production policy or source of randomness.
+The `seed` argument is a caller-controlled style variant mixed into the
+identity-derived renderer RNG. Changing it deliberately produces a different
+deterministic visual variant for the same identity; it is not a replacement for
+identity hashing or namespace style-version rollouts.
 
 ## Public Option Catalog
 
 All public option enums expose an `ALL` slice, `from_byte`, `as_str`,
-`Display`, and `FromStr` support. Byte-to-variant mapping always indexes
-through `ALL`, so adding variants does not require duplicated modulo constants
-in caller code.
+`Display`, and `FromStr` support. With the optional `serde` feature enabled,
+these enums serialize and deserialize as the same lowercase string labels.
+Byte-to-variant mapping always indexes through `ALL`, so adding variants does
+not require duplicated modulo constants in caller code.
 
 | Enum | Controls | Values |
 | --- | --- | --- |
@@ -440,7 +519,7 @@ your namespace style version when intentionally migrating output.
 
 ```toml
 [dependencies]
-hashavatar = { version = "1.0.1", features = ["blake3"] }
+hashavatar = { version = "1.0.2", features = ["blake3"] }
 ```
 
 ```rust
@@ -468,7 +547,7 @@ assert!(svg.contains("alien avatar"));
 
 ```toml
 [dependencies]
-hashavatar = { version = "1.0.1", features = ["xxh3"] }
+hashavatar = { version = "1.0.2", features = ["xxh3"] }
 ```
 
 ```rust
@@ -631,16 +710,20 @@ accounts for all concurrent requests.
 
 Important public entry points:
 
+- `AvatarBuilder::for_id(id)` for fluent SVG, raster, encode, and cache-key workflows
+- `AvatarError` for high-level builder APIs
 - `AvatarSpec::new(width, height, seed) -> Result<AvatarSpec, AvatarSpecError>`
 - `AvatarSpec::render_resource_budget(concurrent_renders) -> AvatarRenderResourceBudget`
 - `AvatarRenderResourceBudget::max_concurrent_renders_for_memory_budget(spec, memory_budget_bytes) -> usize`
 - `AvatarIdentity::new(input) -> Result<AvatarIdentity, AvatarIdentityError>`
 - `AvatarIdentity::new_with_options(options, input) -> Result<AvatarIdentity, AvatarIdentityError>`
+- `AvatarIdentity::cache_key() -> String`
 - `AvatarIdentityOptions::new(namespace)`
 - `AvatarNamespace::new(tenant, style_version) -> Result<AvatarNamespace, AvatarIdentityError>`
 - `AvatarOptions::new(kind, background)`
 - `AvatarKind::supports_face_layers()`
 - `AvatarStyleOptions::new(kind, background, accessory, color, expression, shape)`
+- `AvatarStyleOptions::summary() -> String`
 - `AvatarStyleOptions::from_identity(identity)`
 - `encode_avatar_for_id(...)`
 - `encode_avatar_style_for_id(...)`
