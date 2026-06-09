@@ -1142,12 +1142,21 @@ impl AvatarIdentity {
     /// cache key. Treat cache keys as public identifiers for cache lookup, not
     /// as authentication secrets.
     pub fn cache_key(&self) -> String {
-        let mut preimage = Vec::with_capacity(
-            length_prefixed_component_size(CACHE_KEY_DOMAIN)
-                + length_prefixed_component_size(&self.digest),
-        );
+        let expected_capacity = length_prefixed_component_size(CACHE_KEY_DOMAIN)
+            + length_prefixed_component_size(&self.digest);
+        let mut preimage = Vec::with_capacity(expected_capacity);
         update_hash_input_component(&mut preimage, CACHE_KEY_DOMAIN);
         update_hash_input_component(&mut preimage, &self.digest);
+        debug_assert_eq!(
+            preimage.capacity(),
+            expected_capacity,
+            "cache-key preimage reallocated; zeroization no longer covers all copies"
+        );
+        debug_assert_eq!(
+            preimage.len(),
+            expected_capacity,
+            "cache-key preimage capacity calculation drifted from actual length"
+        );
 
         let mut hasher = sha2::Sha512::new();
         hasher.update(&preimage);
@@ -1236,13 +1245,12 @@ fn identity_hash_preimage(options: AvatarIdentityOptions<'_>, input: &[u8]) -> V
     } else {
         0
     };
-    let mut preimage = Vec::with_capacity(
-        length_prefixed_component_size(HASH_DOMAIN)
-            + algorithm_overhead
-            + length_prefixed_component_size(options.namespace.tenant.as_bytes())
-            + length_prefixed_component_size(options.namespace.style_version.as_bytes())
-            + length_prefixed_component_size(input),
-    );
+    let expected_capacity = length_prefixed_component_size(HASH_DOMAIN)
+        + algorithm_overhead
+        + length_prefixed_component_size(options.namespace.tenant.as_bytes())
+        + length_prefixed_component_size(options.namespace.style_version.as_bytes())
+        + length_prefixed_component_size(input);
+    let mut preimage = Vec::with_capacity(expected_capacity);
 
     update_hash_input_component(&mut preimage, HASH_DOMAIN);
     if active_hash_algorithm_is_domain_separated() {
@@ -1252,6 +1260,16 @@ fn identity_hash_preimage(options: AvatarIdentityOptions<'_>, input: &[u8]) -> V
     update_hash_input_component(&mut preimage, options.namespace.tenant.as_bytes());
     update_hash_input_component(&mut preimage, options.namespace.style_version.as_bytes());
     update_hash_input_component(&mut preimage, input);
+    debug_assert_eq!(
+        preimage.capacity(),
+        expected_capacity,
+        "identity preimage reallocated; zeroization no longer covers all copies"
+    );
+    debug_assert_eq!(
+        preimage.len(),
+        expected_capacity,
+        "identity preimage capacity calculation drifted from actual length"
+    );
     preimage
 }
 
@@ -1317,14 +1335,23 @@ fn blake3_digest(preimage: &[u8]) -> [u8; 64] {
 fn xxh3_128_digest(preimage: &[u8]) -> [u8; 64] {
     let mut digest = [0u8; 64];
     for chunk in 0..4 {
-        let mut chunk_input = Vec::with_capacity(
-            preimage.len()
-                + length_prefixed_component_size(HASH_XOF_CHUNK_COMPONENT)
-                + length_prefixed_component_size(&[chunk as u8]),
-        );
+        let expected_capacity = preimage.len()
+            + length_prefixed_component_size(HASH_XOF_CHUNK_COMPONENT)
+            + length_prefixed_component_size(&[chunk as u8]);
+        let mut chunk_input = Vec::with_capacity(expected_capacity);
         chunk_input.extend_from_slice(preimage);
         update_hash_input_component(&mut chunk_input, HASH_XOF_CHUNK_COMPONENT);
         update_hash_input_component(&mut chunk_input, &[chunk as u8]);
+        debug_assert_eq!(
+            chunk_input.capacity(),
+            expected_capacity,
+            "XXH3 chunk preimage reallocated; zeroization no longer covers all copies"
+        );
+        debug_assert_eq!(
+            chunk_input.len(),
+            expected_capacity,
+            "XXH3 chunk preimage capacity calculation drifted from actual length"
+        );
         let mut chunk_digest = xxhash_rust::xxh3::xxh3_128(&chunk_input).to_le_bytes();
         let offset = chunk * chunk_digest.len();
         digest[offset..offset + chunk_digest.len()].copy_from_slice(&chunk_digest);
@@ -2883,10 +2910,11 @@ pub struct AvatarBuilder<'a, T> {
 
 impl<T> std::fmt::Debug for AvatarBuilder<'_, T> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let namespace = self.namespace.as_ref().map(|_| "[REDACTED]");
         f.debug_struct("AvatarBuilder")
             .field("id", &"[REDACTED]")
             .field("spec", &self.spec)
-            .field("namespace", &self.namespace)
+            .field("namespace", &namespace)
             .field("style", &self.style)
             .finish()
     }
@@ -10168,12 +10196,15 @@ fn render_paws_svg(spec: AvatarSpec, identity: &AvatarIdentity) -> String {
 }
 
 fn encode_rgba_image(image: &RgbaImage, format: AvatarOutputFormat) -> ImageResult<Vec<u8>> {
-    let mut bytes = Vec::new();
-    {
-        let cursor = Cursor::new(&mut bytes);
-        encode_into_writer(image, format, cursor)?;
+    let mut bytes = Zeroizing::new(Vec::with_capacity(image.as_raw().len()));
+    let result = {
+        let cursor = Cursor::new(&mut *bytes);
+        encode_into_writer(image, format, cursor)
+    };
+    match result {
+        Ok(()) => Ok(std::mem::take(&mut *bytes)),
+        Err(error) => Err(error),
     }
-    Ok(bytes)
 }
 
 fn encode_owned_rgba_image(image: RgbaImage, format: AvatarOutputFormat) -> ImageResult<Vec<u8>> {
@@ -10548,6 +10579,44 @@ mod tests {
 
         assert!(helper.contains("Zeroizing::new(active_identity_digest(&preimage))"));
         assert!(helper.contains("preimage.zeroize();"));
+    }
+
+    #[test]
+    fn preimage_builders_assert_exact_capacity_before_zeroization() {
+        let source = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/src/lib.rs"));
+
+        let identity_helper = source
+            .split("fn identity_hash_preimage")
+            .nth(1)
+            .and_then(|after_name| after_name.split("const fn active_hash_algorithm").next())
+            .expect("identity preimage helper should exist");
+        assert!(identity_helper.contains("let expected_capacity"));
+        assert!(identity_helper.contains("debug_assert_eq!("));
+        assert!(identity_helper.contains("preimage.capacity()"));
+        assert!(identity_helper.contains("preimage.len()"));
+
+        let cache_key_helper = source
+            .split("pub fn cache_key")
+            .nth(1)
+            .and_then(|after_name| after_name.split("fn rng_seed").next())
+            .expect("cache-key helper should exist");
+        assert!(cache_key_helper.contains("let expected_capacity"));
+        assert!(cache_key_helper.contains("debug_assert_eq!("));
+        assert!(cache_key_helper.contains("preimage.capacity()"));
+        assert!(cache_key_helper.contains("preimage.len()"));
+
+        #[cfg(feature = "xxh3")]
+        {
+            let xxh3_helper = source
+                .split("fn xxh3_128_digest")
+                .nth(1)
+                .and_then(|after_name| after_name.split("#[derive(Clone, Copy").next())
+                .expect("XXH3 digest helper should exist");
+            assert!(xxh3_helper.contains("let expected_capacity"));
+            assert!(xxh3_helper.contains("debug_assert_eq!("));
+            assert!(xxh3_helper.contains("chunk_input.capacity()"));
+            assert!(xxh3_helper.contains("chunk_input.len()"));
+        }
     }
 
     #[test]
@@ -11076,10 +11145,15 @@ mod tests {
 
     #[test]
     fn avatar_builder_debug_redacts_identity_input() {
-        let debug = format!("{:?}", AvatarBuilder::for_id("secret@example.com"));
+        let debug = format!(
+            "{:?}",
+            AvatarBuilder::for_id("secret@example.com").namespace("private-tenant", "secret-v3")
+        );
 
         assert!(debug.contains("[REDACTED]"));
         assert!(!debug.contains("secret@example.com"));
+        assert!(!debug.contains("private-tenant"));
+        assert!(!debug.contains("secret-v3"));
     }
 
     #[test]
@@ -12206,6 +12280,21 @@ mod tests {
         zeroize_rgba_pixels(&mut image);
 
         assert!(image.as_raw().iter().all(|byte| *byte == 0));
+    }
+
+    #[test]
+    fn encoded_output_buffer_is_zeroizing_until_success() {
+        let source = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/src/lib.rs"));
+        let helper = source
+            .split("fn encode_rgba_image")
+            .nth(1)
+            .and_then(|after_name| after_name.split("fn encode_owned_rgba_image").next())
+            .expect("encode helper should exist");
+
+        assert!(helper.contains("Zeroizing::new(Vec::with_capacity"));
+        assert!(helper.contains("encode_into_writer(image, format, cursor)"));
+        assert!(helper.contains("Ok(()) => Ok(std::mem::take(&mut *bytes))"));
+        assert!(helper.contains("Err(error) => Err(error)"));
     }
 
     #[test]

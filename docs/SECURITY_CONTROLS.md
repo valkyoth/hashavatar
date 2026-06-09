@@ -34,8 +34,12 @@
   `hashavatar` cannot zeroize those codec-owned buffers. High-assurance
   deployments should prefer WebP or PNG.
 - Procedural RNG seeding uses 256 bits from the second half of the identity
-  digest, separate from the lower digest bytes commonly used for direct visual
-  parameters.
+  digest. Most direct visual parameter lookups use lower digest bytes, but some
+  established renderers also use selected upper digest bytes for visible
+  geometry. This is accepted for `1.x` visual stability: avatars are
+  digest-derived public artifacts, and removing those lookups would change
+  golden output. Callers that treat identifiers as sensitive should prefer
+  SHA-512 or BLAKE3 over XXH3 and follow the timing/output-size guidance below.
 - The temporary 256-bit RNG seed copy is stored in `zeroize::Zeroizing`, so the
   digest-derived seed copy is scrubbed on scope exit. The final value passed to
   `StdRng::from_seed` is also held in a `Zeroizing` guard before the copy into
@@ -53,7 +57,8 @@
 - `AvatarIdentity` has a redacted `Debug` implementation so accidental
   `{:?}` logging does not print the raw digest.
 - `AvatarBuilder` has a redacted `Debug` implementation so accidental builder
-  logging does not print the raw identity input.
+  logging does not print the raw identity input, tenant, or style-version
+  namespace values.
 - `AvatarIdentity::cache_key()` derives an opaque display key by hashing the
   internal identity digest under a cache-key domain instead of returning raw
   digest bytes. Cache keys are still stable correlators for the same identity
@@ -75,11 +80,13 @@
   BLAKE3 hasher and XOF reader after deriving the 64-byte digest. Tests assert
   these upstream zeroization traits remain available.
 - Identity hash preimage allocation is sized from the tenant, style-version,
-  and identity input lengths. The crate bounds and zeroizes those temporary
-  buffers, but it does not hide input length from the allocator, OS-level heap
-  profilers, or other same-process memory-observation tools. Very
-  high-assurance callers that treat identifier length as sensitive should
-  normalize or pad identifiers to a fixed length before calling this crate.
+  and identity input lengths. Debug/test builds assert that preimage buffers do
+  not reallocate before zeroization, so future component-size drift is caught by
+  CI. The crate bounds and zeroizes those temporary buffers, but it does not
+  hide input length from the allocator, OS-level heap profilers, or other
+  same-process memory-observation tools. Very high-assurance callers that treat
+  identifier length as sensitive should normalize or pad identifiers to a fixed
+  length before calling this crate.
 - The optional XXH3-128 mode derives the crate's 64-byte identity digest by
   hashing four domain-separated chunks. Each chunk temporarily copies the
   bounded preimage into a zeroized buffer, so peak preimage memory is higher
@@ -93,7 +100,9 @@
   binary must configure and test `getrandom` for their target explicitly.
 - Encode APIs wrap temporary owned raster buffers in RAII zeroization guards, so
   pixel data is cleared during normal returns, encoder errors, and unwinding
-  panics. JPEG export also wraps the temporary RGB flattening buffer in
+  panics. Encoded output is accumulated in a `Zeroizing<Vec<u8>>` until
+  successful return, so partially encoded bytes are scrubbed on encoder errors.
+  JPEG export also wraps the temporary RGB flattening buffer in
   `zeroize::Zeroizing`. Returned encoded bytes and images returned by render
   APIs are caller-owned and must be cleared by the caller if their environment
   requires that. The README includes `zeroize` examples for returned `Vec<u8>`

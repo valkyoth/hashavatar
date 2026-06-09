@@ -1,5 +1,22 @@
 # Changelog
 
+## 1.0.3
+
+- Bumped the crate to `1.0.3`.
+- Hardened encoded-output error paths by keeping encoder output in a
+  `Zeroizing<Vec<u8>>` until successful return, so partially encoded bytes are
+  scrubbed on encoder errors.
+- Added debug/test assertions for exact identity, cache-key, and XXH3 chunk
+  preimage capacities so future edits cannot silently introduce reallocations
+  before zeroization.
+- Redacted `AvatarBuilder` namespace tenant and style-version values from
+  `Debug` output in addition to the identity input.
+- Updated `docs/SECURITY_CONTROLS.md` to accurately describe accepted
+  upper-digest-byte visual parameter usage for `1.x` visual stability.
+- Updated GitHub Actions pins to `actions/checkout` `v6.0.3`,
+  `Swatinem/rust-cache` `v2.9.1`, and `taiki-e/install-action` `v2.81.8`.
+- Removed the temporary pentest report from the tree.
+
 ## 1.0.2
 
 - Bumped the crate to `1.0.2`.
