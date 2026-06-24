@@ -31,6 +31,14 @@
 - Split the former monolithic `src/lib.rs` into focused source files, including
   per-avatar raster and SVG renderer files, while preserving the public API and
   visual fingerprints.
+- Clarified that preimage-capacity assertions are active in all builds as an
+  intentional fail-secure sanitization guard.
+- Made starry-background seed rotation precedence explicit without changing
+  generated visuals.
+- Hardened internal gradient color interpolation against future oversized
+  callers.
+- Added consistent `identity()` accessors and security notes to hashed dog and
+  robot renderer structs, matching the existing hashed cat renderer.
 - Updated GitHub Actions pins to `actions/checkout` `v7.0.0` and
   `taiki-e/install-action` `v2.82.3`; `Swatinem/rust-cache` remains current at
   `v2.9.1`.
