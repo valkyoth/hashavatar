@@ -1,5 +1,17 @@
 # Changelog
 
+## 1.0.4
+
+- Bumped the crate to `1.0.4`.
+- Updated direct dependency pins for the release:
+  - `zeroize` to `1.9.0`
+  - `libfuzzer-sys` in the fuzz harness to `0.4.13`
+- Refreshed Cargo lockfiles with the latest compatible dependency versions.
+- Updated GitHub Actions pins to `actions/checkout` `v7.0.0` and
+  `taiki-e/install-action` `v2.82.3`; `Swatinem/rust-cache` remains current at
+  `v2.9.1`.
+- Refreshed README installation snippets and release metadata for `1.0.4`.
+
 ## 1.0.3
 
 - Bumped the crate to `1.0.3`.

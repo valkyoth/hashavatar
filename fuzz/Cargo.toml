@@ -8,8 +8,8 @@ publish = false
 cargo-fuzz = true
 
 [dependencies]
-hashavatar = { path = "..", version = "1.0.3", features = ["fuzzing"] }
-libfuzzer-sys = "0.4"
+hashavatar = { path = "..", version = "1.0.4", features = ["fuzzing"] }
+libfuzzer-sys = "0.4.13"
 roxmltree = "0.21.1"
 
 [[bin]]
