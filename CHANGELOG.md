@@ -14,10 +14,17 @@
 - Moved cache-key and identity SHA-512 hashing through the crypto interop
   helper, and moved optional BLAKE3 XOF output through the interop helper with a
   `sanitization::Secret` output buffer.
+- Removed a redundant SHA-512 digest `Secret` wrapper now that the interop
+  helper owns hasher-state cleanup and the caller already guards the returned
+  digest.
+- Moved the crate's direct `sha2` dependency to dev-dependencies; production
+  SHA-512 hashing now reaches `sha2` through `sanitization-crypto-interop`.
 - Guarded the optional XXH3 64-byte accumulator with `sanitization::Secret`.
 - Promoted hash-preimage capacity checks from debug-only assertions to release
   assertions so future size-accounting drift cannot silently bypass temporary
   buffer sanitization.
+- Collapsed optional XXH3 chunk capacity and length checks into one release
+  assertion per chunk.
 - Tightened `cargo-deny` duplicate crate policy from `warn` to `deny`.
 - Updated `libfuzzer-sys` in the fuzz harness to `0.4.13`.
 - Refreshed Cargo lockfiles with the latest compatible dependency versions.

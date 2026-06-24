@@ -84,7 +84,7 @@ Planned or intentionally external:
 | License | `MIT OR Apache-2.0` |
 | MSRV | Rust `1.90.0` |
 | Crate shape | Library only |
-| Runtime dependencies | `image`, `palette`, `rand`, `sanitization`, `sanitization-crypto-interop`, `sha2`, `subtle`; optional `blake3`, `xxhash-rust`, `image/png`, `image/jpeg`, `image/gif` |
+| Runtime graph | `image`, `palette`, `rand`, `sanitization`, `sanitization-crypto-interop`, transitive `sha2`, `subtle`; optional `blake3`, `xxhash-rust`, `image/png`, `image/jpeg`, `image/gif` |
 | Unsafe policy | `#![forbid(unsafe_code)]` |
 | Filesystem policy | No public path-writing APIs |
 | Dimension limits | `64..=2048` pixels per side |

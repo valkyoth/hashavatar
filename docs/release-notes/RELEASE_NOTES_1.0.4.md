@@ -20,12 +20,19 @@ sanitization, tooling, and documentation freshness.
 - Fixed-size digest and renderer seed copies now use `sanitization::Secret`.
 - SHA-512 identity hashing and cache-key hashing now route through the
   `sanitization-crypto-interop` SHA-512 helper.
+- The crate's direct `sha2` dependency is now dev-only; production SHA-512
+  hashing reaches `sha2` through `sanitization-crypto-interop`.
+- Removed a redundant SHA-512 digest `Secret` wrapper now that the interop
+  helper owns hasher-state cleanup and the caller already guards the returned
+  digest.
 - Optional BLAKE3 XOF output now uses the `sanitization-crypto-interop` fill
   helper with a `sanitization::Secret` output buffer.
 - Optional XXH3 digest accumulation now uses a `sanitization::Secret` guard for
   the 64-byte accumulator.
 - Hash-preimage capacity checks now use release-mode assertions, so future
   size-accounting drift cannot silently bypass temporary buffer cleanup.
+- Optional XXH3 chunk capacity and length checks are collapsed into one
+  release assertion per chunk.
 - Hash preimage vectors, encoded-output buffers, temporary JPEG RGB buffers,
   and owned RGBA buffers are cleared through `sanitization` volatile clearing
   helpers.

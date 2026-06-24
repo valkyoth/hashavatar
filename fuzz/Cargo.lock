@@ -153,7 +153,6 @@ dependencies = [
  "rand",
  "sanitization",
  "sanitization-crypto-interop",
- "sha2",
  "subtle",
 ]
 

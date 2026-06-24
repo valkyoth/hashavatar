@@ -7,13 +7,14 @@
 - `rand` for deterministic seeded variation
 - optional `serde` for string serialization/deserialization of public style
   enums when the `serde` feature is enabled
-- `sha2` for default SHA-512 identity hashing
+- transitive `sha2` for default SHA-512 identity hashing through
+  `sanitization-crypto-interop`
 - `subtle` for constant-time identity digest comparison
 - `sanitization` for clearing derived identity digests, temporary hash preimage
   buffers, renderer seed copies, and temporary image/encoder buffers
-- `sanitization-crypto-interop` for SHA-512 hasher-state cleanup through the
-  upstream `sha2` zeroization hooks, and for BLAKE3 hasher/XOF cleanup when the
-  `blake3` feature is enabled
+- `sanitization-crypto-interop` for SHA-512 hashing and hasher-state cleanup
+  through the upstream `sha2` zeroization hooks, and for BLAKE3 hasher/XOF
+  cleanup when the `blake3` feature is enabled
 - optional `blake3` for BLAKE3 identity hashing when the `blake3` feature is
   enabled
 - optional `xxhash-rust` for XXH3-128 identity distribution when the `xxh3` feature is enabled
@@ -26,14 +27,15 @@ Dev-only test dependencies:
   validation
 - `serde_json` for feature-gated serde round-trip tests
 
-`sha2` remains the default identity dependency, and WebP remains the default
-raster encoder. `sanitization-crypto-interop` is a direct dependency so SHA-512
-uses the cleanup boundary provided by the `sanitization` sister crate instead
-of direct `zeroize` imports in `hashavatar`. `blake3`, `xxhash-rust`, `serde`,
-`image/png`, `image/jpeg`, and `image/gif` are explicit opt-in features so
-default users keep the smaller conservative dependency graph and only compile
-extra support they use. The `blake3` and `xxh3` features are mutually exclusive
-because identity hashing is a crate-wide mode, not a runtime selection.
+SHA-512 remains the default identity mode, and WebP remains the default raster
+encoder. `sanitization-crypto-interop` is a direct dependency so SHA-512 uses
+the cleanup boundary provided by the `sanitization` sister crate instead of
+direct `zeroize` imports in `hashavatar`; `sha2` is otherwise direct only for
+test fingerprint helpers. `blake3`, `xxhash-rust`, `serde`, `image/png`,
+`image/jpeg`, and `image/gif` are explicit opt-in features so default users
+keep the smaller conservative dependency graph and only compile extra support
+they use. The `blake3` and `xxh3` features are mutually exclusive because
+identity hashing is a crate-wide mode, not a runtime selection.
 
 The crate must not depend on web frameworks, async runtimes, network clients, or service infrastructure. Those concerns belong in `hashavatar-api`.
 
@@ -74,7 +76,7 @@ Dependency changes should be reviewed for:
   before release. Do not use `cargo test --all-features` because the `blake3`
   and `xxh3` identity-hash modes are intentionally mutually exclusive.
 
-`scripts/validate-dependencies.sh` enforces the current direct dependency allowlist.
+`scripts/validate-dependencies.sh` enforces the current dependency allowlist.
 
 ## Crate Boundary
 

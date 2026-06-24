@@ -1312,8 +1312,7 @@ fn hex_lower(bytes: &[u8]) -> String {
 
 #[cfg(not(any(feature = "blake3", feature = "xxh3")))]
 fn sha512_digest(preimage: &[u8]) -> [u8; 64] {
-    let digest = Secret::new(sanitized_sha512_digest(preimage));
-    digest.with_secret(|digest| *digest)
+    sanitized_sha512_digest(preimage)
 }
 
 #[cfg(feature = "blake3")]
@@ -1335,14 +1334,9 @@ fn xxh3_128_digest(preimage: &[u8]) -> [u8; 64] {
         update_hash_input_component(&mut chunk_input, HASH_XOF_CHUNK_COMPONENT);
         update_hash_input_component(&mut chunk_input, &[chunk as u8]);
         assert_eq!(
-            chunk_input.capacity(),
-            expected_capacity,
-            "XXH3 chunk preimage reallocated; sanitization no longer covers all copies"
-        );
-        assert_eq!(
-            chunk_input.len(),
-            expected_capacity,
-            "XXH3 chunk preimage capacity calculation drifted from actual length"
+            (chunk_input.capacity(), chunk_input.len()),
+            (expected_capacity, expected_capacity),
+            "XXH3 chunk preimage size accounting drifted; sanitization no longer covers all copies"
         );
         let mut chunk_digest = xxhash_rust::xxh3::xxh3_128(&chunk_input).to_le_bytes();
         let offset = chunk * chunk_digest.len();
