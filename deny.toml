@@ -10,7 +10,7 @@ version = 2
 ignore = []
 
 [bans]
-multiple-versions = "warn"
+multiple-versions = "deny"
 wildcards = "deny"
 deny = []
 allow = []

@@ -73,11 +73,13 @@
   held in `sanitization::Secret` guards before being copied into
   `AvatarIdentity`, and temporary `Vec<u8>` preimages are cleared across full
   allocation capacity with `sanitization`'s volatile vector clear helper.
-- Third-party hasher internal state is not sanitized by `hashavatar` because
-  `sha2` and `blake3` do not expose a native `sanitization` cleanup hook.
-  `hashavatar` sanitizes the bounded preimage buffer and all digest copies it
-  owns, but very high-assurance callers should still treat opaque hasher state
-  as a known residual.
+- SHA-512 hashing is routed through `sanitization-crypto-interop`, which enables
+  upstream `sha2` hasher cleanup for SHA-512 state. BLAKE3 hashing is routed
+  through the same interop crate when the `blake3` feature is enabled, so the
+  BLAKE3 hasher and XOF reader are explicitly cleared after output extraction.
+  The interop crate necessarily uses those crypto crates' own cleanup hooks;
+  callers that audit dependency internals should keep
+  `sanitization-crypto-interop`, `sha2`, and `blake3` in scope.
 - Identity hash preimage allocation is sized from the tenant, style-version,
   and identity input lengths. Debug/test builds assert that preimage buffers do
   not reallocate before sanitization, so future component-size drift is caught

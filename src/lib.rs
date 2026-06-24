@@ -47,9 +47,9 @@ use palette::{FromColor, Hsl, Srgb};
 use rand::{RngExt, SeedableRng, rngs::StdRng};
 use sanitization::unsafe_wipe::volatile_sanitize_vec;
 use sanitization::{Secret, SecureSanitize, sanitize_bytes};
-use sha2::Digest;
-#[cfg(not(any(feature = "blake3", feature = "xxh3")))]
-use sha2::Sha512;
+#[cfg(feature = "blake3")]
+use sanitization_crypto_interop::blake3::blake3_xof_fill;
+use sanitization_crypto_interop::sha2::sha512_digest as sanitized_sha512_digest;
 use subtle::ConstantTimeEq;
 
 /// Rendering contract version for deterministic avatars.
@@ -1148,20 +1148,18 @@ impl AvatarIdentity {
         let mut preimage = Vec::with_capacity(expected_capacity);
         update_hash_input_component(&mut preimage, CACHE_KEY_DOMAIN);
         update_hash_input_component(&mut preimage, &self.digest);
-        debug_assert_eq!(
+        assert_eq!(
             preimage.capacity(),
             expected_capacity,
             "cache-key preimage reallocated; sanitization no longer covers all copies"
         );
-        debug_assert_eq!(
+        assert_eq!(
             preimage.len(),
             expected_capacity,
             "cache-key preimage capacity calculation drifted from actual length"
         );
 
-        let mut hasher = sha2::Sha512::new();
-        hasher.update(&preimage);
-        let digest = Secret::new(<[u8; 64]>::from(hasher.finalize()));
+        let digest = Secret::new(sanitized_sha512_digest(&preimage));
         volatile_sanitize_vec(&mut preimage);
         digest.with_secret(|digest| hex_lower(&digest[..32]))
     }
@@ -1261,12 +1259,12 @@ fn identity_hash_preimage(options: AvatarIdentityOptions<'_>, input: &[u8]) -> V
     update_hash_input_component(&mut preimage, options.namespace.tenant.as_bytes());
     update_hash_input_component(&mut preimage, options.namespace.style_version.as_bytes());
     update_hash_input_component(&mut preimage, input);
-    debug_assert_eq!(
+    assert_eq!(
         preimage.capacity(),
         expected_capacity,
         "identity preimage reallocated; sanitization no longer covers all copies"
     );
-    debug_assert_eq!(
+    assert_eq!(
         preimage.len(),
         expected_capacity,
         "identity preimage capacity calculation drifted from actual length"
@@ -1314,25 +1312,20 @@ fn hex_lower(bytes: &[u8]) -> String {
 
 #[cfg(not(any(feature = "blake3", feature = "xxh3")))]
 fn sha512_digest(preimage: &[u8]) -> [u8; 64] {
-    let mut hasher = Sha512::new();
-    hasher.update(preimage);
-    let digest = Secret::new(hasher.finalize().into());
+    let digest = Secret::new(sanitized_sha512_digest(preimage));
     digest.with_secret(|digest| *digest)
 }
 
 #[cfg(feature = "blake3")]
 fn blake3_digest(preimage: &[u8]) -> [u8; 64] {
-    let mut hasher = blake3::Hasher::new();
-    hasher.update(preimage);
-    let mut digest = [0u8; 64];
-    let mut reader = hasher.finalize_xof();
-    reader.fill(&mut digest);
-    digest
+    let mut digest = Secret::new([0u8; 64]);
+    digest.with_secret_mut(|digest| blake3_xof_fill(preimage, digest));
+    digest.with_secret(|digest| *digest)
 }
 
 #[cfg(feature = "xxh3")]
 fn xxh3_128_digest(preimage: &[u8]) -> [u8; 64] {
-    let mut digest = [0u8; 64];
+    let mut digest = Secret::new([0u8; 64]);
     for chunk in 0..4 {
         let expected_capacity = preimage.len()
             + length_prefixed_component_size(HASH_XOF_CHUNK_COMPONENT)
@@ -1341,23 +1334,25 @@ fn xxh3_128_digest(preimage: &[u8]) -> [u8; 64] {
         chunk_input.extend_from_slice(preimage);
         update_hash_input_component(&mut chunk_input, HASH_XOF_CHUNK_COMPONENT);
         update_hash_input_component(&mut chunk_input, &[chunk as u8]);
-        debug_assert_eq!(
+        assert_eq!(
             chunk_input.capacity(),
             expected_capacity,
             "XXH3 chunk preimage reallocated; sanitization no longer covers all copies"
         );
-        debug_assert_eq!(
+        assert_eq!(
             chunk_input.len(),
             expected_capacity,
             "XXH3 chunk preimage capacity calculation drifted from actual length"
         );
         let mut chunk_digest = xxhash_rust::xxh3::xxh3_128(&chunk_input).to_le_bytes();
         let offset = chunk * chunk_digest.len();
-        digest[offset..offset + chunk_digest.len()].copy_from_slice(&chunk_digest);
+        digest.with_secret_mut(|digest| {
+            digest[offset..offset + chunk_digest.len()].copy_from_slice(&chunk_digest);
+        });
         chunk_digest.secure_sanitize();
         volatile_sanitize_vec(&mut chunk_input);
     }
-    digest
+    digest.with_secret(|digest| *digest)
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -10547,8 +10542,8 @@ mod tests {
             "/docs/SECURITY_CONTROLS.md"
         ));
 
-        assert!(controls.contains("Third-party hasher internal state"));
-        assert!(controls.contains("not sanitized by `hashavatar`"));
+        assert!(controls.contains("sanitization-crypto-interop"));
+        assert!(controls.contains("upstream `sha2`"));
     }
 
     #[test]
@@ -10625,7 +10620,7 @@ mod tests {
             .and_then(|after_name| after_name.split("const fn active_hash_algorithm").next())
             .expect("identity preimage helper should exist");
         assert!(identity_helper.contains("let expected_capacity"));
-        assert!(identity_helper.contains("debug_assert_eq!("));
+        assert!(identity_helper.contains("assert_eq!("));
         assert!(identity_helper.contains("preimage.capacity()"));
         assert!(identity_helper.contains("preimage.len()"));
 
@@ -10635,7 +10630,7 @@ mod tests {
             .and_then(|after_name| after_name.split("fn rng_seed").next())
             .expect("cache-key helper should exist");
         assert!(cache_key_helper.contains("let expected_capacity"));
-        assert!(cache_key_helper.contains("debug_assert_eq!("));
+        assert!(cache_key_helper.contains("assert_eq!("));
         assert!(cache_key_helper.contains("preimage.capacity()"));
         assert!(cache_key_helper.contains("preimage.len()"));
 
@@ -10647,10 +10642,40 @@ mod tests {
                 .and_then(|after_name| after_name.split("#[derive(Clone, Copy").next())
                 .expect("XXH3 digest helper should exist");
             assert!(xxh3_helper.contains("let expected_capacity"));
-            assert!(xxh3_helper.contains("debug_assert_eq!("));
+            assert!(xxh3_helper.contains("assert_eq!("));
             assert!(xxh3_helper.contains("chunk_input.capacity()"));
             assert!(xxh3_helper.contains("chunk_input.len()"));
         }
+    }
+
+    #[test]
+    #[cfg(feature = "blake3")]
+    fn blake3_digest_uses_crypto_interop_and_secret_buffer() {
+        let source = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/src/lib.rs"));
+        let helper = source
+            .split("fn blake3_digest")
+            .nth(1)
+            .and_then(|after_name| after_name.split("#[cfg(feature = \"xxh3\")]").next())
+            .expect("BLAKE3 digest helper should exist");
+
+        assert!(helper.contains("Secret::new([0u8; 64])"));
+        assert!(helper.contains("blake3_xof_fill(preimage, digest)"));
+        assert!(!helper.contains("let mut digest = [0u8; 64];"));
+    }
+
+    #[test]
+    #[cfg(feature = "xxh3")]
+    fn xxh3_digest_accumulator_uses_sanitizing_guard() {
+        let source = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/src/lib.rs"));
+        let helper = source
+            .split("fn xxh3_128_digest")
+            .nth(1)
+            .and_then(|after_name| after_name.split("#[derive(Clone, Copy").next())
+            .expect("XXH3 digest helper should exist");
+
+        assert!(helper.contains("let mut digest = Secret::new([0u8; 64]);"));
+        assert!(helper.contains("digest.with_secret_mut"));
+        assert!(!helper.contains("let mut digest = [0u8; 64];"));
     }
 
     #[test]

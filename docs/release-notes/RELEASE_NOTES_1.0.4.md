@@ -6,7 +6,10 @@ sanitization, tooling, and documentation freshness.
 ## Dependency Updates
 
 - Replaced direct `zeroize` usage with the native `sanitization` crate API.
-- Added `sanitization` `1.2.1` with `alloc` support.
+- Added `sanitization` `1.2.2` with `alloc` support.
+- Added `sanitization-crypto-interop` `1.2.2` so SHA-512 and optional BLAKE3
+  hashing use the crypto crates' own hasher-state cleanup hooks through the
+  `sanitization` sister crate.
 - Removed direct `zeroize` dependency usage and the `sha2`/`blake3` zeroize
   feature hooks.
 - Updated the fuzz harness `libfuzzer-sys` dependency to `0.4.13`.
@@ -15,11 +18,20 @@ sanitization, tooling, and documentation freshness.
 ## Sanitization
 
 - Fixed-size digest and renderer seed copies now use `sanitization::Secret`.
+- SHA-512 identity hashing and cache-key hashing now route through the
+  `sanitization-crypto-interop` SHA-512 helper.
+- Optional BLAKE3 XOF output now uses the `sanitization-crypto-interop` fill
+  helper with a `sanitization::Secret` output buffer.
+- Optional XXH3 digest accumulation now uses a `sanitization::Secret` guard for
+  the 64-byte accumulator.
+- Hash-preimage capacity checks now use release-mode assertions, so future
+  size-accounting drift cannot silently bypass temporary buffer cleanup.
 - Hash preimage vectors, encoded-output buffers, temporary JPEG RGB buffers,
   and owned RGBA buffers are cleared through `sanitization` volatile clearing
   helpers.
-- Security controls now document that third-party hasher internal state remains
-  outside `hashavatar`'s cleanup boundary.
+- Security controls now document the `sanitization-crypto-interop` cleanup
+  boundary for SHA-512 and optional BLAKE3.
+- `cargo-deny` now denies duplicate crate versions instead of only warning.
 
 ## CI
 

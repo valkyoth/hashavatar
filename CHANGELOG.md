@@ -4,10 +4,21 @@
 
 - Bumped the crate to `1.0.4`.
 - Replaced direct `zeroize` usage with the native `sanitization` crate API.
-- Added `sanitization` `1.2.1` with `alloc` support for digest, seed,
+- Added `sanitization` `1.2.2` with `alloc` support for digest, seed,
   preimage, pixel-buffer, and temporary encoder-buffer cleanup.
+- Added `sanitization-crypto-interop` `1.2.2` so SHA-512 and optional BLAKE3
+  hashing use the crypto crates' own hasher-state cleanup hooks through the
+  `sanitization` sister crate.
 - Removed direct `zeroize` dependency usage and the `sha2`/`blake3` zeroize
   feature hooks.
+- Moved cache-key and identity SHA-512 hashing through the crypto interop
+  helper, and moved optional BLAKE3 XOF output through the interop helper with a
+  `sanitization::Secret` output buffer.
+- Guarded the optional XXH3 64-byte accumulator with `sanitization::Secret`.
+- Promoted hash-preimage capacity checks from debug-only assertions to release
+  assertions so future size-accounting drift cannot silently bypass temporary
+  buffer sanitization.
+- Tightened `cargo-deny` duplicate crate policy from `warn` to `deny`.
 - Updated `libfuzzer-sys` in the fuzz harness to `0.4.13`.
 - Refreshed Cargo lockfiles with the latest compatible dependency versions.
 - Updated GitHub Actions pins to `actions/checkout` `v7.0.0` and
