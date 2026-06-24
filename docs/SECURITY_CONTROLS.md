@@ -81,10 +81,11 @@
   callers that audit dependency internals should keep
   `sanitization-crypto-interop`, `sha2`, and `blake3` in scope.
 - Identity hash preimage allocation is sized from the tenant, style-version,
-  and identity input lengths. Debug/test builds assert that preimage buffers do
-  not reallocate before sanitization, so future component-size drift is caught
-  by CI. The crate bounds and sanitizes those temporary buffers, but it does not
-  hide input length from the allocator, OS-level heap profilers, or other
+  and identity input lengths. All builds assert that preimage buffers do not
+  reallocate before sanitization. This is an intentional fail-secure guard:
+  future component-size drift must not silently create uncleared preimage
+  copies. The crate bounds and sanitizes those temporary buffers, but it does
+  not hide input length from the allocator, OS-level heap profilers, or other
   same-process memory-observation tools. Very high-assurance callers that treat
   identifier length as sensitive should normalize or pad identifiers to a fixed
   length before calling this crate.

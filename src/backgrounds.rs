@@ -113,13 +113,13 @@ pub(crate) fn draw_starry_background(image: &mut RgbaImage, identity: &AvatarIde
             identity.byte(42),
             identity.byte(43),
         ])
-        ^ u32::from_le_bytes([
+        ^ (u32::from_le_bytes([
             identity.byte(44),
             identity.byte(45),
             identity.byte(46),
             identity.byte(47),
         ])
-        .rotate_left(13);
+        .rotate_left(13));
     for index in 0..star_count {
         state = state.wrapping_mul(1_664_525).wrapping_add(1_013_904_223);
         let x = state % image.width().max(1);
@@ -161,11 +161,12 @@ pub(crate) fn lerp_color_u32(start: Color, end: Color, position: u32, max_positi
 }
 
 pub(crate) fn lerp_channel_u32(start: u8, end: u8, position: u32, max_position: u32) -> u8 {
-    let start = u32::from(start);
-    let end = u32::from(end);
-    let max = max_position.max(1);
-    let position = position.min(max);
-    ((start * (max - position) + end * position + max / 2) / max) as u8
+    let start = u64::from(start);
+    let end = u64::from(end);
+    let max = u64::from(max_position.max(1));
+    let position = u64::from(position).min(max);
+    let value = (start * (max - position) + end * position + max / 2) / max;
+    value.min(u64::from(u8::MAX)) as u8
 }
 
 pub(crate) fn color_hex(color: Color) -> String {

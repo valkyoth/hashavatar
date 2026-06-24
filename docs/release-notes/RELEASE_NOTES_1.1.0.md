@@ -53,6 +53,14 @@ sanitization, tooling, source layout, and documentation freshness.
 - Updated the changelog for the `1.1.0` release.
 - Split the former monolithic `src/lib.rs` into focused source files, including
   per-avatar raster and SVG renderer files, without changing the public API.
+- Clarified that preimage-capacity assertions are active in all builds as an
+  intentional fail-secure sanitization guard.
+- Made starry-background seed rotation precedence explicit without changing the
+  generated visuals.
+- Hardened internal gradient color interpolation against future oversized
+  `max_position` callers.
+- Added consistent `identity()` accessors to hashed dog and robot renderer
+  structs, matching the existing hashed cat renderer.
 
 ## Compatibility
 

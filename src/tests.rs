@@ -1963,6 +1963,8 @@ fn starry_background_pattern_depends_on_identity() {
 fn lerp_channel_clamps_position_to_prevent_underflow() {
     assert_eq!(lerp_channel_u32(0, 255, 10, 5), 255);
     assert_eq!(lerp_channel_u32(255, 0, 10, 5), 0);
+    assert_eq!(lerp_channel_u32(0, 255, u32::MAX, u32::MAX), 255);
+    assert_eq!(lerp_channel_u32(255, 0, u32::MAX, u32::MAX), 0);
 }
 
 #[test]

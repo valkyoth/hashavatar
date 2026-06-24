@@ -44,6 +44,13 @@ impl HashedCatAvatar {
         })
     }
 
+    /// Returns the avatar identity.
+    ///
+    /// # Security
+    ///
+    /// The returned identity may be derived from sensitive caller input.
+    /// Keep borrowed or cloned identities short-lived in high-assurance
+    /// deployments.
     pub fn identity(&self) -> &AvatarIdentity {
         &self.identity
     }
@@ -90,6 +97,17 @@ impl HashedDogAvatar {
             background,
         })
     }
+
+    /// Returns the avatar identity.
+    ///
+    /// # Security
+    ///
+    /// The returned identity may be derived from sensitive caller input.
+    /// Keep borrowed or cloned identities short-lived in high-assurance
+    /// deployments.
+    pub fn identity(&self) -> &AvatarIdentity {
+        &self.identity
+    }
 }
 
 impl AvatarRenderer for HashedDogAvatar {
@@ -132,6 +150,17 @@ impl HashedRobotAvatar {
             identity: AvatarIdentity::new_with_options(options, input)?,
             background,
         })
+    }
+
+    /// Returns the avatar identity.
+    ///
+    /// # Security
+    ///
+    /// The returned identity may be derived from sensitive caller input.
+    /// Keep borrowed or cloned identities short-lived in high-assurance
+    /// deployments.
+    pub fn identity(&self) -> &AvatarIdentity {
+        &self.identity
     }
 }
 
