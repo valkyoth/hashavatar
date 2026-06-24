@@ -1,3 +1,5 @@
+use super::*;
+
 pub fn render_ghost_avatar_for_identity(
     spec: AvatarSpec,
     identity: &AvatarIdentity,
@@ -126,4 +128,3 @@ pub fn render_ghost_avatar_for_identity(
     draw_creature_mouth(&mut image, layout, mouth_style, shade);
     Ok(image)
 }
-

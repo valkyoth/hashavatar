@@ -1,3 +1,5 @@
+use super::*;
+
 /// Render a cupcake avatar from a stable identity.
 pub fn render_cupcake_avatar_for_identity(
     spec: AvatarSpec,
@@ -87,4 +89,3 @@ pub fn render_cupcake_avatar_for_identity(
     }
     Ok(image)
 }
-

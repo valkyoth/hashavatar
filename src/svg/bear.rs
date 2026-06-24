@@ -1,4 +1,6 @@
-fn render_bear_svg(spec: AvatarSpec, identity: &AvatarIdentity) -> String {
+use super::*;
+
+pub(crate) fn render_bear_svg(spec: AvatarSpec, identity: &AvatarIdentity) -> String {
     let w = spec.width as f32;
     let h = spec.height as f32;
     let cx = w / 2.0;
@@ -38,4 +40,3 @@ fn render_bear_svg(spec: AvatarSpec, identity: &AvatarIdentity) -> String {
         curve_y = cy + ry * 0.42,
     )
 }
-

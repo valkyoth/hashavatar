@@ -1,4 +1,6 @@
-fn render_paws_svg(spec: AvatarSpec, identity: &AvatarIdentity) -> String {
+use super::*;
+
+pub(crate) fn render_paws_svg(spec: AvatarSpec, identity: &AvatarIdentity) -> String {
     let w = spec.width as f32;
     let h = spec.height as f32;
     let paw = hsl_to_color(identity.unit_f32(1) * 360.0, 0.38, 0.62);

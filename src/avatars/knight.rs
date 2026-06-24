@@ -1,3 +1,5 @@
+use super::*;
+
 /// Render a knight helmet avatar from a stable identity.
 pub fn render_knight_avatar_for_identity(
     spec: AvatarSpec,
@@ -71,4 +73,3 @@ pub fn render_knight_avatar_for_identity(
     }
     Ok(image)
 }
-

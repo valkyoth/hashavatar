@@ -1,3 +1,5 @@
+use super::*;
+
 /// Render a frog avatar from a stable identity.
 pub fn render_frog_avatar_for_identity(
     spec: AvatarSpec,
@@ -106,4 +108,3 @@ pub fn render_frog_avatar_for_identity(
     }
     Ok(image)
 }
-

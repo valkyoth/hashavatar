@@ -1,3 +1,5 @@
+use super::*;
+
 /// Render an octopus avatar from a stable identity.
 pub fn render_octopus_avatar_for_identity(
     spec: AvatarSpec,
@@ -78,4 +80,3 @@ pub fn render_octopus_avatar_for_identity(
     );
     Ok(image)
 }
-

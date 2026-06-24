@@ -1,20 +1,21 @@
+use super::*;
 
 #[derive(Clone, Copy, Debug)]
-struct CatPalette {
-    background: Color,
-    accent: Color,
-    head: Color,
-    ear_inner: Color,
-    muzzle: Color,
-    eye: Color,
-    pupil: Color,
-    nose: Color,
-    outline: Color,
-    marking: Color,
+pub(crate) struct CatPalette {
+    pub(crate) background: Color,
+    pub(crate) accent: Color,
+    pub(crate) head: Color,
+    pub(crate) ear_inner: Color,
+    pub(crate) muzzle: Color,
+    pub(crate) eye: Color,
+    pub(crate) pupil: Color,
+    pub(crate) nose: Color,
+    pub(crate) outline: Color,
+    pub(crate) marking: Color,
 }
 
 impl CatPalette {
-    fn from_genome(genome: &CatGenome) -> Self {
+    pub(crate) fn from_genome(genome: &CatGenome) -> Self {
         let hue = genome.base_hue;
         let head = hsl_to_color(
             hue,
@@ -68,51 +69,51 @@ impl CatPalette {
 }
 
 #[derive(Clone, Copy, Debug)]
-struct CatGenome {
-    base_hue: f32,
-    eye_hue: f32,
-    head_saturation: f32,
-    head_lightness: f32,
-    background_shift: f32,
-    background_sat: f32,
-    accent_shift: f32,
-    accent_sat: f32,
-    ear_inner_sat: f32,
-    ear_inner_light: f32,
-    muzzle_sat: f32,
-    muzzle_light: f32,
-    eye_sat: f32,
-    eye_light: f32,
-    nose_hue: f32,
-    nose_sat: f32,
-    nose_light: f32,
-    marking_hue_shift: f32,
-    marking_sat: f32,
-    marking_light: f32,
-    head_width: f32,
-    head_height: f32,
-    head_drop: f32,
-    ear_width: f32,
-    ear_height: f32,
-    ear_tilt: f32,
-    muzzle_width: f32,
-    muzzle_height: f32,
-    eye_spacing: f32,
-    eye_width: f32,
-    eye_height: f32,
-    pupil_width: f32,
-    whisker_len: f32,
-    whisker_tilt: f32,
-    smile_width: f32,
-    smile_depth: f32,
-    accent_band_height: f32,
-    forehead_mark: f32,
-    cheek_spots: f32,
-    stripe_count: u8,
+pub(crate) struct CatGenome {
+    pub(crate) base_hue: f32,
+    pub(crate) eye_hue: f32,
+    pub(crate) head_saturation: f32,
+    pub(crate) head_lightness: f32,
+    pub(crate) background_shift: f32,
+    pub(crate) background_sat: f32,
+    pub(crate) accent_shift: f32,
+    pub(crate) accent_sat: f32,
+    pub(crate) ear_inner_sat: f32,
+    pub(crate) ear_inner_light: f32,
+    pub(crate) muzzle_sat: f32,
+    pub(crate) muzzle_light: f32,
+    pub(crate) eye_sat: f32,
+    pub(crate) eye_light: f32,
+    pub(crate) nose_hue: f32,
+    pub(crate) nose_sat: f32,
+    pub(crate) nose_light: f32,
+    pub(crate) marking_hue_shift: f32,
+    pub(crate) marking_sat: f32,
+    pub(crate) marking_light: f32,
+    pub(crate) head_width: f32,
+    pub(crate) head_height: f32,
+    pub(crate) head_drop: f32,
+    pub(crate) ear_width: f32,
+    pub(crate) ear_height: f32,
+    pub(crate) ear_tilt: f32,
+    pub(crate) muzzle_width: f32,
+    pub(crate) muzzle_height: f32,
+    pub(crate) eye_spacing: f32,
+    pub(crate) eye_width: f32,
+    pub(crate) eye_height: f32,
+    pub(crate) pupil_width: f32,
+    pub(crate) whisker_len: f32,
+    pub(crate) whisker_tilt: f32,
+    pub(crate) smile_width: f32,
+    pub(crate) smile_depth: f32,
+    pub(crate) accent_band_height: f32,
+    pub(crate) forehead_mark: f32,
+    pub(crate) cheek_spots: f32,
+    pub(crate) stripe_count: u8,
 }
 
 impl CatGenome {
-    fn from_identity(identity: &AvatarIdentity, rng: &mut StdRng) -> Self {
+    pub(crate) fn from_identity(identity: &AvatarIdentity, rng: &mut StdRng) -> Self {
         let mut noise =
             |idx: usize| (identity.unit_f32(idx) + rng.random_range(0.0..0.03)).min(1.0);
         Self {
@@ -161,13 +162,13 @@ impl CatGenome {
 }
 
 #[derive(Clone, Copy, Debug)]
-struct EarSpec {
-    outer: [Point<i32>; 3],
-    inner: [Point<i32>; 3],
+pub(crate) struct EarSpec {
+    pub(crate) outer: [Point<i32>; 3],
+    pub(crate) inner: [Point<i32>; 3],
 }
 
 impl EarSpec {
-    fn left(
+    pub(crate) fn left(
         center_x: i32,
         center_y: i32,
         head_rx: i32,
@@ -199,7 +200,7 @@ impl EarSpec {
         }
     }
 
-    fn right(
+    pub(crate) fn right(
         center_x: i32,
         center_y: i32,
         head_rx: i32,
@@ -233,7 +234,7 @@ impl EarSpec {
 }
 
 #[allow(clippy::too_many_arguments)]
-fn draw_background_accent(
+pub(crate) fn draw_background_accent(
     image: &mut RgbaImage,
     center_x: i32,
     center_y: i32,
@@ -265,7 +266,7 @@ fn draw_background_accent(
     );
 }
 
-fn draw_ear(
+pub(crate) fn draw_ear(
     image: &mut RgbaImage,
     spec: EarSpec,
     outer_color: Color,
@@ -293,7 +294,7 @@ fn draw_ear(
     );
 }
 
-fn draw_eyes(
+pub(crate) fn draw_eyes(
     image: &mut RgbaImage,
     center_x: i32,
     center_y: i32,
@@ -327,7 +328,7 @@ fn draw_eyes(
     }
 }
 
-fn draw_nose_and_mouth(
+pub(crate) fn draw_nose_and_mouth(
     image: &mut RgbaImage,
     center_x: i32,
     center_y: i32,
@@ -373,7 +374,7 @@ fn draw_nose_and_mouth(
     );
 }
 
-fn draw_smile_arc(
+pub(crate) fn draw_smile_arc(
     image: &mut RgbaImage,
     center_x: i32,
     center_y: i32,
@@ -389,7 +390,7 @@ fn draw_smile_arc(
     }
 }
 
-fn draw_whiskers(
+pub(crate) fn draw_whiskers(
     image: &mut RgbaImage,
     center_x: i32,
     center_y: i32,
@@ -428,7 +429,7 @@ fn draw_whiskers(
     }
 }
 
-fn draw_cat_markings(
+pub(crate) fn draw_cat_markings(
     image: &mut RgbaImage,
     center_x: i32,
     center_y: i32,
@@ -472,12 +473,12 @@ fn draw_cat_markings(
     }
 }
 
-fn hsl_to_color(hue: f32, saturation: f32, lightness: f32) -> Color {
+pub(crate) fn hsl_to_color(hue: f32, saturation: f32, lightness: f32) -> Color {
     let rgb_u8: Srgb<u8> = Srgb::from_color(Hsl::new(hue, saturation, lightness)).into_format();
     Color::rgb(rgb_u8.red, rgb_u8.green, rgb_u8.blue)
 }
 
-fn background_fill(background: AvatarBackground, themed: Color) -> Color {
+pub(crate) fn background_fill(background: AvatarBackground, themed: Color) -> Color {
     match background {
         AvatarBackground::Themed => themed,
         AvatarBackground::White => Color::rgb(255, 255, 255),

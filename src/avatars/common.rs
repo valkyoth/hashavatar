@@ -1,4 +1,6 @@
-fn seeded_renderer_rng(spec: AvatarSpec, identity: &AvatarIdentity) -> StdRng {
+use super::*;
+
+pub(crate) fn seeded_renderer_rng(spec: AvatarSpec, identity: &AvatarIdentity) -> StdRng {
     let mut rng_seed = identity.rng_seed();
     rng_seed.with_secret_mut(|rng_seed| {
         for (index, byte) in spec.seed.to_le_bytes().iter().enumerate() {

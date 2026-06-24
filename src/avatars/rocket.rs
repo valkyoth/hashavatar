@@ -1,3 +1,5 @@
+use super::*;
+
 /// Render a rocket avatar from a stable identity.
 pub fn render_rocket_avatar_for_identity(
     spec: AvatarSpec,
@@ -105,4 +107,3 @@ pub fn render_rocket_avatar_for_identity(
     );
     Ok(image)
 }
-

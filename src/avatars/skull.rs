@@ -1,3 +1,5 @@
+use super::*;
+
 pub fn render_skull_avatar_for_identity(
     spec: AvatarSpec,
     identity: &AvatarIdentity,
@@ -146,4 +148,3 @@ pub fn render_skull_avatar_for_identity(
     );
     Ok(image)
 }
-

@@ -1,9 +1,11 @@
+use super::*;
+
 /// Input parameters for a generated avatar image.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct AvatarSpec {
-    width: u32,
-    height: u32,
-    seed: u64,
+    pub(crate) width: u32,
+    pub(crate) height: u32,
+    pub(crate) seed: u64,
 }
 
 impl AvatarSpec {
@@ -25,7 +27,7 @@ impl AvatarSpec {
         }
     }
 
-    const fn new_unchecked(width: u32, height: u32, seed: u64) -> Self {
+    pub(crate) const fn new_unchecked(width: u32, height: u32, seed: u64) -> Self {
         Self {
             width,
             height,
@@ -65,7 +67,7 @@ impl AvatarSpec {
         Self::dimensions_are_supported(self.width, self.height)
     }
 
-    const fn dimensions_are_supported(width: u32, height: u32) -> bool {
+    pub(crate) const fn dimensions_are_supported(width: u32, height: u32) -> bool {
         width >= MIN_AVATAR_DIMENSION
             && height >= MIN_AVATAR_DIMENSION
             && width <= MAX_AVATAR_DIMENSION
@@ -173,19 +175,19 @@ impl std::fmt::Display for AvatarSpecError {
 
 impl std::error::Error for AvatarSpecError {}
 
-fn validate_image_avatar_spec(spec: AvatarSpec) -> ImageResult<()> {
+pub(crate) fn validate_image_avatar_spec(spec: AvatarSpec) -> ImageResult<()> {
     spec.validate().map_err(avatar_spec_error_to_image_error)
 }
 
-fn avatar_spec_error_to_image_error(_: AvatarSpecError) -> ImageError {
+pub(crate) fn avatar_spec_error_to_image_error(_: AvatarSpecError) -> ImageError {
     ImageError::Limits(LimitError::from_kind(LimitErrorKind::DimensionError))
 }
 
-fn avatar_identity_error_to_image_error(error: AvatarIdentityError) -> ImageError {
+pub(crate) fn avatar_identity_error_to_image_error(error: AvatarIdentityError) -> ImageError {
     ImageError::IoError(std::io::Error::new(std::io::ErrorKind::InvalidInput, error))
 }
 
-fn avatar_render_error_to_image_error(error: AvatarRenderError) -> ImageError {
+pub(crate) fn avatar_render_error_to_image_error(error: AvatarRenderError) -> ImageError {
     match error {
         AvatarRenderError::Spec(error) => avatar_spec_error_to_image_error(error),
         AvatarRenderError::Identity(error) => avatar_identity_error_to_image_error(error),
@@ -217,9 +219,9 @@ impl std::fmt::Display for AvatarIdentityComponent {
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct AvatarIdentityError {
-    component: AvatarIdentityComponent,
-    length: usize,
-    max: usize,
+    pub(crate) component: AvatarIdentityComponent,
+    pub(crate) length: usize,
+    pub(crate) max: usize,
 }
 
 impl AvatarIdentityError {
@@ -380,7 +382,7 @@ impl Default for AvatarIdentityOptions<'static> {
 /// exist in multiple memory locations.
 #[derive(Clone, Eq)]
 pub struct AvatarIdentity {
-    digest: [u8; 64],
+    pub(crate) digest: [u8; 64],
 }
 
 impl AvatarIdentity {
@@ -418,7 +420,7 @@ impl AvatarIdentity {
         Ok(Self::new_unchecked(options, input))
     }
 
-    fn new_unchecked(options: AvatarIdentityOptions<'_>, input: &[u8]) -> Self {
+    pub(crate) fn new_unchecked(options: AvatarIdentityOptions<'_>, input: &[u8]) -> Self {
         Self {
             digest: derive_identity_digest(options, input),
         }
@@ -458,13 +460,13 @@ impl AvatarIdentity {
         digest.with_secret(|digest| hex_lower(&digest[..32]))
     }
 
-    fn rng_seed(&self) -> Secret<[u8; 32]> {
+    pub(crate) fn rng_seed(&self) -> Secret<[u8; 32]> {
         let mut seed = Secret::new([0u8; 32]);
         seed.with_secret_mut(|seed| seed.copy_from_slice(&self.digest[32..64]));
         seed
     }
 
-    fn byte(&self, index: usize) -> u8 {
+    pub(crate) fn byte(&self, index: usize) -> u8 {
         debug_assert!(
             index < self.digest.len(),
             "identity digest byte index {index} out of range"
@@ -477,7 +479,7 @@ impl AvatarIdentity {
         }
     }
 
-    fn unit_f32(&self, index: usize) -> f32 {
+    pub(crate) fn unit_f32(&self, index: usize) -> f32 {
         self.byte(index) as f32 / 255.0
     }
 }
@@ -508,7 +510,7 @@ impl Drop for AvatarIdentity {
     }
 }
 
-fn validate_identity_component(
+pub(crate) fn validate_identity_component(
     component: AvatarIdentityComponent,
     length: usize,
     max: usize,
@@ -524,14 +526,14 @@ fn validate_identity_component(
     }
 }
 
-fn derive_identity_digest(options: AvatarIdentityOptions<'_>, input: &[u8]) -> [u8; 64] {
+pub(crate) fn derive_identity_digest(options: AvatarIdentityOptions<'_>, input: &[u8]) -> [u8; 64] {
     let mut preimage = identity_hash_preimage(options, input);
     let digest = Secret::new(active_identity_digest(&preimage));
     volatile_sanitize_vec(&mut preimage);
     digest.with_secret(|digest| *digest)
 }
 
-fn identity_hash_preimage(options: AvatarIdentityOptions<'_>, input: &[u8]) -> Vec<u8> {
+pub(crate) fn identity_hash_preimage(options: AvatarIdentityOptions<'_>, input: &[u8]) -> Vec<u8> {
     let algorithm_overhead = if active_hash_algorithm_is_domain_separated() {
         length_prefixed_component_size(HASH_DOMAIN_ALGORITHM_COMPONENT)
             + length_prefixed_component_size(ACTIVE_HASH_ALGORITHM_LABEL)
@@ -571,17 +573,17 @@ const fn active_hash_algorithm_is_domain_separated() -> bool {
 }
 
 #[cfg(feature = "blake3")]
-fn active_identity_digest(preimage: &[u8]) -> [u8; 64] {
+pub(crate) fn active_identity_digest(preimage: &[u8]) -> [u8; 64] {
     blake3_digest(preimage)
 }
 
 #[cfg(all(not(feature = "blake3"), feature = "xxh3"))]
-fn active_identity_digest(preimage: &[u8]) -> [u8; 64] {
+pub(crate) fn active_identity_digest(preimage: &[u8]) -> [u8; 64] {
     xxh3_128_digest(preimage)
 }
 
 #[cfg(all(not(feature = "blake3"), not(feature = "xxh3")))]
-fn active_identity_digest(preimage: &[u8]) -> [u8; 64] {
+pub(crate) fn active_identity_digest(preimage: &[u8]) -> [u8; 64] {
     sha512_digest(preimage)
 }
 
@@ -589,12 +591,12 @@ const fn length_prefixed_component_size(bytes: &[u8]) -> usize {
     std::mem::size_of::<u64>() + bytes.len()
 }
 
-fn update_hash_input_component(preimage: &mut Vec<u8>, bytes: &[u8]) {
+pub(crate) fn update_hash_input_component(preimage: &mut Vec<u8>, bytes: &[u8]) {
     preimage.extend_from_slice(&(bytes.len() as u64).to_le_bytes());
     preimage.extend_from_slice(bytes);
 }
 
-fn hex_lower(bytes: &[u8]) -> String {
+pub(crate) fn hex_lower(bytes: &[u8]) -> String {
     const HEX: &[u8; 16] = b"0123456789abcdef";
     let mut encoded = String::with_capacity(bytes.len().saturating_mul(2));
     for byte in bytes {
@@ -605,19 +607,19 @@ fn hex_lower(bytes: &[u8]) -> String {
 }
 
 #[cfg(not(any(feature = "blake3", feature = "xxh3")))]
-fn sha512_digest(preimage: &[u8]) -> [u8; 64] {
+pub(crate) fn sha512_digest(preimage: &[u8]) -> [u8; 64] {
     sanitized_sha512_digest(preimage)
 }
 
 #[cfg(feature = "blake3")]
-fn blake3_digest(preimage: &[u8]) -> [u8; 64] {
+pub(crate) fn blake3_digest(preimage: &[u8]) -> [u8; 64] {
     let mut digest = Secret::new([0u8; 64]);
     digest.with_secret_mut(|digest| blake3_xof_fill(preimage, digest));
     digest.with_secret(|digest| *digest)
 }
 
 #[cfg(feature = "xxh3")]
-fn xxh3_128_digest(preimage: &[u8]) -> [u8; 64] {
+pub(crate) fn xxh3_128_digest(preimage: &[u8]) -> [u8; 64] {
     let mut digest = Secret::new([0u8; 64]);
     for chunk in 0..4 {
         let expected_capacity = preimage.len()

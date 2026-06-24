@@ -1,3 +1,5 @@
+use super::*;
+
 /// Cat-face avatar renderer built from simple geometric primitives.
 ///
 /// The face is intentionally stylized:
@@ -138,4 +140,3 @@ impl AvatarRenderer for HashedRobotAvatar {
         render_robot_avatar_for_identity(spec, &self.identity, self.background)
     }
 }
-

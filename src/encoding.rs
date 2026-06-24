@@ -1,4 +1,9 @@
-fn encode_rgba_image(image: &RgbaImage, format: AvatarOutputFormat) -> ImageResult<Vec<u8>> {
+use super::*;
+
+pub(crate) fn encode_rgba_image(
+    image: &RgbaImage,
+    format: AvatarOutputFormat,
+) -> ImageResult<Vec<u8>> {
     let mut bytes = SanitizingVec::with_capacity(image.as_raw().len());
     let result = {
         let cursor = Cursor::new(bytes.as_mut_vec());
@@ -10,12 +15,15 @@ fn encode_rgba_image(image: &RgbaImage, format: AvatarOutputFormat) -> ImageResu
     }
 }
 
-fn encode_owned_rgba_image(image: RgbaImage, format: AvatarOutputFormat) -> ImageResult<Vec<u8>> {
+pub(crate) fn encode_owned_rgba_image(
+    image: RgbaImage,
+    format: AvatarOutputFormat,
+) -> ImageResult<Vec<u8>> {
     let image = SanitizingRgbaImage::new(image);
     encode_rgba_image(image.as_image(), format)
 }
 
-struct SanitizingRgbaImage {
+pub(crate) struct SanitizingRgbaImage {
     image: RgbaImage,
 }
 
@@ -35,12 +43,12 @@ impl Drop for SanitizingRgbaImage {
     }
 }
 
-fn sanitize_rgba_pixels(image: &mut RgbaImage) {
+pub(crate) fn sanitize_rgba_pixels(image: &mut RgbaImage) {
     let pixels: &mut [u8] = image.as_mut();
     sanitize_bytes(pixels);
 }
 
-struct SanitizingVec {
+pub(crate) struct SanitizingVec {
     bytes: Vec<u8>,
 }
 
@@ -76,7 +84,7 @@ impl Drop for SanitizingVec {
     }
 }
 
-fn encode_into_writer<W: std::io::Write>(
+pub(crate) fn encode_into_writer<W: std::io::Write>(
     image: &RgbaImage,
     format: AvatarOutputFormat,
     writer: W,
@@ -119,7 +127,7 @@ fn encode_into_writer<W: std::io::Write>(
 }
 
 #[cfg(any(feature = "jpeg", test))]
-fn rgba_to_rgb_over_white(image: &RgbaImage) -> Vec<u8> {
+pub(crate) fn rgba_to_rgb_over_white(image: &RgbaImage) -> Vec<u8> {
     let mut rgb = Vec::with_capacity(image.as_raw().len() / 4 * 3);
     for pixel in image.pixels() {
         let [red, green, blue, alpha] = pixel.0;
@@ -131,4 +139,3 @@ fn rgba_to_rgb_over_white(image: &RgbaImage) -> Vec<u8> {
     }
     rgb
 }
-

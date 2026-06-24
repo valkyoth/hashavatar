@@ -1,3 +1,5 @@
+use super::*;
+
 pub fn render_paws_avatar_for_identity(
     spec: AvatarSpec,
     identity: &AvatarIdentity,

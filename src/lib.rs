@@ -131,15 +131,33 @@ const ACTIVE_HASH_ALGORITHM_LABEL: &[u8] = b"sha512";
 #[cfg(feature = "xxh3")]
 const HASH_XOF_CHUNK_COMPONENT: &[u8] = b"digest-chunk";
 
-include!("primitives.rs");
-include!("core.rs");
-include!("model.rs");
-include!("renderer_types.rs");
-include!("api.rs");
-include!("layers.rs");
-include!("avatars.rs");
-include!("cat_support.rs");
-include!("backgrounds.rs");
-include!("svg.rs");
-include!("encoding.rs");
-include!("tests.rs");
+mod api;
+mod avatars;
+mod backgrounds;
+mod cat_support;
+mod core;
+mod encoding;
+mod layers;
+mod model;
+mod primitives;
+mod renderer_types;
+mod svg;
+
+#[cfg(test)]
+mod tests;
+
+pub(crate) use self::backgrounds::*;
+pub(crate) use self::cat_support::*;
+pub(crate) use self::encoding::*;
+pub(crate) use self::layers::*;
+pub(crate) use self::primitives::*;
+pub(crate) use self::svg::*;
+
+pub use self::api::*;
+pub use self::avatars::*;
+pub use self::core::*;
+pub use self::model::*;
+pub use self::primitives::Color;
+#[cfg(feature = "fuzzing")]
+pub use self::primitives::fuzz_draw_polygon_rgba;
+pub use self::renderer_types::*;

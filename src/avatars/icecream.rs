@@ -1,3 +1,5 @@
+use super::*;
+
 /// Render an ice cream cone avatar from a stable identity.
 pub fn render_icecream_avatar_for_identity(
     spec: AvatarSpec,
@@ -82,4 +84,3 @@ pub fn render_icecream_avatar_for_identity(
     }
     Ok(image)
 }
-

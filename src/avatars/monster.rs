@@ -1,3 +1,5 @@
+use super::*;
+
 pub fn render_monster_avatar_for_identity(
     spec: AvatarSpec,
     identity: &AvatarIdentity,
@@ -297,15 +299,15 @@ pub fn render_monster_avatar_for_identity(
 }
 
 #[derive(Clone, Copy)]
-struct FaceLayout {
-    center_x: i32,
-    center_y: i32,
-    head_rx: i32,
-    head_ry: i32,
+pub(crate) struct FaceLayout {
+    pub(crate) center_x: i32,
+    pub(crate) center_y: i32,
+    pub(crate) head_rx: i32,
+    pub(crate) head_ry: i32,
 }
 
 #[derive(Clone, Copy)]
-enum CreatureEyeStyle {
+pub(crate) enum CreatureEyeStyle {
     Round,
     Tall,
     Hollow,
@@ -313,13 +315,13 @@ enum CreatureEyeStyle {
 
 #[derive(Clone, Copy)]
 #[allow(dead_code)]
-enum CreatureMouthStyle {
+pub(crate) enum CreatureMouthStyle {
     Smile,
     Fang,
     Flat,
 }
 
-fn draw_creature_eyes(
+pub(crate) fn draw_creature_eyes(
     image: &mut RgbaImage,
     layout: FaceLayout,
     count: usize,
@@ -368,7 +370,7 @@ fn draw_creature_eyes(
     }
 }
 
-fn draw_creature_mouth(
+pub(crate) fn draw_creature_mouth(
     image: &mut RgbaImage,
     layout: FaceLayout,
     style: CreatureMouthStyle,

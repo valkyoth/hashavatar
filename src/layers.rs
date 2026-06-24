@@ -1,4 +1,6 @@
-fn apply_style_layers(
+use super::*;
+
+pub(crate) fn apply_style_layers(
     image: &mut RgbaImage,
     spec: AvatarSpec,
     style: AvatarStyleOptions,
@@ -18,7 +20,7 @@ fn apply_style_layers(
 }
 
 #[derive(Clone, Copy, Debug)]
-struct AvatarLayerAnchors {
+pub(crate) struct AvatarLayerAnchors {
     left_eye: (f32, f32),
     right_eye: (f32, f32),
     mouth: (f32, f32),
@@ -45,7 +47,7 @@ impl AvatarLayerAnchors {
     }
 }
 
-fn avatar_layer_anchors(kind: AvatarKind) -> Option<AvatarLayerAnchors> {
+pub(crate) fn avatar_layer_anchors(kind: AvatarKind) -> Option<AvatarLayerAnchors> {
     let anchors = match kind {
         AvatarKind::Cat => AvatarLayerAnchors {
             left_eye: (0.40, 0.50),
@@ -242,7 +244,7 @@ fn avatar_layer_anchors(kind: AvatarKind) -> Option<AvatarLayerAnchors> {
     Some(anchors)
 }
 
-fn glasses_y_offset(kind: AvatarKind) -> f32 {
+pub(crate) fn glasses_y_offset(kind: AvatarKind) -> f32 {
     match kind {
         AvatarKind::Dog | AvatarKind::Robot | AvatarKind::Ghost => 0.025,
         AvatarKind::Monster => 0.020,
@@ -251,14 +253,14 @@ fn glasses_y_offset(kind: AvatarKind) -> f32 {
     }
 }
 
-fn hat_y_offset(kind: AvatarKind) -> f32 {
+pub(crate) fn hat_y_offset(kind: AvatarKind) -> f32 {
     match kind {
         AvatarKind::Cat | AvatarKind::Frog => -0.035,
         _ => 0.0,
     }
 }
 
-fn crown_y_offset(kind: AvatarKind) -> f32 {
+pub(crate) fn crown_y_offset(kind: AvatarKind) -> f32 {
     match kind {
         AvatarKind::Cat => -0.035,
         AvatarKind::Alien | AvatarKind::Frog => -0.080,
@@ -266,7 +268,7 @@ fn crown_y_offset(kind: AvatarKind) -> f32 {
     }
 }
 
-fn bowtie_y_offset(kind: AvatarKind) -> f32 {
+pub(crate) fn bowtie_y_offset(kind: AvatarKind) -> f32 {
     match kind {
         AvatarKind::Cat
         | AvatarKind::Fox
@@ -277,21 +279,21 @@ fn bowtie_y_offset(kind: AvatarKind) -> f32 {
     }
 }
 
-fn eyepatch_y_offset(kind: AvatarKind) -> f32 {
+pub(crate) fn eyepatch_y_offset(kind: AvatarKind) -> f32 {
     match kind {
         AvatarKind::Knight => 0.030,
         _ => 0.0,
     }
 }
 
-fn horns_y_offset(kind: AvatarKind) -> f32 {
+pub(crate) fn horns_y_offset(kind: AvatarKind) -> f32 {
     match kind {
         AvatarKind::Dog | AvatarKind::Robot => 0.070,
         _ => 0.0,
     }
 }
 
-fn style_accent_color(color: AvatarColor, identity: &AvatarIdentity) -> Color {
+pub(crate) fn style_accent_color(color: AvatarColor, identity: &AvatarIdentity) -> Color {
     match color {
         AvatarColor::Default => hsl_to_color(180.0 + identity.unit_f32(25) * 160.0, 0.58, 0.48),
         AvatarColor::NeonMint => Color::rgb(27, 235, 179),
@@ -302,11 +304,11 @@ fn style_accent_color(color: AvatarColor, identity: &AvatarIdentity) -> Color {
     }
 }
 
-fn rgba_with_alpha(color: Color, alpha: u8) -> Rgba<u8> {
+pub(crate) fn rgba_with_alpha(color: Color, alpha: u8) -> Rgba<u8> {
     Rgba([color.0[0], color.0[1], color.0[2], alpha])
 }
 
-fn blend_pixel(image: &mut RgbaImage, x: i32, y: i32, source: Rgba<u8>) {
+pub(crate) fn blend_pixel(image: &mut RgbaImage, x: i32, y: i32, source: Rgba<u8>) {
     if !in_bounds(image, x, y) {
         return;
     }
@@ -326,7 +328,7 @@ fn blend_pixel(image: &mut RgbaImage, x: i32, y: i32, source: Rgba<u8>) {
     image.put_pixel(x as u32, y as u32, blended);
 }
 
-fn draw_blended_rect_mut(image: &mut RgbaImage, rect: Rect, color: Rgba<u8>) {
+pub(crate) fn draw_blended_rect_mut(image: &mut RgbaImage, rect: Rect, color: Rgba<u8>) {
     if image.width() == 0 || image.height() == 0 {
         return;
     }
@@ -343,7 +345,7 @@ fn draw_blended_rect_mut(image: &mut RgbaImage, rect: Rect, color: Rgba<u8>) {
     }
 }
 
-fn draw_style_color_layer(image: &mut RgbaImage, spec: AvatarSpec, accent: Color) {
+pub(crate) fn draw_style_color_layer(image: &mut RgbaImage, spec: AvatarSpec, accent: Color) {
     let width = spec.width as i32;
     let height = spec.height as i32;
     let bar_height = ((height as f32 * 0.08) as u32).max(3);
@@ -366,7 +368,7 @@ fn draw_style_color_layer(image: &mut RgbaImage, spec: AvatarSpec, accent: Color
     );
 }
 
-fn draw_accessory_layer(
+pub(crate) fn draw_accessory_layer(
     image: &mut RgbaImage,
     spec: AvatarSpec,
     kind: AvatarKind,
@@ -547,7 +549,7 @@ fn draw_accessory_layer(
     }
 }
 
-fn draw_expression_layer(
+pub(crate) fn draw_expression_layer(
     image: &mut RgbaImage,
     spec: AvatarSpec,
     kind: AvatarKind,
@@ -666,7 +668,7 @@ fn draw_expression_layer(
     }
 }
 
-fn draw_smile_curve(
+pub(crate) fn draw_smile_curve(
     image: &mut RgbaImage,
     cx: i32,
     cy: i32,
@@ -692,7 +694,7 @@ fn draw_smile_curve(
     }
 }
 
-fn draw_hollow_ellipse_mut(
+pub(crate) fn draw_hollow_ellipse_mut(
     image: &mut RgbaImage,
     center: (i32, i32),
     width_radius: i32,
@@ -713,7 +715,7 @@ fn draw_hollow_ellipse_mut(
     }
 }
 
-fn draw_top_hollow_ellipse_mut(
+pub(crate) fn draw_top_hollow_ellipse_mut(
     image: &mut RgbaImage,
     center: (i32, i32),
     width_radius: i32,
@@ -734,7 +736,12 @@ fn draw_top_hollow_ellipse_mut(
     }
 }
 
-fn apply_shape_layer(image: &mut RgbaImage, spec: AvatarSpec, shape: AvatarShape, accent: Color) {
+pub(crate) fn apply_shape_layer(
+    image: &mut RgbaImage,
+    spec: AvatarSpec,
+    shape: AvatarShape,
+    accent: Color,
+) {
     if shape == AvatarShape::Square {
         return;
     }
@@ -762,7 +769,12 @@ fn apply_shape_layer(image: &mut RgbaImage, spec: AvatarSpec, shape: AvatarShape
     }
 }
 
-fn point_inside_avatar_shape(x: i32, y: i32, spec: AvatarSpec, shape: AvatarShape) -> bool {
+pub(crate) fn point_inside_avatar_shape(
+    x: i32,
+    y: i32,
+    spec: AvatarSpec,
+    shape: AvatarShape,
+) -> bool {
     if x < 0 || y < 0 || x >= spec.width as i32 || y >= spec.height as i32 {
         return false;
     }
@@ -829,7 +841,12 @@ fn point_inside_avatar_shape(x: i32, y: i32, spec: AvatarSpec, shape: AvatarShap
     }
 }
 
-fn point_inside_percent_polygon(x: i32, y: i32, spec: AvatarSpec, points: &[(i64, i64)]) -> bool {
+pub(crate) fn point_inside_percent_polygon(
+    x: i32,
+    y: i32,
+    spec: AvatarSpec,
+    points: &[(i64, i64)],
+) -> bool {
     let mut inside = false;
     let width = i64::from(spec.width);
     let height = i64::from(spec.height);
@@ -858,7 +875,7 @@ fn point_inside_percent_polygon(x: i32, y: i32, spec: AvatarSpec, points: &[(i64
     inside
 }
 
-fn render_style_svg_layers(
+pub(crate) fn render_style_svg_layers(
     spec: AvatarSpec,
     style: AvatarStyleOptions,
     identity: &AvatarIdentity,
@@ -887,7 +904,7 @@ fn render_style_svg_layers(
     svg
 }
 
-fn render_color_svg_layer(spec: AvatarSpec, accent: Color) -> String {
+pub(crate) fn render_color_svg_layer(spec: AvatarSpec, accent: Color) -> String {
     let bar_height = spec.height as f32 * 0.08;
     let stripe = spec.width.min(spec.height) as f32 * 0.03;
     format!(
@@ -902,7 +919,7 @@ fn render_color_svg_layer(spec: AvatarSpec, accent: Color) -> String {
     )
 }
 
-fn render_accessory_svg_layer(
+pub(crate) fn render_accessory_svg_layer(
     spec: AvatarSpec,
     kind: AvatarKind,
     accessory: AvatarAccessory,
@@ -1083,7 +1100,7 @@ fn render_accessory_svg_layer(
     format!(r#"<g data-layer="accessory-{layer}">{body}</g>"#)
 }
 
-fn render_expression_svg_layer(
+pub(crate) fn render_expression_svg_layer(
     spec: AvatarSpec,
     kind: AvatarKind,
     expression: AvatarExpression,
@@ -1171,7 +1188,11 @@ fn render_expression_svg_layer(
     format!(r#"<g data-layer="expression-{layer}">{body}</g>"#)
 }
 
-fn render_shape_svg_layer(spec: AvatarSpec, shape: AvatarShape, accent: Color) -> String {
+pub(crate) fn render_shape_svg_layer(
+    spec: AvatarSpec,
+    shape: AvatarShape,
+    accent: Color,
+) -> String {
     if shape == AvatarShape::Square {
         return String::new();
     }
@@ -1238,7 +1259,11 @@ fn render_shape_svg_layer(spec: AvatarSpec, shape: AvatarShape, accent: Color) -
     format!(r#"<g data-layer="shape-{}">{body}</g>"#, shape.as_str())
 }
 
-fn render_shape_svg_clip(spec: AvatarSpec, shape: AvatarShape, content: &str) -> (String, String) {
+pub(crate) fn render_shape_svg_clip(
+    spec: AvatarSpec,
+    shape: AvatarShape,
+    content: &str,
+) -> (String, String) {
     if shape == AvatarShape::Square {
         return (String::new(), content.to_owned());
     }
@@ -1251,7 +1276,7 @@ fn render_shape_svg_clip(spec: AvatarSpec, shape: AvatarShape, content: &str) ->
     )
 }
 
-fn render_shape_svg_clip_body(spec: AvatarSpec, shape: AvatarShape) -> String {
+pub(crate) fn render_shape_svg_clip_body(spec: AvatarSpec, shape: AvatarShape) -> String {
     let w = spec.width as f32;
     let h = spec.height as f32;
     match shape {
@@ -1309,4 +1334,3 @@ fn render_shape_svg_clip_body(spec: AvatarSpec, shape: AvatarShape) -> String {
         }
     }
 }
-

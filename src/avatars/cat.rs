@@ -1,3 +1,5 @@
+use super::*;
+
 pub fn render_cat_avatar(spec: AvatarSpec) -> Result<RgbaImage, AvatarSpecError> {
     spec.validate()?;
     let seed = spec.seed.to_le_bytes();
@@ -147,4 +149,3 @@ fn render_cat_avatar_with_identity(
 
     image
 }
-

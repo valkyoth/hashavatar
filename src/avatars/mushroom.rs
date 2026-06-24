@@ -1,3 +1,5 @@
+use super::*;
+
 /// Render a mushroom avatar from a stable identity.
 pub fn render_mushroom_avatar_for_identity(
     spec: AvatarSpec,
@@ -65,4 +67,3 @@ pub fn render_mushroom_avatar_for_identity(
     }
     Ok(image)
 }
-

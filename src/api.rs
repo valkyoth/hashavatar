@@ -1,3 +1,5 @@
+use super::*;
+
 pub fn encode_avatar<R: AvatarRenderer>(
     renderer: &R,
     spec: AvatarSpec,
@@ -133,14 +135,14 @@ pub fn encode_avatar_auto_with_identity_options<T: AsRef<[u8]>>(
 }
 
 #[derive(Clone, Debug)]
-struct AvatarRenderPlan {
+pub(crate) struct AvatarRenderPlan {
     spec: AvatarSpec,
     identity: AvatarIdentity,
     style: AvatarStyleOptions,
 }
 
 impl AvatarRenderPlan {
-    fn new<T: AsRef<[u8]>>(
+    pub(crate) fn new<T: AsRef<[u8]>>(
         spec: AvatarSpec,
         identity_options: AvatarIdentityOptions<'_>,
         id: T,
@@ -154,7 +156,7 @@ impl AvatarRenderPlan {
         )
     }
 
-    fn new_with_style<T: AsRef<[u8]>>(
+    pub(crate) fn new_with_style<T: AsRef<[u8]>>(
         spec: AvatarSpec,
         identity_options: AvatarIdentityOptions<'_>,
         id: T,
@@ -169,7 +171,7 @@ impl AvatarRenderPlan {
         })
     }
 
-    fn new_auto<T: AsRef<[u8]>>(
+    pub(crate) fn new_auto<T: AsRef<[u8]>>(
         spec: AvatarSpec,
         identity_options: AvatarIdentityOptions<'_>,
         id: T,
@@ -184,7 +186,7 @@ impl AvatarRenderPlan {
         })
     }
 
-    fn render_rgba(&self) -> Result<RgbaImage, AvatarSpecError> {
+    pub(crate) fn render_rgba(&self) -> Result<RgbaImage, AvatarSpecError> {
         let mut image = match self.style.kind {
             AvatarKind::Cat => render_cat_avatar_for_identity_with_background(
                 self.spec,
@@ -295,7 +297,7 @@ impl AvatarRenderPlan {
         Ok(image)
     }
 
-    fn svg_background_color(&self) -> Color {
+    pub(crate) fn svg_background_color(&self) -> Color {
         match self.style.background {
             AvatarBackground::Themed => match self.style.kind {
                 AvatarKind::Cat => {
@@ -407,7 +409,7 @@ impl AvatarRenderPlan {
         }
     }
 
-    fn render_svg_body(&self) -> String {
+    pub(crate) fn render_svg_body(&self) -> String {
         match self.style.kind {
             AvatarKind::Cat => render_cat_svg(self.spec, &self.identity),
             AvatarKind::Dog => render_dog_svg(self.spec, &self.identity),
@@ -443,7 +445,7 @@ impl AvatarRenderPlan {
         }
     }
 
-    fn render_svg(&self) -> String {
+    pub(crate) fn render_svg(&self) -> String {
         let background = self.render_svg_background();
 
         let content = format!(

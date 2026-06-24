@@ -1,3 +1,5 @@
+use super::*;
+
 /// Render a cactus avatar from a stable identity.
 pub fn render_cactus_avatar_for_identity(
     spec: AvatarSpec,
@@ -101,4 +103,3 @@ pub fn render_cactus_avatar_for_identity(
     }
     Ok(image)
 }
-

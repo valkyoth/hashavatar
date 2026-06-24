@@ -1,3 +1,5 @@
+use super::*;
+
 /// RGBA color helper for concise shape drawing.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct Color(pub [u8; 4]);
@@ -21,57 +23,57 @@ impl From<Color> for Rgba<u8> {
 // Raster primitive implementations adapted from imageproc's MIT-licensed
 // drawing modules. See THIRD_PARTY_NOTICES.md.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-struct Point<T> {
-    x: T,
-    y: T,
+pub(crate) struct Point<T> {
+    pub(crate) x: T,
+    pub(crate) y: T,
 }
 
 impl<T> Point<T> {
-    const fn new(x: T, y: T) -> Self {
+    pub(crate) const fn new(x: T, y: T) -> Self {
         Self { x, y }
     }
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-struct Rect {
-    left: i32,
-    top: i32,
-    width: u32,
-    height: u32,
+pub(crate) struct Rect {
+    pub(crate) left: i32,
+    pub(crate) top: i32,
+    pub(crate) width: u32,
+    pub(crate) height: u32,
 }
 
 impl Rect {
-    const fn at(left: i32, top: i32) -> RectPosition {
+    pub(crate) const fn at(left: i32, top: i32) -> RectPosition {
         RectPosition { left, top }
     }
 
-    const fn left(self) -> i32 {
+    pub(crate) const fn left(self) -> i32 {
         self.left
     }
 
-    const fn top(self) -> i32 {
+    pub(crate) const fn top(self) -> i32 {
         self.top
     }
 
-    fn right(self) -> i32 {
+    pub(crate) fn right(self) -> i32 {
         let width_offset = self.width.saturating_sub(1).min(i32::MAX as u32) as i32;
         self.left.saturating_add(width_offset)
     }
 
-    fn bottom(self) -> i32 {
+    pub(crate) fn bottom(self) -> i32 {
         let height_offset = self.height.saturating_sub(1).min(i32::MAX as u32) as i32;
         self.top.saturating_add(height_offset)
     }
 
-    const fn width(self) -> u32 {
+    pub(crate) const fn width(self) -> u32 {
         self.width
     }
 
-    const fn height(self) -> u32 {
+    pub(crate) const fn height(self) -> u32 {
         self.height
     }
 
-    fn intersect(self, other: Self) -> Option<Self> {
+    pub(crate) fn intersect(self, other: Self) -> Option<Self> {
         let left = self.left.max(other.left);
         let top = self.top.max(other.top);
         let right = self.right().min(other.right());
@@ -89,15 +91,15 @@ impl Rect {
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-struct RectPosition {
-    left: i32,
-    top: i32,
+pub(crate) struct RectPosition {
+    pub(crate) left: i32,
+    pub(crate) top: i32,
 }
 
 impl RectPosition {
     // Zero-size rectangles are promoted to one pixel so drawing helpers remain
     // non-panicking when integer layout rounds a narrow feature down to zero.
-    const fn of_size(self, width: u32, height: u32) -> Rect {
+    pub(crate) const fn of_size(self, width: u32, height: u32) -> Rect {
         Rect {
             left: self.left,
             top: self.top,
@@ -107,7 +109,7 @@ impl RectPosition {
     }
 }
 
-fn draw_filled_rect_mut(image: &mut RgbaImage, rect: Rect, color: Rgba<u8>) {
+pub(crate) fn draw_filled_rect_mut(image: &mut RgbaImage, rect: Rect, color: Rgba<u8>) {
     if image.width() == 0 || image.height() == 0 {
         return;
     }
@@ -124,7 +126,7 @@ fn draw_filled_rect_mut(image: &mut RgbaImage, rect: Rect, color: Rgba<u8>) {
     }
 }
 
-fn draw_line_segment_mut(
+pub(crate) fn draw_line_segment_mut(
     image: &mut RgbaImage,
     start: (f32, f32),
     end: (f32, f32),
@@ -135,7 +137,7 @@ fn draw_line_segment_mut(
     }
 }
 
-struct BresenhamLineIter {
+pub(crate) struct BresenhamLineIter {
     dx: f32,
     dy: f32,
     x: i32,
@@ -201,7 +203,7 @@ impl Iterator for BresenhamLineIter {
     }
 }
 
-fn draw_antialiased_line_segment_mut<B>(
+pub(crate) fn draw_antialiased_line_segment_mut<B>(
     image: &mut RgbaImage,
     start: (i32, i32),
     end: (i32, i32),
@@ -229,7 +231,7 @@ fn draw_antialiased_line_segment_mut<B>(
     }
 }
 
-fn plot_wu_line<T, B>(
+pub(crate) fn plot_wu_line<T, B>(
     image: &mut RgbaImage,
     start: (i32, i32),
     end: (i32, i32),
@@ -268,7 +270,7 @@ fn plot_wu_line<T, B>(
     }
 }
 
-fn plot_antialiased_pixel<B>(
+pub(crate) fn plot_antialiased_pixel<B>(
     image: &mut RgbaImage,
     (x, y): (i32, i32),
     color: Rgba<u8>,
@@ -283,7 +285,7 @@ fn plot_antialiased_pixel<B>(
     }
 }
 
-fn draw_filled_ellipse_mut(
+pub(crate) fn draw_filled_ellipse_mut(
     image: &mut RgbaImage,
     center: (i32, i32),
     width_radius: i32,
@@ -317,7 +319,7 @@ fn draw_filled_ellipse_mut(
     );
 }
 
-fn draw_ellipse<F>(
+pub(crate) fn draw_ellipse<F>(
     mut render: F,
     image: &mut RgbaImage,
     center: (i32, i32),
@@ -365,7 +367,12 @@ fn draw_ellipse<F>(
     }
 }
 
-fn draw_hollow_circle_mut(image: &mut RgbaImage, center: (i32, i32), radius: i32, color: Rgba<u8>) {
+pub(crate) fn draw_hollow_circle_mut(
+    image: &mut RgbaImage,
+    center: (i32, i32),
+    radius: i32,
+    color: Rgba<u8>,
+) {
     let mut x = 0;
     let mut y = radius;
     let mut p = 1 - radius;
@@ -391,7 +398,12 @@ fn draw_hollow_circle_mut(image: &mut RgbaImage, center: (i32, i32), radius: i32
     }
 }
 
-fn draw_filled_circle_mut(image: &mut RgbaImage, center: (i32, i32), radius: i32, color: Rgba<u8>) {
+pub(crate) fn draw_filled_circle_mut(
+    image: &mut RgbaImage,
+    center: (i32, i32),
+    radius: i32,
+    color: Rgba<u8>,
+) {
     let mut x = 0;
     let mut y = radius;
     let mut p = 1 - radius;
@@ -433,7 +445,7 @@ fn draw_filled_circle_mut(image: &mut RgbaImage, center: (i32, i32), radius: i32
     }
 }
 
-fn draw_polygon_mut(image: &mut RgbaImage, poly: &[Point<i32>], color: Rgba<u8>) {
+pub(crate) fn draw_polygon_mut(image: &mut RgbaImage, poly: &[Point<i32>], color: Rgba<u8>) {
     if poly.is_empty() || image.width() == 0 || image.height() == 0 {
         return;
     }
@@ -513,7 +525,7 @@ fn draw_polygon_mut(image: &mut RgbaImage, poly: &[Point<i32>], color: Rgba<u8>)
     }
 }
 
-fn round_f64_to_i32_saturating(value: f64) -> i32 {
+pub(crate) fn round_f64_to_i32_saturating(value: f64) -> i32 {
     if !value.is_finite() {
         0
     } else if value <= i32::MIN as f64 {
@@ -537,7 +549,7 @@ pub fn fuzz_draw_polygon_rgba(width: u32, height: u32, points: &[(i32, i32)], co
     draw_polygon_mut(&mut image, &polygon, Rgba(color));
 }
 
-fn interpolate(left: Rgba<u8>, right: Rgba<u8>, left_weight: f32) -> Rgba<u8> {
+pub(crate) fn interpolate(left: Rgba<u8>, right: Rgba<u8>, left_weight: f32) -> Rgba<u8> {
     let right_weight = 1.0 - left_weight;
     Rgba([
         weighted_channel_sum(left.0[0], right.0[0], left_weight, right_weight),
@@ -547,7 +559,7 @@ fn interpolate(left: Rgba<u8>, right: Rgba<u8>, left_weight: f32) -> Rgba<u8> {
     ])
 }
 
-fn weighted_channel_sum(left: u8, right: u8, left_weight: f32, right_weight: f32) -> u8 {
+pub(crate) fn weighted_channel_sum(left: u8, right: u8, left_weight: f32, right_weight: f32) -> u8 {
     let total_weight = left_weight + right_weight;
     if !total_weight.is_finite() || total_weight <= 0.0 {
         return u8::MIN;
@@ -561,12 +573,12 @@ fn weighted_channel_sum(left: u8, right: u8, left_weight: f32, right_weight: f32
     }
 }
 
-fn draw_if_in_bounds(image: &mut RgbaImage, x: i32, y: i32, color: Rgba<u8>) {
+pub(crate) fn draw_if_in_bounds(image: &mut RgbaImage, x: i32, y: i32, color: Rgba<u8>) {
     if in_bounds(image, x, y) {
         image.put_pixel(x as u32, y as u32, color);
     }
 }
 
-fn in_bounds(image: &RgbaImage, x: i32, y: i32) -> bool {
+pub(crate) fn in_bounds(image: &RgbaImage, x: i32, y: i32) -> bool {
     x >= 0 && x < image.width() as i32 && y >= 0 && y < image.height() as i32
 }

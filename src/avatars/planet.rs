@@ -1,3 +1,5 @@
+use super::*;
+
 /// Render a ringed planet avatar from a stable identity.
 pub fn render_planet_avatar_for_identity(
     spec: AvatarSpec,
@@ -77,4 +79,3 @@ pub fn render_planet_avatar_for_identity(
     );
     Ok(image)
 }
-

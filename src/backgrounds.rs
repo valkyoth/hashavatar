@@ -1,4 +1,6 @@
-fn draw_decorative_background(
+use super::*;
+
+pub(crate) fn draw_decorative_background(
     image: &mut RgbaImage,
     background: AvatarBackground,
     accent: Color,
@@ -29,7 +31,7 @@ fn draw_decorative_background(
     }
 }
 
-fn draw_polka_dot_background(image: &mut RgbaImage, accent: Color) {
+pub(crate) fn draw_polka_dot_background(image: &mut RgbaImage, accent: Color) {
     let base = Color::rgb(248, 250, 247);
     let dot = rgba_over(base, Color::rgba(accent.0[0], accent.0[1], accent.0[2], 62));
     fill_image(image, base);
@@ -44,7 +46,7 @@ fn draw_polka_dot_background(image: &mut RgbaImage, accent: Color) {
     }
 }
 
-fn draw_striped_background(image: &mut RgbaImage, accent: Color) {
+pub(crate) fn draw_striped_background(image: &mut RgbaImage, accent: Color) {
     let base = Color::rgb(248, 250, 247);
     let stripe = rgba_over(base, Color::rgba(accent.0[0], accent.0[1], accent.0[2], 42));
     let min_side = image.width().min(image.height()).max(1);
@@ -58,7 +60,7 @@ fn draw_striped_background(image: &mut RgbaImage, accent: Color) {
     }
 }
 
-fn draw_checkerboard_background(image: &mut RgbaImage) {
+pub(crate) fn draw_checkerboard_background(image: &mut RgbaImage) {
     let light = Color::rgb(248, 250, 247);
     let dark = Color::rgb(232, 236, 231);
     let min_side = image.width().min(image.height()).max(1);
@@ -72,7 +74,7 @@ fn draw_checkerboard_background(image: &mut RgbaImage) {
     }
 }
 
-fn draw_grid_background(image: &mut RgbaImage) {
+pub(crate) fn draw_grid_background(image: &mut RgbaImage) {
     let base = Color::rgb(248, 250, 247);
     let line = Color::rgb(221, 226, 221);
     let min_side = image.width().min(image.height()).max(1);
@@ -86,7 +88,7 @@ fn draw_grid_background(image: &mut RgbaImage) {
     }
 }
 
-fn draw_vertical_gradient_background(image: &mut RgbaImage, top: Color, bottom: Color) {
+pub(crate) fn draw_vertical_gradient_background(image: &mut RgbaImage, top: Color, bottom: Color) {
     let max_y = image.height().saturating_sub(1).max(1);
     for y in 0..image.height() {
         let color = lerp_color_u32(top, bottom, y, max_y);
@@ -96,7 +98,7 @@ fn draw_vertical_gradient_background(image: &mut RgbaImage, top: Color, bottom: 
     }
 }
 
-fn draw_starry_background(image: &mut RgbaImage, identity: &AvatarIdentity) {
+pub(crate) fn draw_starry_background(image: &mut RgbaImage, identity: &AvatarIdentity) {
     let base = Color::rgb(17, 24, 39);
     fill_image(image, base);
 
@@ -133,13 +135,13 @@ fn draw_starry_background(image: &mut RgbaImage, identity: &AvatarIdentity) {
     }
 }
 
-fn fill_image(image: &mut RgbaImage, color: Color) {
+pub(crate) fn fill_image(image: &mut RgbaImage, color: Color) {
     for pixel in image.pixels_mut() {
         *pixel = color.into();
     }
 }
 
-fn rgba_over(bottom: Color, top: Color) -> Color {
+pub(crate) fn rgba_over(bottom: Color, top: Color) -> Color {
     let alpha = u32::from(top.0[3]);
     let inverse = 255 - alpha;
     Color::rgb(
@@ -149,7 +151,7 @@ fn rgba_over(bottom: Color, top: Color) -> Color {
     )
 }
 
-fn lerp_color_u32(start: Color, end: Color, position: u32, max_position: u32) -> Color {
+pub(crate) fn lerp_color_u32(start: Color, end: Color, position: u32, max_position: u32) -> Color {
     let max = max_position.max(1);
     Color::rgb(
         lerp_channel_u32(start.0[0], end.0[0], position, max),
@@ -158,7 +160,7 @@ fn lerp_color_u32(start: Color, end: Color, position: u32, max_position: u32) ->
     )
 }
 
-fn lerp_channel_u32(start: u8, end: u8, position: u32, max_position: u32) -> u8 {
+pub(crate) fn lerp_channel_u32(start: u8, end: u8, position: u32, max_position: u32) -> u8 {
     let start = u32::from(start);
     let end = u32::from(end);
     let max = max_position.max(1);
@@ -166,6 +168,6 @@ fn lerp_channel_u32(start: u8, end: u8, position: u32, max_position: u32) -> u8 
     ((start * (max - position) + end * position + max / 2) / max) as u8
 }
 
-fn color_hex(color: Color) -> String {
+pub(crate) fn color_hex(color: Color) -> String {
     format!("#{:02x}{:02x}{:02x}", color.0[0], color.0[1], color.0[2])
 }

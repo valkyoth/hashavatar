@@ -1,4 +1,6 @@
-fn render_cupcake_svg(spec: AvatarSpec, identity: &AvatarIdentity) -> String {
+use super::*;
+
+pub(crate) fn render_cupcake_svg(spec: AvatarSpec, identity: &AvatarIdentity) -> String {
     let w = spec.width as f32;
     let h = spec.height as f32;
     let cx = w / 2.0;
@@ -48,4 +50,3 @@ fn render_cupcake_svg(spec: AvatarSpec, identity: &AvatarIdentity) -> String {
         cherry = color_hex(cherry),
     )
 }
-

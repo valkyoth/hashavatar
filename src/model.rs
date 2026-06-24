@@ -1,3 +1,5 @@
+use super::*;
+
 /// Trait for renderers that can draw reusable avatar styles onto an image buffer.
 pub trait AvatarRenderer {
     fn render(&self, spec: AvatarSpec) -> Result<RgbaImage, AvatarSpecError>;
@@ -805,7 +807,7 @@ impl AvatarStyleOptions {
         self.to_string()
     }
 
-    const fn has_extra_layers(self) -> bool {
+    pub(crate) const fn has_extra_layers(self) -> bool {
         !matches!(self.accessory, AvatarAccessory::None)
             || !matches!(self.color, AvatarColor::Default)
             || !matches!(self.expression, AvatarExpression::Default)
