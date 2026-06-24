@@ -1,8 +1,8 @@
 # Changelog
 
-## 1.0.4
+## 1.1.0
 
-- Bumped the crate to `1.0.4`.
+- Bumped the crate to `1.1.0`.
 - Replaced direct `zeroize` usage with the native `sanitization` crate API.
 - Added `sanitization` `1.2.2` with `alloc` support for digest, seed,
   preimage, pixel-buffer, and temporary encoder-buffer cleanup.
@@ -28,10 +28,13 @@
 - Tightened `cargo-deny` duplicate crate policy from `warn` to `deny`.
 - Updated `libfuzzer-sys` in the fuzz harness to `0.4.13`.
 - Refreshed Cargo lockfiles with the latest compatible dependency versions.
+- Split the former monolithic `src/lib.rs` into focused source files, including
+  per-avatar raster and SVG renderer files, while preserving the public API and
+  visual fingerprints.
 - Updated GitHub Actions pins to `actions/checkout` `v7.0.0` and
   `taiki-e/install-action` `v2.82.3`; `Swatinem/rust-cache` remains current at
   `v2.9.1`.
-- Refreshed README installation snippets and release metadata for `1.0.4`.
+- Refreshed README installation snippets and release metadata for `1.1.0`.
 
 ## 1.0.3
 

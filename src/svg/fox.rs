@@ -1,0 +1,61 @@
+fn render_fox_svg(spec: AvatarSpec, identity: &AvatarIdentity) -> String {
+    let w = spec.width as f32;
+    let h = spec.height as f32;
+    let cx = w / 2.0;
+    let cy = h * 0.56;
+    let orange = hsl_to_color(18.0 + identity.unit_f32(1) * 20.0, 0.76, 0.58);
+    let cream = hsl_to_color(40.0, 0.30, 0.94);
+    format!(
+        r##"<polygon points="{},{}, {},{}, {},{}" fill="{}"/><polygon points="{},{}, {},{}, {},{}" fill="{}"/><ellipse cx="{}" cy="{}" rx="{}" ry="{}" fill="{}"/><polygon points="{},{}, {},{}, {},{}" fill="{}"/><polygon points="{},{}, {},{}, {},{}" fill="{}"/><ellipse cx="{}" cy="{}" rx="{}" ry="{}" fill="#fff"/><ellipse cx="{}" cy="{}" rx="{}" ry="{}" fill="#fff"/><ellipse cx="{}" cy="{}" rx="{}" ry="{}" fill="#221c18"/><ellipse cx="{}" cy="{}" rx="{}" ry="{}" fill="#221c18"/>"##,
+        cx - w * 0.18,
+        cy - h * 0.12,
+        cx - w * 0.10,
+        cy - h * 0.28,
+        cx - w * 0.02,
+        cy - h * 0.05,
+        color_hex(orange),
+        cx + w * 0.18,
+        cy - h * 0.12,
+        cx + w * 0.10,
+        cy - h * 0.28,
+        cx + w * 0.02,
+        cy - h * 0.05,
+        color_hex(orange),
+        cx,
+        cy,
+        w * 0.24,
+        h * 0.22,
+        color_hex(orange),
+        cx - w * 0.18,
+        cy - h * 0.03,
+        cx,
+        cy + h * 0.10,
+        cx - w * 0.06,
+        cy + h * 0.18,
+        color_hex(cream),
+        cx + w * 0.18,
+        cy - h * 0.03,
+        cx,
+        cy + h * 0.10,
+        cx + w * 0.06,
+        cy + h * 0.18,
+        color_hex(cream),
+        cx - w * 0.08,
+        cy - h * 0.04,
+        w * 0.03,
+        h * 0.03,
+        cx + w * 0.08,
+        cy - h * 0.04,
+        w * 0.03,
+        h * 0.03,
+        cx - w * 0.08,
+        cy - h * 0.04,
+        w * 0.013,
+        h * 0.022,
+        cx + w * 0.08,
+        cy - h * 0.04,
+        w * 0.013,
+        h * 0.022,
+    )
+}
+

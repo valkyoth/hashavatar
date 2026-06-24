@@ -1,7 +1,7 @@
-# hashavatar 1.0.4
+# hashavatar 1.1.0
 
-`1.0.4` is a maintenance release for `hashavatar` focused on dependency,
-sanitization, tooling, and documentation freshness.
+`1.1.0` is a minor release for `hashavatar` focused on dependency,
+sanitization, tooling, source layout, and documentation freshness.
 
 ## Dependency Updates
 
@@ -49,8 +49,10 @@ sanitization, tooling, and documentation freshness.
 
 ## Documentation
 
-- Updated README installation snippets and compatibility wording to `1.0.4`.
-- Updated the changelog for the `1.0.4` release.
+- Updated README installation snippets and compatibility wording to `1.1.0`.
+- Updated the changelog for the `1.1.0` release.
+- Split the former monolithic `src/lib.rs` into focused source files, including
+  per-avatar raster and SVG renderer files, without changing the public API.
 
 ## Compatibility
 
