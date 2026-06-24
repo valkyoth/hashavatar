@@ -28,9 +28,6 @@ name = "arrayvec"
 version = "0.7.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f02882884d3e1bc524fb12c79f107f6ad0e1cfd498c536ffb494301740995dfe"
-dependencies = [
- "zeroize",
-]
 
 [[package]]
 name = "autocfg"
@@ -56,7 +53,6 @@ dependencies = [
  "cfg-if",
  "constant_time_eq",
  "cpufeatures",
- "zeroize",
 ]
 
 [[package]]
@@ -66,7 +62,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d2f6c7dbe95a6ed67ad9f18e57daf93a2f034c524b99fd2b76d18fdfeb6660aa"
 dependencies = [
  "hybrid-array",
- "zeroize",
 ]
 
 [[package]]
@@ -161,7 +156,6 @@ checksum = "f1dd6dbb5841937940781866fa1281a1ff7bd3bf827091440879f9994983d5c2"
 dependencies = [
  "block-buffer",
  "crypto-common",
- "zeroize",
 ]
 
 [[package]]
@@ -225,12 +219,12 @@ dependencies = [
  "palette",
  "rand",
  "roxmltree",
+ "sanitization",
  "serde",
  "serde_json",
  "sha2",
  "subtle",
  "xxhash-rust",
- "zeroize",
 ]
 
 [[package]]
@@ -416,6 +410,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "sanitization"
+version = "1.2.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "51992628809c9dcb8fa6c55d868ff724ae724c4641a29b24867fda6d15665ff6"
+
+[[package]]
 name = "serde"
 version = "1.0.228"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -520,12 +520,6 @@ name = "xxhash-rust"
 version = "0.8.15"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "fdd20c5420375476fbd4394763288da7eb0cc0b8c11deed431a91562af7335d3"
-
-[[package]]
-name = "zeroize"
-version = "1.9.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e13c156562582aa81c60cb29407084cdb54c4164760106ab78e6c5b0858cf64e"
 
 [[package]]
 name = "zmij"

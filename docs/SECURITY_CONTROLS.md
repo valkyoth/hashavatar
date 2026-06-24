@@ -31,7 +31,7 @@
   features. The default build exposes WebP as the only raster encoder.
 - GIF export is available only through the explicit `gif` feature. The `image`
   crate's GIF encoder performs internal 256-color quantization, and
-  `hashavatar` cannot zeroize those codec-owned buffers. High-assurance
+  `hashavatar` cannot sanitize those codec-owned buffers. High-assurance
   deployments should prefer WebP or PNG.
 - Procedural RNG seeding uses 256 bits from the second half of the identity
   digest. Most direct visual parameter lookups use lower digest bytes, but some
@@ -40,15 +40,15 @@
   digest-derived public artifacts, and removing those lookups would change
   golden output. Callers that treat identifiers as sensitive should prefer
   SHA-512 or BLAKE3 over XXH3 and follow the timing/output-size guidance below.
-- The temporary 256-bit RNG seed copy is stored in `zeroize::Zeroizing`, so the
-  digest-derived seed copy is scrubbed on scope exit. The final value passed to
-  `StdRng::from_seed` is also held in a `Zeroizing` guard before the copy into
-  `StdRng`. `StdRng::from_seed` still takes the seed by value, so a transient
-  unguarded argument copy is part of the crate's documented by-value-copy
-  zeroization caveat.
+- The temporary 256-bit RNG seed copy is stored in `sanitization::Secret`, so
+  the digest-derived seed copy is scrubbed on scope exit. The final value
+  passed to `StdRng::from_seed` is also held in a `Secret` guard before the
+  copy into `StdRng`. `StdRng::from_seed` still takes the seed by value, so a
+  transient unguarded argument copy is part of the crate's documented
+  by-value-copy sanitization caveat.
 - The procedural RNG itself is `rand::rngs::StdRng`. Its expanded internal
-  state is not zeroized on drop because `StdRng` does not currently implement
-  `ZeroizeOnDrop`. In the default SHA-512 mode, recovering the original
+  state is not sanitized on drop because `StdRng` does not currently expose a
+  sanitization hook. In the default SHA-512 mode, recovering the original
   identity from that expanded state would require reversing SHA-512 output,
   which is computationally infeasible. High-assurance callers should still
   treat this as a known residual and prefer SHA-512 or BLAKE3 over XXH3 for
@@ -64,32 +64,31 @@
   digest bytes. Cache keys are still stable correlators for the same identity
   and should be treated as public cache identifiers, not authentication
   secrets.
-- `AvatarIdentity` implements `Clone`; every clone is zeroized independently
+- `AvatarIdentity` implements `Clone`; every clone is sanitized independently
   on drop. High-assurance integrations should keep identity clones
   short-lived so digest bytes do not remain live in multiple memory locations
   longer than necessary.
-- Derived identity digests and temporary hash preimage buffers are zeroized
+- Derived identity digests and temporary hash preimage buffers are sanitized
   when dropped. The intermediate 64-byte digest returned by each hash backend is
-  held in `Zeroizing` guards before being copied into `AvatarIdentity`.
-- The SHA-512 dependency is built with its `zeroize` feature so its block
-  buffer uses upstream `ZeroizeOnDrop`. SHA-512 `finalize()` still returns the
-  digest output by value, so the output bytes have the same unavoidable
-  by-value-copy caveats as the BLAKE3 and XXH3 paths. `hashavatar` wraps that
-  returned digest in `Zeroizing` immediately. The optional BLAKE3 dependency is
-  built with its `zeroize` feature, and `hashavatar` explicitly zeroizes the
-  BLAKE3 hasher and XOF reader after deriving the 64-byte digest. Tests assert
-  these upstream zeroization traits remain available.
+  held in `sanitization::Secret` guards before being copied into
+  `AvatarIdentity`, and temporary `Vec<u8>` preimages are cleared across full
+  allocation capacity with `sanitization`'s volatile vector clear helper.
+- Third-party hasher internal state is not sanitized by `hashavatar` because
+  `sha2` and `blake3` do not expose a native `sanitization` cleanup hook.
+  `hashavatar` sanitizes the bounded preimage buffer and all digest copies it
+  owns, but very high-assurance callers should still treat opaque hasher state
+  as a known residual.
 - Identity hash preimage allocation is sized from the tenant, style-version,
   and identity input lengths. Debug/test builds assert that preimage buffers do
-  not reallocate before zeroization, so future component-size drift is caught by
-  CI. The crate bounds and zeroizes those temporary buffers, but it does not
+  not reallocate before sanitization, so future component-size drift is caught
+  by CI. The crate bounds and sanitizes those temporary buffers, but it does not
   hide input length from the allocator, OS-level heap profilers, or other
   same-process memory-observation tools. Very high-assurance callers that treat
   identifier length as sensitive should normalize or pad identifiers to a fixed
   length before calling this crate.
 - The optional XXH3-128 mode derives the crate's 64-byte identity digest by
   hashing four domain-separated chunks. Each chunk temporarily copies the
-  bounded preimage into a zeroized buffer, so peak preimage memory is higher
+  bounded preimage into a sanitized buffer, so peak preimage memory is higher
   than SHA-512 or BLAKE3. Keep XXH3 for low-stakes, non-adversarial workloads
   where its non-cryptographic collision profile and extra temporary preimage
   copy are acceptable.
@@ -98,15 +97,15 @@
   may still bring a transitive `getrandom` dependency into the lockfile; WASM
   and embedded applications that use OS-backed randomness elsewhere in the same
   binary must configure and test `getrandom` for their target explicitly.
-- Encode APIs wrap temporary owned raster buffers in RAII zeroization guards, so
-  pixel data is cleared during normal returns, encoder errors, and unwinding
-  panics. Encoded output is accumulated in a `Zeroizing<Vec<u8>>` until
+- Encode APIs wrap temporary owned raster buffers in RAII sanitization guards,
+  so pixel data is cleared during normal returns, encoder errors, and unwinding
+  panics. Encoded output is accumulated in a local `SanitizingVec` until
   successful return, so partially encoded bytes are scrubbed on encoder errors.
-  JPEG export also wraps the temporary RGB flattening buffer in
-  `zeroize::Zeroizing`. Returned encoded bytes and images returned by render
-  APIs are caller-owned and must be cleared by the caller if their environment
-  requires that. The README includes `zeroize` examples for returned `Vec<u8>`
-  and `RgbaImage` buffers.
+  JPEG export also wraps the temporary RGB flattening buffer in `SanitizingVec`.
+  Returned encoded bytes and images returned by render APIs are caller-owned
+  and must be cleared by the caller if their environment requires that. The
+  README includes `sanitization` examples for returned `Vec<u8>` and
+  `RgbaImage` buffers.
 - Rendering time is intentionally not constant-time. Shape counts, geometry,
   raster encoding, and SVG length can vary with the identity digest, so callers
   should not treat rendered avatar timing or output size as secret-preserving

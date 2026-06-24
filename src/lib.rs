@@ -45,11 +45,12 @@ use image::{
 };
 use palette::{FromColor, Hsl, Srgb};
 use rand::{RngExt, SeedableRng, rngs::StdRng};
+use sanitization::unsafe_wipe::volatile_sanitize_vec;
+use sanitization::{Secret, SecureSanitize, sanitize_bytes};
 use sha2::Digest;
 #[cfg(not(any(feature = "blake3", feature = "xxh3")))]
 use sha2::Sha512;
 use subtle::ConstantTimeEq;
-use zeroize::{Zeroize, Zeroizing};
 
 /// Rendering contract version for deterministic avatars.
 ///
@@ -1079,7 +1080,7 @@ impl Default for AvatarIdentityOptions<'static> {
 ///
 /// # Security
 ///
-/// `AvatarIdentity` implements `Clone`. Each clone is independently zeroized
+/// `AvatarIdentity` implements `Clone`. Each clone is independently sanitized
 /// on drop. Callers operating in high-assurance environments should keep clones
 /// as short-lived as possible to reduce the window during which digest bytes
 /// exist in multiple memory locations.
@@ -1150,7 +1151,7 @@ impl AvatarIdentity {
         debug_assert_eq!(
             preimage.capacity(),
             expected_capacity,
-            "cache-key preimage reallocated; zeroization no longer covers all copies"
+            "cache-key preimage reallocated; sanitization no longer covers all copies"
         );
         debug_assert_eq!(
             preimage.len(),
@@ -1160,14 +1161,14 @@ impl AvatarIdentity {
 
         let mut hasher = sha2::Sha512::new();
         hasher.update(&preimage);
-        let digest = Zeroizing::new(<[u8; 64]>::from(hasher.finalize()));
-        preimage.zeroize();
-        hex_lower(&digest[..32])
+        let digest = Secret::new(<[u8; 64]>::from(hasher.finalize()));
+        volatile_sanitize_vec(&mut preimage);
+        digest.with_secret(|digest| hex_lower(&digest[..32]))
     }
 
-    fn rng_seed(&self) -> Zeroizing<[u8; 32]> {
-        let mut seed = Zeroizing::new([0u8; 32]);
-        seed.copy_from_slice(&self.digest[32..64]);
+    fn rng_seed(&self) -> Secret<[u8; 32]> {
+        let mut seed = Secret::new([0u8; 32]);
+        seed.with_secret_mut(|seed| seed.copy_from_slice(&self.digest[32..64]));
         seed
     }
 
@@ -1189,9 +1190,9 @@ impl AvatarIdentity {
     }
 }
 
-impl Zeroize for AvatarIdentity {
-    fn zeroize(&mut self) {
-        self.digest.zeroize();
+impl SecureSanitize for AvatarIdentity {
+    fn secure_sanitize(&mut self) {
+        self.digest.secure_sanitize();
     }
 }
 
@@ -1211,7 +1212,7 @@ impl PartialEq for AvatarIdentity {
 
 impl Drop for AvatarIdentity {
     fn drop(&mut self) {
-        self.zeroize();
+        self.secure_sanitize();
     }
 }
 
@@ -1233,9 +1234,9 @@ fn validate_identity_component(
 
 fn derive_identity_digest(options: AvatarIdentityOptions<'_>, input: &[u8]) -> [u8; 64] {
     let mut preimage = identity_hash_preimage(options, input);
-    let digest = Zeroizing::new(active_identity_digest(&preimage));
-    preimage.zeroize();
-    *digest
+    let digest = Secret::new(active_identity_digest(&preimage));
+    volatile_sanitize_vec(&mut preimage);
+    digest.with_secret(|digest| *digest)
 }
 
 fn identity_hash_preimage(options: AvatarIdentityOptions<'_>, input: &[u8]) -> Vec<u8> {
@@ -1263,7 +1264,7 @@ fn identity_hash_preimage(options: AvatarIdentityOptions<'_>, input: &[u8]) -> V
     debug_assert_eq!(
         preimage.capacity(),
         expected_capacity,
-        "identity preimage reallocated; zeroization no longer covers all copies"
+        "identity preimage reallocated; sanitization no longer covers all copies"
     );
     debug_assert_eq!(
         preimage.len(),
@@ -1315,8 +1316,8 @@ fn hex_lower(bytes: &[u8]) -> String {
 fn sha512_digest(preimage: &[u8]) -> [u8; 64] {
     let mut hasher = Sha512::new();
     hasher.update(preimage);
-    let digest = Zeroizing::new(hasher.finalize().into());
-    *digest
+    let digest = Secret::new(hasher.finalize().into());
+    digest.with_secret(|digest| *digest)
 }
 
 #[cfg(feature = "blake3")]
@@ -1326,8 +1327,6 @@ fn blake3_digest(preimage: &[u8]) -> [u8; 64] {
     let mut digest = [0u8; 64];
     let mut reader = hasher.finalize_xof();
     reader.fill(&mut digest);
-    reader.zeroize();
-    hasher.zeroize();
     digest
 }
 
@@ -1345,7 +1344,7 @@ fn xxh3_128_digest(preimage: &[u8]) -> [u8; 64] {
         debug_assert_eq!(
             chunk_input.capacity(),
             expected_capacity,
-            "XXH3 chunk preimage reallocated; zeroization no longer covers all copies"
+            "XXH3 chunk preimage reallocated; sanitization no longer covers all copies"
         );
         debug_assert_eq!(
             chunk_input.len(),
@@ -1355,8 +1354,8 @@ fn xxh3_128_digest(preimage: &[u8]) -> [u8; 64] {
         let mut chunk_digest = xxhash_rust::xxh3::xxh3_128(&chunk_input).to_le_bytes();
         let offset = chunk * chunk_digest.len();
         digest[offset..offset + chunk_digest.len()].copy_from_slice(&chunk_digest);
-        chunk_digest.zeroize();
-        chunk_input.zeroize();
+        chunk_digest.secure_sanitize();
+        volatile_sanitize_vec(&mut chunk_input);
     }
     digest
 }
@@ -1431,7 +1430,7 @@ pub enum AvatarOutputFormat {
     ///
     /// GIF encoding performs 256-color quantization inside the `image` crate.
     /// Those internal quantization buffers are not accessible to `hashavatar`
-    /// and are not zeroized by this crate. For high-assurance deployments,
+    /// and are not sanitized by this crate. For high-assurance deployments,
     /// prefer `AvatarOutputFormat::WebP` or PNG output.
     #[cfg(feature = "gif")]
     Gif,
@@ -4595,12 +4594,14 @@ pub fn render_cat_avatar_for_identity_with_background(
 
 fn seeded_renderer_rng(spec: AvatarSpec, identity: &AvatarIdentity) -> StdRng {
     let mut rng_seed = identity.rng_seed();
-    for (index, byte) in spec.seed.to_le_bytes().iter().enumerate() {
-        rng_seed[index] ^= *byte;
-    }
-    let rng_seed_value = Zeroizing::new(*rng_seed);
+    rng_seed.with_secret_mut(|rng_seed| {
+        for (index, byte) in spec.seed.to_le_bytes().iter().enumerate() {
+            rng_seed[index] ^= *byte;
+        }
+    });
+    let rng_seed_value = Secret::new(rng_seed.with_secret(|rng_seed| *rng_seed));
     drop(rng_seed);
-    StdRng::from_seed(*rng_seed_value)
+    rng_seed_value.with_secret(|rng_seed_value| StdRng::from_seed(*rng_seed_value))
 }
 
 fn render_cat_avatar_with_identity(
@@ -10196,27 +10197,27 @@ fn render_paws_svg(spec: AvatarSpec, identity: &AvatarIdentity) -> String {
 }
 
 fn encode_rgba_image(image: &RgbaImage, format: AvatarOutputFormat) -> ImageResult<Vec<u8>> {
-    let mut bytes = Zeroizing::new(Vec::with_capacity(image.as_raw().len()));
+    let mut bytes = SanitizingVec::with_capacity(image.as_raw().len());
     let result = {
-        let cursor = Cursor::new(&mut *bytes);
+        let cursor = Cursor::new(bytes.as_mut_vec());
         encode_into_writer(image, format, cursor)
     };
     match result {
-        Ok(()) => Ok(std::mem::take(&mut *bytes)),
+        Ok(()) => Ok(bytes.into_inner()),
         Err(error) => Err(error),
     }
 }
 
 fn encode_owned_rgba_image(image: RgbaImage, format: AvatarOutputFormat) -> ImageResult<Vec<u8>> {
-    let image = ZeroizingRgbaImage::new(image);
+    let image = SanitizingRgbaImage::new(image);
     encode_rgba_image(image.as_image(), format)
 }
 
-struct ZeroizingRgbaImage {
+struct SanitizingRgbaImage {
     image: RgbaImage,
 }
 
-impl ZeroizingRgbaImage {
+impl SanitizingRgbaImage {
     fn new(image: RgbaImage) -> Self {
         Self { image }
     }
@@ -10226,15 +10227,51 @@ impl ZeroizingRgbaImage {
     }
 }
 
-impl Drop for ZeroizingRgbaImage {
+impl Drop for SanitizingRgbaImage {
     fn drop(&mut self) {
-        zeroize_rgba_pixels(&mut self.image);
+        sanitize_rgba_pixels(&mut self.image);
     }
 }
 
-fn zeroize_rgba_pixels(image: &mut RgbaImage) {
+fn sanitize_rgba_pixels(image: &mut RgbaImage) {
     let pixels: &mut [u8] = image.as_mut();
-    pixels.zeroize();
+    sanitize_bytes(pixels);
+}
+
+struct SanitizingVec {
+    bytes: Vec<u8>,
+}
+
+impl SanitizingVec {
+    fn with_capacity(capacity: usize) -> Self {
+        Self {
+            bytes: Vec::with_capacity(capacity),
+        }
+    }
+
+    #[cfg(feature = "jpeg")]
+    fn from_vec(bytes: Vec<u8>) -> Self {
+        Self { bytes }
+    }
+
+    fn as_mut_vec(&mut self) -> &mut Vec<u8> {
+        &mut self.bytes
+    }
+
+    #[cfg(feature = "jpeg")]
+    fn as_slice(&self) -> &[u8] {
+        &self.bytes
+    }
+
+    fn into_inner(mut self) -> Vec<u8> {
+        std::mem::take(&mut self.bytes)
+    }
+}
+
+impl Drop for SanitizingVec {
+    fn drop(&mut self) {
+        volatile_sanitize_vec(&mut self.bytes);
+    }
 }
 
 fn encode_into_writer<W: std::io::Write>(
@@ -10261,7 +10298,7 @@ fn encode_into_writer<W: std::io::Write>(
         }
         #[cfg(feature = "jpeg")]
         AvatarOutputFormat::Jpeg => {
-            let rgb = Zeroizing::new(rgba_to_rgb_over_white(image));
+            let rgb = SanitizingVec::from_vec(rgba_to_rgb_over_white(image));
             JpegEncoder::new_with_quality(writer, 92).write_image(
                 rgb.as_slice(),
                 image.width(),
@@ -10466,7 +10503,7 @@ mod tests {
 
         assert_eq!(identity.digest.len(), 64);
         let rng_seed = identity.rng_seed();
-        assert_eq!(&rng_seed[..], &identity.digest[32..64]);
+        rng_seed.with_secret(|rng_seed| assert_eq!(&rng_seed[..], &identity.digest[32..64]));
     }
 
     #[test]
@@ -10484,7 +10521,7 @@ mod tests {
     }
 
     #[test]
-    fn avatar_identity_rustdoc_mentions_clone_zeroization() {
+    fn avatar_identity_rustdoc_mentions_clone_sanitization() {
         let source = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/src/lib.rs"));
         let before_struct = source
             .split("pub struct AvatarIdentity {")
@@ -10497,26 +10534,21 @@ mod tests {
 
         assert!(docs.contains("/// # Security"));
         assert!(docs.contains("`AvatarIdentity` implements `Clone`"));
-        assert!(docs.contains("Each clone is independently zeroized"));
+        assert!(docs.contains("Each clone is independently sanitized"));
         assert!(docs.contains("short-lived as possible"));
         assert!(docs.contains("multiple memory locations"));
     }
 
     #[test]
     #[cfg(not(any(feature = "blake3", feature = "xxh3")))]
-    fn sha512_hasher_state_uses_zeroize_on_drop() {
-        fn assert_zeroize_on_drop<T: zeroize::ZeroizeOnDrop>() {}
+    fn sha512_hasher_state_sanitization_boundary_is_documented() {
+        let controls = include_str!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/docs/SECURITY_CONTROLS.md"
+        ));
 
-        assert_zeroize_on_drop::<TestSha512>();
-    }
-
-    #[test]
-    #[cfg(feature = "blake3")]
-    fn blake3_hasher_state_can_be_zeroized() {
-        fn assert_zeroize<T: Zeroize>() {}
-
-        assert_zeroize::<blake3::Hasher>();
-        assert_zeroize::<blake3::OutputReader>();
+        assert!(controls.contains("Third-party hasher internal state"));
+        assert!(controls.contains("not sanitized by `hashavatar`"));
     }
 
     #[test]
@@ -10524,17 +10556,19 @@ mod tests {
         let identity = valid_identity("alice@example.com");
         let rng_seed = identity.rng_seed();
 
-        assert_eq!(rng_seed.len(), 32);
-        assert_eq!(&rng_seed[..], &identity.digest[32..64]);
-        assert_ne!(&identity.digest[..32], &rng_seed[..]);
+        rng_seed.with_secret(|rng_seed| {
+            assert_eq!(rng_seed.len(), 32);
+            assert_eq!(&rng_seed[..], &identity.digest[32..64]);
+            assert_ne!(&identity.digest[..32], &rng_seed[..]);
+        });
     }
 
     #[test]
-    fn rng_seed_copy_is_zeroizing() {
+    fn rng_seed_copy_is_sanitizing() {
         let identity = valid_identity("alice@example.com");
-        let rng_seed: Zeroizing<[u8; 32]> = identity.rng_seed();
+        let rng_seed: Secret<[u8; 32]> = identity.rng_seed();
 
-        assert_eq!(rng_seed.len(), 32);
+        rng_seed.with_secret(|rng_seed| assert_eq!(rng_seed.len(), 32));
     }
 
     #[test]
@@ -10550,7 +10584,7 @@ mod tests {
     }
 
     #[test]
-    fn renderer_rng_seed_copy_is_zeroized_before_rng_use() {
+    fn renderer_rng_seed_copy_is_sanitized_before_rng_use() {
         let source = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/src/lib.rs"));
         let helper = source
             .split("fn seeded_renderer_rng")
@@ -10562,14 +10596,14 @@ mod tests {
             })
             .expect("seeded renderer rng helper should exist");
 
-        assert!(helper.contains("let rng_seed_value = Zeroizing::new(*rng_seed);"));
+        assert!(helper.contains("let rng_seed_value = Secret::new(rng_seed.with_secret"));
         assert!(helper.contains("drop(rng_seed);"));
         assert!(helper.contains("StdRng::from_seed(*rng_seed_value)"));
         assert!(!helper.contains("let mut rng_seed_value = *rng_seed;"));
     }
 
     #[test]
-    fn identity_digest_intermediate_uses_zeroizing_guard() {
+    fn identity_digest_intermediate_uses_sanitizing_guard() {
         let source = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/src/lib.rs"));
         let helper = source
             .split("fn derive_identity_digest")
@@ -10577,12 +10611,12 @@ mod tests {
             .and_then(|after_name| after_name.split("fn identity_hash_preimage").next())
             .expect("identity digest helper should exist");
 
-        assert!(helper.contains("Zeroizing::new(active_identity_digest(&preimage))"));
-        assert!(helper.contains("preimage.zeroize();"));
+        assert!(helper.contains("Secret::new(active_identity_digest(&preimage))"));
+        assert!(helper.contains("volatile_sanitize_vec(&mut preimage);"));
     }
 
     #[test]
-    fn preimage_builders_assert_exact_capacity_before_zeroization() {
+    fn preimage_builders_assert_exact_capacity_before_sanitization() {
         let source = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/src/lib.rs"));
 
         let identity_helper = source
@@ -11635,7 +11669,7 @@ mod tests {
 
         assert!(variant_docs.contains("# Warning"));
         assert!(variant_docs.contains("256-color quantization"));
-        assert!(variant_docs.contains("not zeroized"));
+        assert!(variant_docs.contains("not sanitized"));
         assert!(variant_docs.contains("high-assurance deployments"));
         assert!(variant_docs.contains("AvatarOutputFormat::WebP"));
         assert!(variant_docs.contains("PNG output"));
@@ -12154,10 +12188,10 @@ mod tests {
     }
 
     #[test]
-    fn avatar_identity_implements_zeroize() {
-        fn assert_zeroize<T: Zeroize>() {}
+    fn avatar_identity_implements_secure_sanitize() {
+        fn assert_secure_sanitize<T: SecureSanitize>() {}
 
-        assert_zeroize::<AvatarIdentity>();
+        assert_secure_sanitize::<AvatarIdentity>();
     }
 
     #[test]
@@ -12266,7 +12300,7 @@ mod tests {
     }
 
     #[test]
-    fn rgba_pixel_zeroizer_scrubs_owned_render_buffers() {
+    fn rgba_pixel_sanitizer_scrubs_owned_render_buffers() {
         let mut image = RgbaImage::from_vec(
             2,
             1,
@@ -12277,13 +12311,13 @@ mod tests {
         )
         .expect("test image should be valid");
 
-        zeroize_rgba_pixels(&mut image);
+        sanitize_rgba_pixels(&mut image);
 
         assert!(image.as_raw().iter().all(|byte| *byte == 0));
     }
 
     #[test]
-    fn encoded_output_buffer_is_zeroizing_until_success() {
+    fn encoded_output_buffer_is_sanitizing_until_success() {
         let source = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/src/lib.rs"));
         let helper = source
             .split("fn encode_rgba_image")
@@ -12291,9 +12325,9 @@ mod tests {
             .and_then(|after_name| after_name.split("fn encode_owned_rgba_image").next())
             .expect("encode helper should exist");
 
-        assert!(helper.contains("Zeroizing::new(Vec::with_capacity"));
+        assert!(helper.contains("SanitizingVec::with_capacity"));
         assert!(helper.contains("encode_into_writer(image, format, cursor)"));
-        assert!(helper.contains("Ok(()) => Ok(std::mem::take(&mut *bytes))"));
+        assert!(helper.contains("Ok(()) => Ok(bytes.into_inner())"));
         assert!(helper.contains("Err(error) => Err(error)"));
     }
 

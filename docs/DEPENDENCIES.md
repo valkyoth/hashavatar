@@ -7,18 +7,16 @@
 - `rand` for deterministic seeded variation
 - optional `serde` for string serialization/deserialization of public style
   enums when the `serde` feature is enabled
-- `sha2` for identity hashing, with its `zeroize` feature enabled so hasher
-  block buffers participate in upstream `ZeroizeOnDrop` cleanup
+- `sha2` for default SHA-512 identity hashing
 - `subtle` for constant-time identity digest comparison
+- `sanitization` for clearing derived identity digests, temporary hash preimage
+  buffers, renderer seed copies, and temporary image/encoder buffers
 - optional `blake3` for BLAKE3 identity hashing when the `blake3` feature is
-  enabled, with its `zeroize` feature enabled so hasher and XOF reader state
-  can be explicitly cleared
+  enabled
 - optional `xxhash-rust` for XXH3-128 identity distribution when the `xxh3` feature is enabled
 - optional `image/png` encoder support when the `png` feature is enabled
 - optional `image/jpeg` encoder support when the `jpeg` feature is enabled
 - optional `image/gif` encoder support when the `gif` feature is enabled
-- `zeroize` for clearing derived identity digests and temporary hash preimage buffers
-
 Dev-only test dependencies:
 
 - `roxmltree` for parser-backed SVG well-formedness tests and fuzz harness

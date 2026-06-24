@@ -1,13 +1,25 @@
 # hashavatar 1.0.4
 
 `1.0.4` is a maintenance release for `hashavatar` focused on dependency,
-tooling, and documentation freshness.
+sanitization, tooling, and documentation freshness.
 
 ## Dependency Updates
 
-- Updated `zeroize` to `1.9.0`.
+- Replaced direct `zeroize` usage with the native `sanitization` crate API.
+- Added `sanitization` `1.2.1` with `alloc` support.
+- Removed direct `zeroize` dependency usage and the `sha2`/`blake3` zeroize
+  feature hooks.
 - Updated the fuzz harness `libfuzzer-sys` dependency to `0.4.13`.
 - Refreshed Cargo lockfiles with the latest compatible crate versions.
+
+## Sanitization
+
+- Fixed-size digest and renderer seed copies now use `sanitization::Secret`.
+- Hash preimage vectors, encoded-output buffers, temporary JPEG RGB buffers,
+  and owned RGBA buffers are cleared through `sanitization` volatile clearing
+  helpers.
+- Security controls now document that third-party hasher internal state remains
+  outside `hashavatar`'s cleanup boundary.
 
 ## CI
 

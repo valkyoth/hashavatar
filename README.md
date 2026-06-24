@@ -84,7 +84,7 @@ Planned or intentionally external:
 | License | `MIT OR Apache-2.0` |
 | MSRV | Rust `1.90.0` |
 | Crate shape | Library only |
-| Runtime dependencies | `image`, `palette`, `rand`, `sha2`, `subtle`, `zeroize`; optional `blake3`, `xxhash-rust`, `image/png`, `image/jpeg`, `image/gif` |
+| Runtime dependencies | `image`, `palette`, `rand`, `sanitization`, `sha2`, `subtle`; optional `blake3`, `xxhash-rust`, `image/png`, `image/jpeg`, `image/gif` |
 | Unsafe policy | `#![forbid(unsafe_code)]` |
 | Filesystem policy | No public path-writing APIs |
 | Dimension limits | `64..=2048` pixels per side |
@@ -624,7 +624,7 @@ renders at the API layer.
 
 ### Caller-Owned Output Cleanup
 
-Encode APIs zeroize internal temporary raster buffers after encoding, but the
+Encode APIs sanitize internal temporary raster buffers after encoding, but the
 returned `Vec<u8>` belongs to the caller. Render APIs return an `RgbaImage`
 owned by the caller. High-assurance applications that treat avatar output as
 sensitive should clear those buffers after use:
@@ -634,7 +634,7 @@ use hashavatar::{
     AvatarBackground, AvatarKind, AvatarOptions, AvatarOutputFormat, AvatarSpec,
     encode_avatar_for_id, render_avatar_for_id,
 };
-use zeroize::Zeroize;
+use sanitization::{sanitize_bytes, unsafe_wipe::volatile_sanitize_vec};
 
 let spec = AvatarSpec::new(256, 256, 0)?;
 let options = AvatarOptions::new(AvatarKind::Cat, AvatarBackground::Transparent);
@@ -646,11 +646,11 @@ let mut bytes = encode_avatar_for_id(
     options,
 )?;
 // Send, store, or otherwise consume `bytes`.
-bytes.zeroize();
+volatile_sanitize_vec(&mut bytes);
 
 let mut image = render_avatar_for_id(spec, "sensitive-user-id", options)?;
 // Composite, inspect, or encode `image`.
-image.as_mut().zeroize();
+sanitize_bytes(image.as_mut());
 
 # Ok::<(), Box<dyn std::error::Error>>(())
 ```
@@ -749,7 +749,7 @@ Lower-level identity-specific renderers are available for callers that want dire
 | WebP | `AvatarOutputFormat::WebP` | Default encoder and recommended format for modern web delivery. |
 | PNG | `AvatarOutputFormat::Png` | Optional `png` feature. Lossless and broadly compatible. |
 | JPEG | `AvatarOutputFormat::Jpeg` | Optional `jpeg` feature. Transparent pixels are composited over white. |
-| GIF | `AvatarOutputFormat::Gif` | Optional `gif` feature. Legacy-compatible single-frame output; the encoder performs internal quantization buffers that `hashavatar` cannot zeroize, so prefer WebP or PNG for high-assurance deployments. |
+| GIF | `AvatarOutputFormat::Gif` | Optional `gif` feature. Legacy-compatible single-frame output; the encoder performs internal quantization buffers that `hashavatar` cannot sanitize, so prefer WebP or PNG for high-assurance deployments. |
 | SVG | `render_avatar_svg_*` | Returns a string rather than raster bytes. |
 
 AVIF and JPEG XL are not exposed because they add dependency or encoder maturity tradeoffs that have not cleared the crate's dependency policy.
