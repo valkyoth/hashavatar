@@ -15,6 +15,11 @@
 - Switched the pinned development toolchain to Rust `1.96.1` while keeping the
   crate MSRV at Rust `1.90.0`.
 - Added CI/release checks that verify backward compatibility on Rust `1.90.0`.
+- Added bounded Kani proof harnesses for `AvatarSpec` bounds, render-resource
+  memory math, and rectangle arithmetic.
+- Added `scripts/check_kani.sh` using the documented Rust `1.90.0` verifier
+  toolchain when available, plus `docs/KANI.md` to define the proof scope and
+  skip policy.
 
 ## 1.1.0
 

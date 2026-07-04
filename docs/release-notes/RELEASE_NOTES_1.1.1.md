@@ -38,6 +38,18 @@ the public API.
 - Added project checks that run focused compatibility coverage on Rust `1.90.0`
   in addition to the normal development-toolchain checks.
 
+## Verification
+
+- Added bounded Kani proof harnesses for pure invariants that matter to this
+  crate: avatar spec bounds, render-resource memory math, and rectangle
+  arithmetic.
+- Added `scripts/check_kani.sh`, pinned by default to the Rust
+  `1.90.0-x86_64-unknown-linux-gnu` verifier toolchain when Kani is installed.
+- Added `docs/KANI.md` documenting that these harnesses are scoped bounded
+  evidence, not a whole-crate formal-verification claim.
+- Added the Kani check to the stable release gate. Missing or incompatible Kani
+  is reported as an explicit verifier skip, not as a completed proof.
+
 ## Compatibility
 
 - No intentional public API changes.

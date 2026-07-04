@@ -62,6 +62,7 @@ test -s README.md
 test -s CONTRIBUTING.md
 test -s SECURITY.md
 test -s docs/DEPENDENCIES.md
+test -s docs/KANI.md
 test -s docs/PANIC_POLICY.md
 test -s docs/RELEASE.md
 test -s docs/SECURITY_CONTROLS.md
@@ -70,6 +71,7 @@ test -s "docs/release-notes/RELEASE_NOTES_${cargo_version}.md"
 
 for required_script in \
     "scripts/check_fuzz.sh" \
+    "scripts/check_kani.sh" \
     "scripts/checks.sh" \
     "scripts/generate-sbom.sh" \
     "scripts/reproducible_build_check.sh" \
@@ -116,6 +118,7 @@ for required_package_file in \
     "Cargo.toml" \
     "deny.toml" \
     "docs/DEPENDENCIES.md" \
+    "docs/KANI.md" \
     "docs/PANIC_POLICY.md" \
     "docs/RELEASE.md" \
     "docs/SECURITY_CONTROLS.md" \
@@ -127,6 +130,7 @@ for required_package_file in \
     "rust-toolchain.toml" \
     "SECURITY.md" \
     "scripts/check_fuzz.sh" \
+    "scripts/check_kani.sh" \
     "scripts/checks.sh" \
     "scripts/generate-sbom.sh" \
     "scripts/reproducible_build_check.sh" \
@@ -135,6 +139,7 @@ for required_package_file in \
     "scripts/validate-panic-policy.sh" \
     "scripts/validate-release-metadata.sh" \
     "scripts/validate-unsafe-boundary.sh" \
+    "src/kani_proofs.rs" \
     "src/lib.rs" \
     "tests/golden_fingerprints.txt"
 do

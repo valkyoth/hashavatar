@@ -34,6 +34,9 @@ cargo doc --no-deps
 echo "stable release gate: fuzz harnesses"
 scripts/check_fuzz.sh
 
+echo "stable release gate: Kani proofs"
+scripts/check_kani.sh
+
 echo "stable release gate: reproducible package/build"
 scripts/reproducible_build_check.sh
 

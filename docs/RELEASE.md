@@ -17,7 +17,12 @@ The stable gate runs on the pinned development toolchain from
 `rust-toolchain.toml`. The normal project checks also install and run focused
 compatibility checks against the `Cargo.toml` MSRV, currently Rust `1.90.0`.
 Package verification, documentation generation, fuzz harness compilation, and
-reproducibility checks run as part of the same gate. Optional SBOM generation
-runs when `cargo-sbom` is installed.
+bounded Kani proof execution run as part of the same gate. Kani uses the
+documented Rust `1.90.0` verifier toolchain when installed; an unavailable or
+incompatible verifier is printed as an explicit skip, not treated as completed
+formal verification. Optional SBOM generation runs when `cargo-sbom` is
+installed.
 
-The crate package should contain the reusable library, metadata, documentation, and policy scripts. It should not contain binaries, the demo/API server, fuzz harnesses, or generated build output.
+The crate package should contain the reusable library, metadata, documentation,
+and policy scripts. It should not contain binaries, the demo/API server, fuzz
+harnesses, or generated build output.

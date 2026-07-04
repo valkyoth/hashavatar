@@ -26,6 +26,8 @@ Dev-only test dependencies:
 - `roxmltree` for parser-backed SVG well-formedness tests and fuzz harness
   validation
 - `serde_json` for feature-gated serde round-trip tests
+- `kani` is a reserved Cargo feature for verifier harnesses. It does not add a
+  runtime dependency; Kani itself is an external release-evidence tool.
 
 SHA-512 remains the default identity mode, and WebP remains the default raster
 encoder. `sanitization-crypto-interop` is a direct dependency so SHA-512 uses

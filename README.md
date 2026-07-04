@@ -69,7 +69,10 @@ Implemented now:
 - Golden visual regression fingerprints.
 - Isolated fuzz harness for avatar identities, families, backgrounds, SVG
   rendering, default WebP encoding, and feature-gated encoder paths.
-- Local release gates for formatting, clippy, tests, docs, dependency policy, RustSec advisories, package contents, SBOM generation, reproducible build checks, and crates.io publish dry runs.
+- Local release gates for formatting, clippy, tests, docs, dependency policy,
+  RustSec advisories, bounded Kani proofs when the documented verifier is
+  available, package contents, SBOM generation, reproducible build checks, and
+  crates.io publish dry runs.
 
 Planned or intentionally external:
 
@@ -93,9 +96,10 @@ Planned or intentionally external:
 | Namespace limits | 128 bytes per tenant/style-version component |
 | Hashing posture | SHA-512 default with length-prefixed domain, namespace, style, and identity components; optional BLAKE3 and non-cryptographic XXH3-128 |
 | SVG posture | Generated numeric markup only; caller input is not inserted into SVG fragments |
-| Release evidence | fmt, clippy, tests, docs, deny, audit, fuzz harness compile, package check, SBOM, reproducibility |
+| Kani | Bounded no-default-features harnesses for spec/resource/geometry arithmetic through the Rust `1.90.0` verifier toolchain when available; not a whole-crate formal-verification claim |
+| Release evidence | fmt, clippy, tests, docs, deny, audit, fuzz harness compile, Kani proof run or explicit skip, package check, SBOM, reproducibility |
 
-Security-control details live in [docs/SECURITY_CONTROLS.md](docs/SECURITY_CONTROLS.md). Dependency policy lives in [docs/DEPENDENCIES.md](docs/DEPENDENCIES.md). Panic policy lives in [docs/PANIC_POLICY.md](docs/PANIC_POLICY.md). Stable API and rendering policy lives in [docs/STABILITY.md](docs/STABILITY.md).
+Security-control details live in [docs/SECURITY_CONTROLS.md](docs/SECURITY_CONTROLS.md). Dependency policy lives in [docs/DEPENDENCIES.md](docs/DEPENDENCIES.md). Panic policy lives in [docs/PANIC_POLICY.md](docs/PANIC_POLICY.md). Kani proof policy lives in [docs/KANI.md](docs/KANI.md). Stable API and rendering policy lives in [docs/STABILITY.md](docs/STABILITY.md).
 
 Future version planning lives in [docs/VERSION_PLAN.md](docs/VERSION_PLAN.md).
 `hashavatar` remains a single image-generation crate; low-level core planning
@@ -163,6 +167,8 @@ hashavatar = { version = "1.1.1", features = ["serde"] }
 ```
 
 Combine these as needed, for example `features = ["blake3", "png", "serde"]`.
+The `kani` feature is reserved for verifier harnesses and has no runtime API
+effect in normal builds.
 
 For a local checkout:
 
@@ -863,6 +869,8 @@ The repository includes:
 - transparent background checks
 - golden visual fingerprint tests
 - fuzz harness compilation
+- bounded Kani proof run, or an explicit verifier skip when the documented Kani
+  setup is unavailable
 - `cargo deny` policy
 - RustSec advisory scanning
 - reproducible package/build checks

@@ -143,6 +143,9 @@ mod primitives;
 mod renderer_types;
 mod svg;
 
+#[cfg(kani)]
+mod kani_proofs;
+
 #[cfg(test)]
 mod tests;
 

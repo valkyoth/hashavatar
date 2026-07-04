@@ -14,7 +14,7 @@ categories = ["multimedia::images", "graphics"]
 exclude = ["Screenshot_*.png", ".github/images/**", "fuzz/**", "target/**"]
 
 [lints.rust]
-unexpected_cfgs = { level = "warn", check-cfg = ["cfg(fuzzing)"] }
+unexpected_cfgs = { level = "warn", check-cfg = ["cfg(fuzzing)", "cfg(kani)"] }
 
 [dependencies]
 blake3 = { version = "1.8.5", default-features = true, optional = true }
@@ -39,6 +39,7 @@ blake3 = ["dep:blake3", "sanitization-crypto-interop/blake3"]
 fuzzing = []
 gif = ["image/gif"]
 jpeg = ["image/jpeg"]
+kani = []
 png = ["image/png"]
 serde = ["dep:serde"]
 xxh3 = ["dep:xxhash-rust"]
