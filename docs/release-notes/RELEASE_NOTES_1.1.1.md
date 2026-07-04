@@ -28,6 +28,15 @@ the public API.
 - Updated latest-stable Rust wording to Rust `1.96.1`.
 - Added local `cargo check --features all-formats` compatibility evidence for
   Rust `1.96.1`.
+- Documented the split between the Rust `1.96.1` development toolchain and the
+  Rust `1.90.0` MSRV.
+
+## Toolchain
+
+- Switched `rust-toolchain.toml` from Rust `1.90.0` to Rust `1.96.1`.
+- Kept `Cargo.toml` `rust-version = "1.90"` as the public MSRV.
+- Added project checks that run focused compatibility coverage on Rust `1.90.0`
+  in addition to the normal development-toolchain checks.
 
 ## Compatibility
 

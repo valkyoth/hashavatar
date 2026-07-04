@@ -83,6 +83,7 @@ Planned or intentionally external:
 | --- | --- |
 | License | `MIT OR Apache-2.0` |
 | MSRV | Rust `1.90.0` |
+| Development toolchain | Rust `1.96.1` |
 | Crate shape | Library only |
 | Runtime graph | `image`, `palette`, `rand`, `sanitization`, `sanitization-crypto-interop`, transitive `sha2`, `subtle`; optional `blake3`, `xxhash-rust`, `image/png`, `image/jpeg`, `image/gif` |
 | Unsafe policy | `#![forbid(unsafe_code)]` |
@@ -103,26 +104,27 @@ to split it.
 
 ## Rust Version Support
 
-The minimum supported Rust version is Rust `1.90.0`. New deployments should
-prefer the latest stable Rust; as of June 30, 2026, that is Rust `1.96.1`.
+The minimum supported Rust version is Rust `1.90.0`, as declared by
+`Cargo.toml`. Local development and release checks use the pinned
+`rust-toolchain.toml` toolchain, currently Rust `1.96.1`. CI also checks back
+to Rust `1.90.0` so the MSRV stays honest. New deployments should prefer the
+latest stable Rust; as of June 30, 2026, that is Rust `1.96.1`.
 
 Compatibility evidence for `1.1.1`:
 
 | Rust | Local Evidence |
 | --- | --- |
-| `1.90.0` | ✓ full release gate |
+| `1.90.0` | ✓ `cargo check`; ✓ `cargo check --features all-formats`; ✓ `cargo check --features "blake3 all-formats"`; ✓ `cargo check --features "xxh3 all-formats"` |
 | `1.91.0` | ✓ `cargo check --features all-formats` |
 | `1.92.0` | ✓ `cargo check --features all-formats` |
 | `1.93.0` | ✓ `cargo check --features all-formats` |
 | `1.94.0` | ✓ `cargo check --features all-formats` |
 | `1.95.0` | ✓ `cargo check --features all-formats` |
 | `1.96.0` | ✓ `cargo check --features all-formats` |
-| `1.96.1` | ✓ `cargo check --features all-formats` |
+| `1.96.1` | ✓ full release gate; ✓ `cargo check --features all-formats` |
 
 Optional hash modes are mutually exclusive, so `hashavatar` cannot use a single
-`--all-features` evidence run. The `1.90.0` MSRV was also checked with
-`cargo check --features "blake3 all-formats"` and
-`cargo check --features "xxh3 all-formats"`.
+`--all-features` evidence run.
 
 ## Install
 

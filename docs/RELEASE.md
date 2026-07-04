@@ -13,6 +13,11 @@ cargo publish --dry-run
 freshness still has to be checked before release through crates.io, docs.rs,
 upstream repositories, and RustSec advisories.
 
-The stable gate runs the normal project checks, package verification, documentation generation, fuzz harness compilation, and reproducibility checks. Optional SBOM generation runs when `cargo-sbom` is installed.
+The stable gate runs on the pinned development toolchain from
+`rust-toolchain.toml`. The normal project checks also install and run focused
+compatibility checks against the `Cargo.toml` MSRV, currently Rust `1.90.0`.
+Package verification, documentation generation, fuzz harness compilation, and
+reproducibility checks run as part of the same gate. Optional SBOM generation
+runs when `cargo-sbom` is installed.
 
 The crate package should contain the reusable library, metadata, documentation, and policy scripts. It should not contain binaries, the demo/API server, fuzz harnesses, or generated build output.

@@ -12,6 +12,9 @@
 - Updated README installation snippets, latest-stable Rust wording, and release
   metadata for `1.1.1`.
 - Added local compatibility evidence for Rust `1.96.1`.
+- Switched the pinned development toolchain to Rust `1.96.1` while keeping the
+  crate MSRV at Rust `1.90.0`.
+- Added CI/release checks that verify backward compatibility on Rust `1.90.0`.
 
 ## 1.1.0
 

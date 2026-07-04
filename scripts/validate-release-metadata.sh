@@ -29,8 +29,13 @@ if [ -z "$cargo_rust_version" ]; then
     exit 1
 fi
 
-if [ "$toolchain_version" != "$cargo_rust_version.0" ]; then
-    echo "release metadata: rust-toolchain.toml channel $toolchain_version does not match Cargo.toml rust-version $cargo_rust_version" >&2
+if [ "$cargo_rust_version" != "1.90" ]; then
+    echo "release metadata: Cargo.toml rust-version must remain the MSRV 1.90" >&2
+    exit 1
+fi
+
+if [ "$toolchain_version" != "1.96.1" ]; then
+    echo "release metadata: rust-toolchain.toml channel must be the development toolchain 1.96.1, got $toolchain_version" >&2
     exit 1
 fi
 
