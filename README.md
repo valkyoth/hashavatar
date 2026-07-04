@@ -889,6 +889,24 @@ Run the fuller release gate:
 scripts/stable_release_gate.sh check
 ```
 
+## Kani Proofs
+
+`hashavatar` includes a small Kani proof set for bounded arithmetic invariants:
+validated avatar dimensions, render-resource memory math, and rectangle
+intersection bounds. This is scoped release evidence, not a claim that the full
+renderer, encoders, hash functions, or RNG internals are formally verified.
+
+To run the admitted proof set locally, install Kani and use the documented Rust
+`1.90.0` verifier toolchain:
+
+```bash
+cargo kani --version
+scripts/check_kani.sh
+```
+
+If Kani or the verifier toolchain is unavailable, the script prints an explicit
+skip. See [docs/KANI.md](docs/KANI.md) for the full policy.
+
 ## Provenance
 
 The repository is intended to remain code-generated and asset-free. For a direct statement of how the visuals are produced, see [PROVENANCE.md](PROVENANCE.md).
