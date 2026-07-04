@@ -1,5 +1,18 @@
 # Changelog
 
+## 1.1.1
+
+- Bumped the crate to `1.1.1`.
+- Updated `rand` to `0.10.2` and `xxhash-rust` to `0.8.16`.
+- Refreshed compatible transitive dependencies in the root and fuzz lockfiles,
+  including `arrayvec`, `chacha20`, and `hybrid-array`.
+- Updated the pinned GitHub CI `taiki-e/install-action` commit to `v2.82.8`.
+- Confirmed `actions/checkout` remains current at `v7.0.0` and
+  `Swatinem/rust-cache` remains current at `v2.9.1`.
+- Updated README installation snippets, latest-stable Rust wording, and release
+  metadata for `1.1.1`.
+- Added local compatibility evidence for Rust `1.96.1`.
+
 ## 1.1.0
 
 - Bumped the crate to `1.1.0`.
