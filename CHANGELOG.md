@@ -1,5 +1,23 @@
 # Changelog
 
+## 1.1.2
+
+- Bumped the crate to `1.1.2`.
+- Updated `sanitization` and `sanitization-crypto-interop` from `1.2.2` to
+  `1.2.4`.
+- Refreshed compatible transitive dependencies in the root and fuzz
+  lockfiles.
+- Updated the pinned development toolchain from Rust `1.96.1` to Rust `1.97.0`
+  while keeping the public MSRV at Rust `1.90.0`.
+- Updated the pinned GitHub CI `taiki-e/install-action` commit from the tagged
+  `1.1.1` release's `v2.82.8` to `v2.83.0`.
+- Confirmed `actions/checkout` remains current at `v7.0.0` and
+  `Swatinem/rust-cache` remains current at `v2.9.1`.
+- Updated the fuzz dependency-policy invocation for the current `cargo-deny`
+  CLI option ordering.
+- Updated README installation snippets, Rust compatibility information, Kani
+  documentation, and release metadata for `1.1.2`.
+
 ## 1.1.1
 
 - Bumped the crate to `1.1.1`.

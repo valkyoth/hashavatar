@@ -1,6 +1,6 @@
 [package]
 name = "hashavatar"
-version = "1.1.1"
+version = "1.1.2"
 edition = "2024"
 rust-version = "1.90"
 description = "Stable deterministic procedural avatars in Rust with configurable identity hashing, WebP, optional PNG/JPEG/GIF, and SVG export"
@@ -21,8 +21,8 @@ blake3 = { version = "1.8.5", default-features = true, optional = true }
 image = { version = "0.25.10", default-features = false, features = ["webp"] }
 palette = { version = "0.7.6", default-features = false, features = ["std"] }
 rand = { version = "0.10.2", default-features = false, features = ["std", "std_rng"] }
-sanitization = { version = "1.2.2", default-features = false, features = ["alloc"] }
-sanitization-crypto-interop = { version = "1.2.2", default-features = false, features = ["sha2"] }
+sanitization = { version = "1.2.4", default-features = false, features = ["alloc"] }
+sanitization-crypto-interop = { version = "1.2.4", default-features = false, features = ["sha2"] }
 serde = { version = "1.0.228", default-features = false, optional = true }
 subtle = { version = "2.6.1", default-features = false }
 xxhash-rust = { version = "0.8.16", default-features = false, features = ["xxh3"], optional = true }

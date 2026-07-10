@@ -18,7 +18,7 @@ fi
 
 if cargo deny --version >/dev/null 2>&1 && [ -s fuzz/deny.toml ]; then
     echo "fuzz checks: dependency policy"
-    cargo deny --manifest-path fuzz/Cargo.toml check licenses --config fuzz/deny.toml
+    cargo deny --manifest-path fuzz/Cargo.toml --config fuzz/deny.toml check licenses
 else
     echo "fuzz checks: skipping dependency policy; cargo-deny or fuzz/deny.toml unavailable"
 fi

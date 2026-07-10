@@ -29,7 +29,7 @@ The crate starts conservative: validated avatar dimensions, bounded identity inp
 
 ## Current Status
 
-The current crate version is `1.1.1`.
+The current crate version is `1.1.2`.
 
 Implemented now:
 
@@ -86,7 +86,7 @@ Planned or intentionally external:
 | --- | --- |
 | License | `MIT OR Apache-2.0` |
 | MSRV | Rust `1.90.0` |
-| Development toolchain | Rust `1.96.1` |
+| Development toolchain | Rust `1.97.0` |
 | Crate shape | Library only |
 | Runtime graph | `image`, `palette`, `rand`, `sanitization`, `sanitization-crypto-interop`, transitive `sha2`, `subtle`; optional `blake3`, `xxhash-rust`, `image/png`, `image/jpeg`, `image/gif` |
 | Unsafe policy | `#![forbid(unsafe_code)]` |
@@ -110,11 +110,11 @@ to split it.
 
 The minimum supported Rust version is Rust `1.90.0`, as declared by
 `Cargo.toml`. Local development and release checks use the pinned
-`rust-toolchain.toml` toolchain, currently Rust `1.96.1`. CI also checks back
+`rust-toolchain.toml` toolchain, currently Rust `1.97.0`. CI also checks back
 to Rust `1.90.0` so the MSRV stays honest. New deployments should prefer the
-latest stable Rust; as of June 30, 2026, that is Rust `1.96.1`.
+latest stable Rust; as of July 10, 2026, that is Rust `1.97.0`.
 
-Compatibility evidence for `1.1.1`:
+Compatibility evidence for `1.1.2`:
 
 | Rust | Local Evidence |
 | --- | --- |
@@ -125,7 +125,8 @@ Compatibility evidence for `1.1.1`:
 | `1.94.0` | ✓ `cargo check --features all-formats` |
 | `1.95.0` | ✓ `cargo check --features all-formats` |
 | `1.96.0` | ✓ `cargo check --features all-formats` |
-| `1.96.1` | ✓ full release gate; ✓ `cargo check --features all-formats` |
+| `1.96.1` | ✓ `cargo check --features all-formats` |
+| `1.97.0` | ✓ full release gate; ✓ `cargo check --features all-formats` |
 
 Optional hash modes are mutually exclusive, so `hashavatar` cannot use a single
 `--all-features` evidence run.
@@ -134,7 +135,7 @@ Optional hash modes are mutually exclusive, so `hashavatar` cannot use a single
 
 ```toml
 [dependencies]
-hashavatar = "1.1.1"
+hashavatar = "1.1.2"
 ```
 
 Optional identity hash modes and extra raster encoders are disabled by default.
@@ -142,28 +143,28 @@ Hash modes are mutually exclusive, so enable at most one of `blake3` or `xxh3`:
 
 ```toml
 [dependencies]
-hashavatar = { version = "1.1.1", features = ["blake3"] }
+hashavatar = { version = "1.1.2", features = ["blake3"] }
 ```
 
 Enable additional raster formats explicitly:
 
 ```toml
 [dependencies]
-hashavatar = { version = "1.1.1", features = ["png", "jpeg", "gif"] }
+hashavatar = { version = "1.1.2", features = ["png", "jpeg", "gif"] }
 ```
 
 Or enable every optional raster encoder at once:
 
 ```toml
 [dependencies]
-hashavatar = { version = "1.1.1", features = ["all-formats"] }
+hashavatar = { version = "1.1.2", features = ["all-formats"] }
 ```
 
 Enable string serialization/deserialization for public style enums:
 
 ```toml
 [dependencies]
-hashavatar = { version = "1.1.1", features = ["serde"] }
+hashavatar = { version = "1.1.2", features = ["serde"] }
 ```
 
 Combine these as needed, for example `features = ["blake3", "png", "serde"]`.
@@ -528,7 +529,7 @@ your namespace style version when intentionally migrating output.
 
 ```toml
 [dependencies]
-hashavatar = { version = "1.1.1", features = ["blake3"] }
+hashavatar = { version = "1.1.2", features = ["blake3"] }
 ```
 
 ```rust
@@ -556,7 +557,7 @@ assert!(svg.contains("alien avatar"));
 
 ```toml
 [dependencies]
-hashavatar = { version = "1.1.1", features = ["xxh3"] }
+hashavatar = { version = "1.1.2", features = ["xxh3"] }
 ```
 
 ```rust
