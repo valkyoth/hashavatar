@@ -34,7 +34,7 @@ Both sanitization crates continue to declare Rust `1.90` support.
 - Confirmed the repository's audit, deny, fuzz, outdated, and Kani tooling is
   current at release preparation time.
 - Updated the fuzz dependency-policy check to use the current `cargo-deny`
-  global-option ordering.
+  CLI without relying on version-sensitive `--config` option ordering.
 
 ## Compatibility
 

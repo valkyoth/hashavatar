@@ -14,7 +14,7 @@
 - Confirmed `actions/checkout` remains current at `v7.0.0` and
   `Swatinem/rust-cache` remains current at `v2.9.1`.
 - Updated the fuzz dependency-policy invocation for the current `cargo-deny`
-  CLI option ordering.
+  CLI while remaining compatible with the version installed by GitHub CI.
 - Moved identity, cache-key, and optional XXH3 temporary preimages into
   `sanitization::SecretVec` guards before sensitive bytes are written, ensuring
   full-capacity cleanup on normal return and unwinding.
