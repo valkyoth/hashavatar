@@ -265,7 +265,7 @@ fn renderer_rng_seed_copy_is_sanitized_before_rng_use() {
 }
 
 #[test]
-fn identity_digest_intermediate_uses_sanitizing_guard() {
+fn identity_digest_preimage_uses_raii_sanitizing_guard() {
     let source = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/src/core.rs"));
     let helper = source
         .split("fn derive_identity_digest")
@@ -273,12 +273,12 @@ fn identity_digest_intermediate_uses_sanitizing_guard() {
         .and_then(|after_name| after_name.split("fn identity_hash_preimage").next())
         .expect("identity digest helper should exist");
 
-    assert!(helper.contains("Secret::new(active_identity_digest(&preimage))"));
-    assert!(helper.contains("volatile_sanitize_vec(&mut preimage);"));
+    assert!(helper.contains("preimage.with_secret(active_identity_digest)"));
+    assert!(!helper.contains("volatile_sanitize_vec"));
 }
 
 #[test]
-fn preimage_builders_assert_exact_capacity_before_sanitization() {
+fn preimage_builders_use_raii_sanitizing_vectors() {
     let source = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/src/core.rs"));
 
     let identity_helper = source
@@ -287,9 +287,12 @@ fn preimage_builders_assert_exact_capacity_before_sanitization() {
         .and_then(|after_name| after_name.split("const fn active_hash_algorithm").next())
         .expect("identity preimage helper should exist");
     assert!(identity_helper.contains("let expected_capacity"));
-    assert!(identity_helper.contains("assert_eq!("));
+    assert!(identity_helper.contains("SecretVec::with_capacity"));
+    assert!(identity_helper.contains("debug_assert_eq!("));
     assert!(identity_helper.contains("preimage.capacity()"));
     assert!(identity_helper.contains("preimage.len()"));
+    assert!(!identity_helper.contains("let mut preimage = Vec::with_capacity"));
+    assert!(!identity_helper.contains("volatile_sanitize_vec"));
 
     let cache_key_helper = source
         .split("pub fn cache_key")
@@ -297,9 +300,12 @@ fn preimage_builders_assert_exact_capacity_before_sanitization() {
         .and_then(|after_name| after_name.split("fn rng_seed").next())
         .expect("cache-key helper should exist");
     assert!(cache_key_helper.contains("let expected_capacity"));
-    assert!(cache_key_helper.contains("assert_eq!("));
+    assert!(cache_key_helper.contains("SecretVec::with_capacity"));
+    assert!(cache_key_helper.contains("debug_assert_eq!("));
     assert!(cache_key_helper.contains("preimage.capacity()"));
     assert!(cache_key_helper.contains("preimage.len()"));
+    assert!(!cache_key_helper.contains("let mut preimage = Vec::with_capacity"));
+    assert!(!cache_key_helper.contains("volatile_sanitize_vec"));
 
     #[cfg(feature = "xxh3")]
     {
@@ -309,10 +315,27 @@ fn preimage_builders_assert_exact_capacity_before_sanitization() {
             .and_then(|after_name| after_name.split("#[derive(Clone, Copy").next())
             .expect("XXH3 digest helper should exist");
         assert!(xxh3_helper.contains("let expected_capacity"));
-        assert!(xxh3_helper.contains("assert_eq!("));
+        assert!(xxh3_helper.contains("SecretVec::with_capacity"));
+        assert!(xxh3_helper.contains("debug_assert_eq!("));
         assert!(xxh3_helper.contains("chunk_input.capacity()"));
         assert!(xxh3_helper.contains("chunk_input.len()"));
+        assert!(!xxh3_helper.contains("let mut chunk_input = Vec::with_capacity"));
+        assert!(!xxh3_helper.contains("volatile_sanitize_vec"));
     }
+}
+
+#[test]
+fn panic_policy_scans_every_production_rust_module() {
+    let policy = include_str!(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/scripts/validate-panic-policy.sh"
+    ));
+
+    assert!(policy.contains("find src -type f -name '*.rs'"));
+    assert!(policy.contains("(debug_)?assert(_eq|_ne)?!"));
+    assert!(policy.contains("! -name 'tests.rs'"));
+    assert!(policy.contains("! -name 'kani_proofs.rs'"));
+    assert!(!policy.contains("check_file src/lib.rs"));
 }
 
 #[test]
@@ -400,16 +423,18 @@ fn active_hash_algorithm_label_matches_enabled_feature() {
 fn default_sha512_preimage_omits_algorithm_domain_for_legacy_stability() {
     let preimage = identity_hash_preimage(AvatarIdentityOptions::default(), b"alice@example.com");
 
-    assert!(
-        !preimage
-            .windows(HASH_DOMAIN_ALGORITHM_COMPONENT.len())
-            .any(|window| window == HASH_DOMAIN_ALGORITHM_COMPONENT)
-    );
-    assert!(
-        !preimage
-            .windows(ACTIVE_HASH_ALGORITHM_LABEL.len())
-            .any(|window| window == ACTIVE_HASH_ALGORITHM_LABEL)
-    );
+    preimage.with_secret(|preimage| {
+        assert!(
+            !preimage
+                .windows(HASH_DOMAIN_ALGORITHM_COMPONENT.len())
+                .any(|window| window == HASH_DOMAIN_ALGORITHM_COMPONENT)
+        );
+        assert!(
+            !preimage
+                .windows(ACTIVE_HASH_ALGORITHM_LABEL.len())
+                .any(|window| window == ACTIVE_HASH_ALGORITHM_LABEL)
+        );
+    });
 }
 
 #[test]
@@ -417,16 +442,18 @@ fn default_sha512_preimage_omits_algorithm_domain_for_legacy_stability() {
 fn optional_hash_modes_add_algorithm_domain_to_preimage() {
     let preimage = identity_hash_preimage(AvatarIdentityOptions::default(), b"alice@example.com");
 
-    assert!(
-        preimage
-            .windows(HASH_DOMAIN_ALGORITHM_COMPONENT.len())
-            .any(|window| window == HASH_DOMAIN_ALGORITHM_COMPONENT)
-    );
-    assert!(
-        preimage
-            .windows(ACTIVE_HASH_ALGORITHM_LABEL.len())
-            .any(|window| window == ACTIVE_HASH_ALGORITHM_LABEL)
-    );
+    preimage.with_secret(|preimage| {
+        assert!(
+            preimage
+                .windows(HASH_DOMAIN_ALGORITHM_COMPONENT.len())
+                .any(|window| window == HASH_DOMAIN_ALGORITHM_COMPONENT)
+        );
+        assert!(
+            preimage
+                .windows(ACTIVE_HASH_ALGORITHM_LABEL.len())
+                .any(|window| window == ACTIVE_HASH_ALGORITHM_LABEL)
+        );
+    });
 }
 
 #[test]
@@ -1054,11 +1081,16 @@ fn dark_svg_output_has_background_rect() {
 fn parser_round_trip_supports_public_enums() {
     for &kind in AvatarKind::ALL {
         assert_eq!(kind.as_str().parse::<AvatarKind>().ok(), Some(kind));
+        assert_eq!(kind.as_str().to_ascii_uppercase().parse().ok(), Some(kind));
         assert_eq!(kind.to_string(), kind.as_str());
     }
     for &background in AvatarBackground::ALL {
         assert_eq!(
             background.as_str().parse::<AvatarBackground>().ok(),
+            Some(background)
+        );
+        assert_eq!(
+            background.as_str().to_ascii_uppercase().parse().ok(),
             Some(background)
         );
         assert_eq!(background.to_string(), background.as_str());
@@ -1068,6 +1100,10 @@ fn parser_round_trip_supports_public_enums() {
             format.as_str().parse::<AvatarOutputFormat>().ok(),
             Some(format)
         );
+        assert_eq!(
+            format.as_str().to_ascii_uppercase().parse().ok(),
+            Some(format)
+        );
         assert_eq!(format.to_string(), format.as_str());
     }
     for &accessory in AvatarAccessory::ALL {
@@ -1075,10 +1111,18 @@ fn parser_round_trip_supports_public_enums() {
             accessory.as_str().parse::<AvatarAccessory>().ok(),
             Some(accessory)
         );
+        assert_eq!(
+            accessory.as_str().to_ascii_uppercase().parse().ok(),
+            Some(accessory)
+        );
         assert_eq!(accessory.to_string(), accessory.as_str());
     }
     for &color in AvatarColor::ALL {
         assert_eq!(color.as_str().parse::<AvatarColor>().ok(), Some(color));
+        assert_eq!(
+            color.as_str().to_ascii_uppercase().parse().ok(),
+            Some(color)
+        );
         assert_eq!(color.to_string(), color.as_str());
     }
     for &expression in AvatarExpression::ALL {
@@ -1086,12 +1130,28 @@ fn parser_round_trip_supports_public_enums() {
             expression.as_str().parse::<AvatarExpression>().ok(),
             Some(expression)
         );
+        assert_eq!(
+            expression.as_str().to_ascii_uppercase().parse().ok(),
+            Some(expression)
+        );
         assert_eq!(expression.to_string(), expression.as_str());
     }
     for &shape in AvatarShape::ALL {
         assert_eq!(shape.as_str().parse::<AvatarShape>().ok(), Some(shape));
+        assert_eq!(
+            shape.as_str().to_ascii_uppercase().parse().ok(),
+            Some(shape)
+        );
         assert_eq!(shape.to_string(), shape.as_str());
     }
+}
+
+#[test]
+fn public_enum_parsers_do_not_allocate_lowercase_copies() {
+    let source = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/src/model.rs"));
+
+    assert!(source.contains("eq_ignore_ascii_case"));
+    assert!(!source.contains("to_ascii_lowercase"));
 }
 
 #[test]

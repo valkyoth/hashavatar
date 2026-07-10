@@ -242,7 +242,44 @@ fn main() -> Result<(), AvatarError> {
 ```
 
 Cache keys are stable and display-safe, but they still allow correlation: the
-same identity maps to the same key.
+same identity maps to the same key. An opaque cache key is not a password hash;
+an attacker who obtains one can still test a dictionary of likely email
+addresses, usernames, or personnel identifiers offline.
+
+For sensitive, guessable identifiers, derive a keyed pseudonym at the service
+boundary and pass only that pseudonym to `hashavatar`. Keep the key in a KMS or
+equivalent secret store and use a separate key per security domain or tenant.
+For example, using keyed BLAKE3 from the sanitization sister crate:
+
+```toml
+[dependencies]
+hashavatar = "1.1.2"
+sanitization = "1.2.4"
+sanitization-crypto-interop = { version = "1.2.4", features = ["blake3"] }
+```
+
+```rust
+use hashavatar::{AvatarBuilder, AvatarError};
+use sanitization::Secret;
+use sanitization_crypto_interop::blake3::blake3_keyed_digest;
+
+fn sensitive_identity_cache_key(
+    tenant_key: &Secret<[u8; 32]>,
+    raw_identity: &[u8],
+) -> Result<String, AvatarError> {
+    let pseudonym = Secret::new(
+        tenant_key.with_secret(|key| blake3_keyed_digest(key, raw_identity)),
+    );
+
+    pseudonym.with_secret(|id| AvatarBuilder::for_id(id).cache_key())
+}
+```
+
+The pseudonym is an avatar identifier, not an authentication token. Rotating
+the tenant key deliberately changes avatar/cache identity, so coordinate key
+rotation with cache invalidation and visual-stability requirements. The caller
+still owns and must handle the raw identifier according to its own memory and
+logging policy.
 
 ## Stable Contract
 

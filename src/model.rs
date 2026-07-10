@@ -1,5 +1,17 @@
 use super::*;
 
+fn parse_ascii_label<T: Copy>(
+    input: &str,
+    labels: &[(&str, T)],
+    error: &'static str,
+) -> Result<T, &'static str> {
+    let input = input.trim();
+    labels
+        .iter()
+        .find_map(|(label, value)| input.eq_ignore_ascii_case(label).then_some(*value))
+        .ok_or(error)
+}
+
 /// Trait for renderers that can draw reusable avatar styles onto an image buffer.
 pub trait AvatarRenderer {
     fn render(&self, spec: AvatarSpec) -> Result<RgbaImage, AvatarSpecError>;
@@ -64,16 +76,21 @@ impl FromStr for AvatarOutputFormat {
     type Err = &'static str;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s.trim().to_ascii_lowercase().as_str() {
-            "webp" => Ok(Self::WebP),
-            #[cfg(feature = "png")]
-            "png" => Ok(Self::Png),
-            #[cfg(feature = "jpeg")]
-            "jpg" | "jpeg" => Ok(Self::Jpeg),
-            #[cfg(feature = "gif")]
-            "gif" => Ok(Self::Gif),
-            _ => Err("unsupported avatar output format"),
-        }
+        parse_ascii_label(
+            s,
+            &[
+                ("webp", Self::WebP),
+                #[cfg(feature = "png")]
+                ("png", Self::Png),
+                #[cfg(feature = "jpeg")]
+                ("jpg", Self::Jpeg),
+                #[cfg(feature = "jpeg")]
+                ("jpeg", Self::Jpeg),
+                #[cfg(feature = "gif")]
+                ("gif", Self::Gif),
+            ],
+            "unsupported avatar output format",
+        )
     }
 }
 
@@ -258,40 +275,47 @@ impl FromStr for AvatarKind {
     type Err = &'static str;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s.trim().to_ascii_lowercase().as_str() {
-            "cat" => Ok(Self::Cat),
-            "dog" => Ok(Self::Dog),
-            "robot" => Ok(Self::Robot),
-            "fox" => Ok(Self::Fox),
-            "alien" => Ok(Self::Alien),
-            "monster" => Ok(Self::Monster),
-            "ghost" => Ok(Self::Ghost),
-            "slime" => Ok(Self::Slime),
-            "bird" => Ok(Self::Bird),
-            "wizard" => Ok(Self::Wizard),
-            "skull" => Ok(Self::Skull),
-            "paws" => Ok(Self::Paws),
-            "planet" => Ok(Self::Planet),
-            "rocket" => Ok(Self::Rocket),
-            "mushroom" => Ok(Self::Mushroom),
-            "cactus" => Ok(Self::Cactus),
-            "frog" => Ok(Self::Frog),
-            "panda" => Ok(Self::Panda),
-            "cupcake" => Ok(Self::Cupcake),
-            "pizza" => Ok(Self::Pizza),
-            "icecream" | "ice-cream" | "ice_cream" => Ok(Self::Icecream),
-            "octopus" => Ok(Self::Octopus),
-            "knight" => Ok(Self::Knight),
-            "bear" => Ok(Self::Bear),
-            "penguin" => Ok(Self::Penguin),
-            "dragon" => Ok(Self::Dragon),
-            "ninja" => Ok(Self::Ninja),
-            "astronaut" => Ok(Self::Astronaut),
-            "diamond" => Ok(Self::Diamond),
-            "coffee-cup" | "coffee_cup" | "coffeecup" => Ok(Self::CoffeeCup),
-            "shield" => Ok(Self::Shield),
-            _ => Err("unsupported avatar kind"),
-        }
+        parse_ascii_label(
+            s,
+            &[
+                ("cat", Self::Cat),
+                ("dog", Self::Dog),
+                ("robot", Self::Robot),
+                ("fox", Self::Fox),
+                ("alien", Self::Alien),
+                ("monster", Self::Monster),
+                ("ghost", Self::Ghost),
+                ("slime", Self::Slime),
+                ("bird", Self::Bird),
+                ("wizard", Self::Wizard),
+                ("skull", Self::Skull),
+                ("paws", Self::Paws),
+                ("planet", Self::Planet),
+                ("rocket", Self::Rocket),
+                ("mushroom", Self::Mushroom),
+                ("cactus", Self::Cactus),
+                ("frog", Self::Frog),
+                ("panda", Self::Panda),
+                ("cupcake", Self::Cupcake),
+                ("pizza", Self::Pizza),
+                ("icecream", Self::Icecream),
+                ("ice-cream", Self::Icecream),
+                ("ice_cream", Self::Icecream),
+                ("octopus", Self::Octopus),
+                ("knight", Self::Knight),
+                ("bear", Self::Bear),
+                ("penguin", Self::Penguin),
+                ("dragon", Self::Dragon),
+                ("ninja", Self::Ninja),
+                ("astronaut", Self::Astronaut),
+                ("diamond", Self::Diamond),
+                ("coffee-cup", Self::CoffeeCup),
+                ("coffee_cup", Self::CoffeeCup),
+                ("coffeecup", Self::CoffeeCup),
+                ("shield", Self::Shield),
+            ],
+            "unsupported avatar kind",
+        )
     }
 }
 
@@ -381,22 +405,31 @@ impl FromStr for AvatarBackground {
     type Err = &'static str;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s.trim().to_ascii_lowercase().as_str() {
-            "themed" => Ok(Self::Themed),
-            "white" => Ok(Self::White),
-            "black" => Ok(Self::Black),
-            "dark" => Ok(Self::Dark),
-            "light" => Ok(Self::Light),
-            "transparent" => Ok(Self::Transparent),
-            "polka-dot" | "polka_dot" | "polkadot" => Ok(Self::PolkaDot),
-            "striped" | "stripes" => Ok(Self::Striped),
-            "checkerboard" | "checker-board" | "checker_board" => Ok(Self::Checkerboard),
-            "grid" => Ok(Self::Grid),
-            "sunrise" => Ok(Self::Sunrise),
-            "ocean" => Ok(Self::Ocean),
-            "starry" | "stars" => Ok(Self::Starry),
-            _ => Err("unsupported avatar background"),
-        }
+        parse_ascii_label(
+            s,
+            &[
+                ("themed", Self::Themed),
+                ("white", Self::White),
+                ("black", Self::Black),
+                ("dark", Self::Dark),
+                ("light", Self::Light),
+                ("transparent", Self::Transparent),
+                ("polka-dot", Self::PolkaDot),
+                ("polka_dot", Self::PolkaDot),
+                ("polkadot", Self::PolkaDot),
+                ("striped", Self::Striped),
+                ("stripes", Self::Striped),
+                ("checkerboard", Self::Checkerboard),
+                ("checker-board", Self::Checkerboard),
+                ("checker_board", Self::Checkerboard),
+                ("grid", Self::Grid),
+                ("sunrise", Self::Sunrise),
+                ("ocean", Self::Ocean),
+                ("starry", Self::Starry),
+                ("stars", Self::Starry),
+            ],
+            "unsupported avatar background",
+        )
     }
 }
 
@@ -470,19 +503,26 @@ impl FromStr for AvatarAccessory {
     type Err = &'static str;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s.trim().to_ascii_lowercase().as_str() {
-            "none" => Ok(Self::None),
-            "glasses" => Ok(Self::Glasses),
-            "hat" => Ok(Self::Hat),
-            "headphones" => Ok(Self::Headphones),
-            "crown" => Ok(Self::Crown),
-            "bowtie" | "bow-tie" | "bow_tie" => Ok(Self::Bowtie),
-            "eyepatch" | "eye-patch" | "eye_patch" => Ok(Self::Eyepatch),
-            "scarf" => Ok(Self::Scarf),
-            "halo" => Ok(Self::Halo),
-            "horns" => Ok(Self::Horns),
-            _ => Err("unsupported avatar accessory"),
-        }
+        parse_ascii_label(
+            s,
+            &[
+                ("none", Self::None),
+                ("glasses", Self::Glasses),
+                ("hat", Self::Hat),
+                ("headphones", Self::Headphones),
+                ("crown", Self::Crown),
+                ("bowtie", Self::Bowtie),
+                ("bow-tie", Self::Bowtie),
+                ("bow_tie", Self::Bowtie),
+                ("eyepatch", Self::Eyepatch),
+                ("eye-patch", Self::Eyepatch),
+                ("eye_patch", Self::Eyepatch),
+                ("scarf", Self::Scarf),
+                ("halo", Self::Halo),
+                ("horns", Self::Horns),
+            ],
+            "unsupported avatar accessory",
+        )
     }
 }
 
@@ -540,15 +580,24 @@ impl FromStr for AvatarColor {
     type Err = &'static str;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s.trim().to_ascii_lowercase().as_str() {
-            "default" => Ok(Self::Default),
-            "neon-mint" | "neon_mint" | "neonmint" => Ok(Self::NeonMint),
-            "pastel-pink" | "pastel_pink" | "pastelpink" => Ok(Self::PastelPink),
-            "crimson" => Ok(Self::Crimson),
-            "gold" => Ok(Self::Gold),
-            "deep-sea-blue" | "deep_sea_blue" | "deepseablue" => Ok(Self::DeepSeaBlue),
-            _ => Err("unsupported avatar color"),
-        }
+        parse_ascii_label(
+            s,
+            &[
+                ("default", Self::Default),
+                ("neon-mint", Self::NeonMint),
+                ("neon_mint", Self::NeonMint),
+                ("neonmint", Self::NeonMint),
+                ("pastel-pink", Self::PastelPink),
+                ("pastel_pink", Self::PastelPink),
+                ("pastelpink", Self::PastelPink),
+                ("crimson", Self::Crimson),
+                ("gold", Self::Gold),
+                ("deep-sea-blue", Self::DeepSeaBlue),
+                ("deep_sea_blue", Self::DeepSeaBlue),
+                ("deepseablue", Self::DeepSeaBlue),
+            ],
+            "unsupported avatar color",
+        )
     }
 }
 
@@ -614,17 +663,21 @@ impl FromStr for AvatarExpression {
     type Err = &'static str;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s.trim().to_ascii_lowercase().as_str() {
-            "default" => Ok(Self::Default),
-            "happy" => Ok(Self::Happy),
-            "grumpy" => Ok(Self::Grumpy),
-            "surprised" => Ok(Self::Surprised),
-            "sleepy" => Ok(Self::Sleepy),
-            "winking" | "wink" => Ok(Self::Winking),
-            "cool" => Ok(Self::Cool),
-            "crying" => Ok(Self::Crying),
-            _ => Err("unsupported avatar expression"),
-        }
+        parse_ascii_label(
+            s,
+            &[
+                ("default", Self::Default),
+                ("happy", Self::Happy),
+                ("grumpy", Self::Grumpy),
+                ("surprised", Self::Surprised),
+                ("sleepy", Self::Sleepy),
+                ("winking", Self::Winking),
+                ("wink", Self::Winking),
+                ("cool", Self::Cool),
+                ("crying", Self::Crying),
+            ],
+            "unsupported avatar expression",
+        )
     }
 }
 
@@ -678,14 +731,17 @@ impl FromStr for AvatarShape {
     type Err = &'static str;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s.trim().to_ascii_lowercase().as_str() {
-            "square" => Ok(Self::Square),
-            "circle" => Ok(Self::Circle),
-            "squircle" => Ok(Self::Squircle),
-            "hexagon" => Ok(Self::Hexagon),
-            "octagon" => Ok(Self::Octagon),
-            _ => Err("unsupported avatar shape"),
-        }
+        parse_ascii_label(
+            s,
+            &[
+                ("square", Self::Square),
+                ("circle", Self::Circle),
+                ("squircle", Self::Squircle),
+                ("hexagon", Self::Hexagon),
+                ("octagon", Self::Octagon),
+            ],
+            "unsupported avatar shape",
+        )
     }
 }
 

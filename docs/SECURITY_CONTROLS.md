@@ -63,7 +63,12 @@
   internal identity digest under a cache-key domain instead of returning raw
   digest bytes. Cache keys are still stable correlators for the same identity
   and should be treated as public cache identifiers, not authentication
-  secrets.
+  secrets. Rehashing is not key stretching: an attacker who obtains a cache key
+  can test dictionaries of low-entropy identifiers offline. Applications with
+  sensitive, guessable identifiers should first derive a keyed pseudonym with
+  a separately managed per-domain or per-tenant key and pass only that
+  pseudonym to `hashavatar`. Key rotation changes avatar/cache identity and
+  must be coordinated with cache invalidation and visual-stability policy.
 - `AvatarIdentity` implements `Clone`; every clone is sanitized independently
   on drop. High-assurance integrations should keep identity clones
   short-lived so digest bytes do not remain live in multiple memory locations
@@ -71,8 +76,12 @@
 - Derived identity digests and temporary hash preimage buffers are sanitized
   when dropped. The intermediate 64-byte digest returned by each hash backend is
   held in `sanitization::Secret` guards before being copied into
-  `AvatarIdentity`, and temporary `Vec<u8>` preimages are cleared across full
-  allocation capacity with `sanitization`'s volatile vector clear helper.
+  `AvatarIdentity`. Identity, cache-key, and optional XXH3 chunk preimages are
+  owned by `sanitization::SecretVec` before sensitive bytes are written, so
+  their full allocation capacity is cleared on normal return and unwinding.
+  If a preimage ever outgrows its expected capacity, `SecretVec` clears the old
+  allocation before replacing it. Process aborts and environments that bypass
+  Rust destructors remain outside this cleanup guarantee.
 - SHA-512 hashing is routed through `sanitization-crypto-interop`, which enables
   upstream `sha2` hasher cleanup for SHA-512 state. BLAKE3 hashing is routed
   through the same interop crate when the `blake3` feature is enabled, so the
@@ -81,10 +90,10 @@
   callers that audit dependency internals should keep
   `sanitization-crypto-interop`, `sha2`, and `blake3` in scope.
 - Identity hash preimage allocation is sized from the tenant, style-version,
-  and identity input lengths. All builds assert that preimage buffers do not
-  reallocate before sanitization. This is an intentional fail-secure guard:
-  future component-size drift must not silently create uncleared preimage
-  copies. The crate bounds and sanitizes those temporary buffers, but it does
+  and identity input lengths. Debug builds verify the expected capacity and
+  final length as a correctness check, while `SecretVec` cleanup remains the
+  security boundary even if future size accounting drifts. The crate bounds
+  and sanitizes those temporary buffers, but it does
   not hide input length from the allocator, OS-level heap profilers, or other
   same-process memory-observation tools. Very high-assurance callers that treat
   identifier length as sensitive should normalize or pad identifiers to a fixed

@@ -436,27 +436,25 @@ impl AvatarIdentity {
     /// # Security
     ///
     /// Cache keys still enable correlation: the same identity produces the same
-    /// cache key. Treat cache keys as public identifiers for cache lookup, not
-    /// as authentication secrets.
+    /// cache key. They also do not prevent offline dictionary enumeration of
+    /// low-entropy inputs such as email addresses or usernames. Treat cache keys
+    /// as public identifiers for cache lookup, not as authentication secrets.
+    /// Applications with sensitive, guessable identifiers should first map them
+    /// through a keyed pseudonymization boundary with a separately managed
+    /// tenant/domain key, then pass only the pseudonym to `hashavatar`.
     pub fn cache_key(&self) -> String {
         let expected_capacity = length_prefixed_component_size(CACHE_KEY_DOMAIN)
             + length_prefixed_component_size(&self.digest);
-        let mut preimage = Vec::with_capacity(expected_capacity);
+        let mut preimage = SecretVec::with_capacity(expected_capacity);
         update_hash_input_component(&mut preimage, CACHE_KEY_DOMAIN);
         update_hash_input_component(&mut preimage, &self.digest);
-        assert_eq!(
-            preimage.capacity(),
-            expected_capacity,
-            "cache-key preimage reallocated; sanitization no longer covers all copies"
-        );
-        assert_eq!(
-            preimage.len(),
-            expected_capacity,
-            "cache-key preimage capacity calculation drifted from actual length"
+        debug_assert_eq!(
+            (preimage.capacity(), preimage.len()),
+            (expected_capacity, expected_capacity),
+            "cache-key preimage size accounting drifted"
         );
 
-        let digest = Secret::new(sanitized_sha512_digest(&preimage));
-        volatile_sanitize_vec(&mut preimage);
+        let digest = Secret::new(preimage.with_secret(sanitized_sha512_digest));
         digest.with_secret(|digest| hex_lower(&digest[..32]))
     }
 
@@ -527,13 +525,15 @@ pub(crate) fn validate_identity_component(
 }
 
 pub(crate) fn derive_identity_digest(options: AvatarIdentityOptions<'_>, input: &[u8]) -> [u8; 64] {
-    let mut preimage = identity_hash_preimage(options, input);
-    let digest = Secret::new(active_identity_digest(&preimage));
-    volatile_sanitize_vec(&mut preimage);
+    let preimage = identity_hash_preimage(options, input);
+    let digest = Secret::new(preimage.with_secret(active_identity_digest));
     digest.with_secret(|digest| *digest)
 }
 
-pub(crate) fn identity_hash_preimage(options: AvatarIdentityOptions<'_>, input: &[u8]) -> Vec<u8> {
+pub(crate) fn identity_hash_preimage(
+    options: AvatarIdentityOptions<'_>,
+    input: &[u8],
+) -> SecretVec {
     let algorithm_overhead = if active_hash_algorithm_is_domain_separated() {
         length_prefixed_component_size(HASH_DOMAIN_ALGORITHM_COMPONENT)
             + length_prefixed_component_size(ACTIVE_HASH_ALGORITHM_LABEL)
@@ -545,7 +545,7 @@ pub(crate) fn identity_hash_preimage(options: AvatarIdentityOptions<'_>, input: 
         + length_prefixed_component_size(options.namespace.tenant.as_bytes())
         + length_prefixed_component_size(options.namespace.style_version.as_bytes())
         + length_prefixed_component_size(input);
-    let mut preimage = Vec::with_capacity(expected_capacity);
+    let mut preimage = SecretVec::with_capacity(expected_capacity);
 
     update_hash_input_component(&mut preimage, HASH_DOMAIN);
     if active_hash_algorithm_is_domain_separated() {
@@ -555,15 +555,10 @@ pub(crate) fn identity_hash_preimage(options: AvatarIdentityOptions<'_>, input: 
     update_hash_input_component(&mut preimage, options.namespace.tenant.as_bytes());
     update_hash_input_component(&mut preimage, options.namespace.style_version.as_bytes());
     update_hash_input_component(&mut preimage, input);
-    assert_eq!(
-        preimage.capacity(),
-        expected_capacity,
-        "identity preimage reallocated; sanitization no longer covers all copies"
-    );
-    assert_eq!(
-        preimage.len(),
-        expected_capacity,
-        "identity preimage capacity calculation drifted from actual length"
+    debug_assert_eq!(
+        (preimage.capacity(), preimage.len()),
+        (expected_capacity, expected_capacity),
+        "identity preimage size accounting drifted"
     );
     preimage
 }
@@ -591,7 +586,7 @@ const fn length_prefixed_component_size(bytes: &[u8]) -> usize {
     std::mem::size_of::<u64>() + bytes.len()
 }
 
-pub(crate) fn update_hash_input_component(preimage: &mut Vec<u8>, bytes: &[u8]) {
+pub(crate) fn update_hash_input_component(preimage: &mut SecretVec, bytes: &[u8]) {
     preimage.extend_from_slice(&(bytes.len() as u64).to_le_bytes());
     preimage.extend_from_slice(bytes);
 }
@@ -625,22 +620,23 @@ pub(crate) fn xxh3_128_digest(preimage: &[u8]) -> [u8; 64] {
         let expected_capacity = preimage.len()
             + length_prefixed_component_size(HASH_XOF_CHUNK_COMPONENT)
             + length_prefixed_component_size(&[chunk as u8]);
-        let mut chunk_input = Vec::with_capacity(expected_capacity);
+        let mut chunk_input = SecretVec::with_capacity(expected_capacity);
         chunk_input.extend_from_slice(preimage);
         update_hash_input_component(&mut chunk_input, HASH_XOF_CHUNK_COMPONENT);
         update_hash_input_component(&mut chunk_input, &[chunk as u8]);
-        assert_eq!(
+        debug_assert_eq!(
             (chunk_input.capacity(), chunk_input.len()),
             (expected_capacity, expected_capacity),
-            "XXH3 chunk preimage size accounting drifted; sanitization no longer covers all copies"
+            "XXH3 chunk preimage size accounting drifted"
         );
-        let mut chunk_digest = xxhash_rust::xxh3::xxh3_128(&chunk_input).to_le_bytes();
+        let mut chunk_digest = chunk_input
+            .with_secret(xxhash_rust::xxh3::xxh3_128)
+            .to_le_bytes();
         let offset = chunk * chunk_digest.len();
         digest.with_secret_mut(|digest| {
             digest[offset..offset + chunk_digest.len()].copy_from_slice(&chunk_digest);
         });
         chunk_digest.secure_sanitize();
-        volatile_sanitize_vec(&mut chunk_input);
     }
     digest.with_secret(|digest| *digest)
 }

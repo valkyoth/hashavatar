@@ -46,7 +46,7 @@ use image::{
 use palette::{FromColor, Hsl, Srgb};
 use rand::{RngExt, SeedableRng, rngs::StdRng};
 use sanitization::unsafe_wipe::volatile_sanitize_vec;
-use sanitization::{Secret, SecureSanitize, sanitize_bytes};
+use sanitization::{Secret, SecretVec, SecureSanitize, sanitize_bytes};
 #[cfg(feature = "blake3")]
 use sanitization_crypto_interop::blake3::blake3_xof_fill;
 use sanitization_crypto_interop::sha2::sha512_digest as sanitized_sha512_digest;

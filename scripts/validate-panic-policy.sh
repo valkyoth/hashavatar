@@ -12,12 +12,12 @@ check_file() {
         /^[[:space:]]*\/\/[!\/]/ {
             next
         }
-        /assert!\(|panic!\(|unreachable!\(|\.unwrap\(|\.expect\(/ {
+        /(debug_)?assert(_eq|_ne)?!\(|panic!\(|unreachable!\(|\.unwrap\(|\.expect\(/ {
             allowed = 0
             if ($0 ~ /unreachable!\("SVG is handled outside AvatarOutputFormat"\)/) {
                 allowed = 1
             }
-            if ($0 ~ /debug_assert!\(/) {
+            if ($0 ~ /debug_assert(_eq|_ne)?!\(/) {
                 allowed = 1
             }
             if (!allowed) {
@@ -31,6 +31,13 @@ check_file() {
     ' "$file"
 }
 
-check_file src/lib.rs
+find src -type f -name '*.rs' \
+    ! -name 'tests.rs' \
+    ! -name 'kani_proofs.rs' \
+    -print |
+    sort |
+    while IFS= read -r file; do
+        check_file "$file"
+    done
 
 echo "panic policy: ok"

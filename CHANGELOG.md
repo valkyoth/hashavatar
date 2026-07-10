@@ -15,6 +15,14 @@
   `Swatinem/rust-cache` remains current at `v2.9.1`.
 - Updated the fuzz dependency-policy invocation for the current `cargo-deny`
   CLI option ordering.
+- Moved identity, cache-key, and optional XXH3 temporary preimages into
+  `sanitization::SecretVec` guards before sensitive bytes are written, ensuring
+  full-capacity cleanup on normal return and unwinding.
+- Removed temporary lowercase allocations from all public enum parsers.
+- Expanded the panic-policy gate from `src/lib.rs` to every production Rust
+  module.
+- Documented offline dictionary enumeration of deterministic cache keys and
+  keyed pseudonymization guidance for sensitive, guessable identifiers.
 - Updated README installation snippets, Rust compatibility information, Kani
   documentation, and release metadata for `1.1.2`.
 

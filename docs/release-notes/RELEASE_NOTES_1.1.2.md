@@ -44,6 +44,25 @@ Both sanitization crates continue to declare Rust `1.90` support.
   unchanged.
 - WebP remains the default raster encoder; PNG, JPEG, and GIF remain opt-in.
 
+## Security Hardening
+
+- Moved identity, cache-key, and optional XXH3 chunk preimages into
+  `sanitization::SecretVec` before sensitive bytes are written. Full allocation
+  capacity is now cleared by RAII on normal return and unwinding, and secure
+  growth clears an old allocation before replacement.
+- Replaced production preimage capacity assertions with debug-only correctness
+  checks; cleanup no longer depends on those assertions executing.
+- Removed attacker-sized lowercase-copy allocations from all seven public enum
+  parsers while preserving case-insensitive aliases.
+- Expanded the panic-policy scanner from only `src/lib.rs` to every production
+  Rust module, excluding only dedicated tests and Kani proofs.
+- Documented that deterministic cache keys permit offline enumeration of
+  low-entropy identifiers, with a keyed BLAKE3 pseudonymization example for
+  sensitive service boundaries.
+- Added focused regression tests for RAII preimage guards, allocation-free
+  parser implementation, case-insensitive parser behavior, and whole-source
+  panic-policy coverage.
+
 ## Verification
 
 - Passed all-format compatibility checks on Rust `1.90.0`, `1.91.0`,
