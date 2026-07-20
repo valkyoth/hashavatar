@@ -21,6 +21,8 @@
 - Added `EncoderBuildId` and deployment-bound encoded keys for shared byte
   caches, while documenting that content-addressable integrity requires hashing
   the actual encoded bytes.
+- Documented that cache adapters should retain nominal key types until the
+  storage boundary because string serialization erases compile-time separation.
 - Canonicalized unsupported legacy accessory/expression layers during asset-key
   derivation, preventing redundant cache keys for identical output.
 - Changed owned raster cleanup to sanitize full backing-vector capacity,

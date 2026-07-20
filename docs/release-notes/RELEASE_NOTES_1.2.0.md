@@ -38,6 +38,9 @@ APIs and pixels remain compatible.
   types prevent semantic and deployment-specific cache keys from being mixed.
   Actual encoded-byte hashing remains required for content-addressable
   integrity.
+- Documented that hexadecimal/string serialization erases nominal key types;
+  byte-cache adapters should accept `BuildEncodedAssetKey` and serialize it
+  internally rather than accepting arbitrary string keys.
 - Preserved `AvatarIdentity::cache_key()` and `AvatarBuilder::cache_key()` with
   their exact previous output for existing caches.
 - Added `examples/asset_keys.rs` for the recommended typed-key workflow.

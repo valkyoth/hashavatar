@@ -16,6 +16,11 @@ macro_rules! define_asset_key {
                 &self.0
             }
 
+            /// Serializes this key as lowercase hexadecimal.
+            ///
+            /// Serialization erases the key's nominal Rust type. Keep typed
+            /// keys in application APIs and serialize only inside the storage
+            /// adapter that accepts the appropriate key type.
             pub fn to_hex(self) -> String {
                 hex_lower(&self.0)
             }

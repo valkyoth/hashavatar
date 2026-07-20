@@ -297,6 +297,22 @@ For content-addressable integrity, encode first and hash the actual returned
 bytes. Predictive asset keys, including build-bound keys, are cache-routing
 identifiers rather than proofs of byte equality.
 
+Keep typed keys intact until the storage boundary. Calling `to_hex()` or
+`to_string()` necessarily erases Rust's distinction between
+`SemanticEncodedAssetKey` and `BuildEncodedAssetKey`, so a byte-exact cache
+adapter should accept `BuildEncodedAssetKey` directly and serialize internally:
+
+```rust
+use hashavatar::BuildEncodedAssetKey;
+
+fn deployment_cache_storage_key(key: BuildEncodedAssetKey) -> String {
+    key.to_hex()
+}
+```
+
+Avoid application-level byte-cache APIs that accept an arbitrary `String` key;
+those interfaces allow a semantic key to be supplied accidentally.
+
 `AvatarIdentity::cache_key()` and `AvatarBuilder::cache_key()` remain available
 with their exact 1.1 output for existing caches. New integrations should prefer
 the typed keys because their domains explicitly include the active identity

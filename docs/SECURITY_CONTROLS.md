@@ -89,6 +89,11 @@
   `EncoderBuildId` with `encoded_for_build()`; content-addressed stores must hash
   actual output bytes. These keys are correlators, not secrets, content digests,
   or authorization tokens.
+- Converting typed keys with `to_hex()`, `to_string()`, or formatting erases
+  their nominal Rust type. Cache interfaces should accept the appropriate key
+  type directly and perform serialization inside the storage adapter. A
+  byte-exact deployment cache should not expose a generic `String` key API that
+  can accept a semantic encoded key accidentally.
 - Unsupported accessories and expressions remain deterministic no-ops in the
   legacy rendering APIs. Applications that accept explicit user style choices
   can fail closed before rendering with

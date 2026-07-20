@@ -58,6 +58,9 @@ The typed cache-key hierarchy introduced in 1.2 is also contract-versioned:
 
 The distinct encoded-key types prevent a semantic request key from being used
 accidentally where a deployment-specific byte key is required.
+Serialization necessarily erases that distinction. Integrations should retain
+the nominal type through their cache API and convert to hexadecimal only inside
+the final storage adapter.
 
 Neither encoded-key method is a digest of actual output bytes. Content-addressed
 storage must hash the bytes after encoding. Applications own the build-ID
