@@ -41,7 +41,7 @@ else
     scripts/check_kani.sh
 fi
 
-echo "stable release gate: reproducible package/build"
+echo "stable release gate: reproducible .crate package archive"
 scripts/reproducible_build_check.sh
 
 echo "stable release gate: SBOM"

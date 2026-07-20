@@ -136,6 +136,13 @@ if ! grep -q 'cmp "$first_crate" "$second_crate"' scripts/reproducible_build_che
     exit 1
 fi
 
+if ! grep -q 'stable release gate: reproducible \.crate package archive' \
+    scripts/stable_release_gate.sh
+then
+    echo "release metadata: reproducibility evidence label must describe crate archives" >&2
+    exit 1
+fi
+
 if grep -q 'HASHAVATAR_REPRO_TARGET_' scripts/reproducible_build_check.sh; then
     echo "release metadata: reproducibility target isolation must not be overrideable" >&2
     exit 1
