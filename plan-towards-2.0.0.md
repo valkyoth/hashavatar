@@ -1,1334 +1,1117 @@
 # hashavatar Plan Towards 2.0.0
 
-Status: planning document
+Status: accepted direction, implementation not started
 
 Current stable line: `1.1.x`
 
-Target: a security-oriented `2.0.0` workspace whose canonical safe-Rust CPU
-renderer produces a validated fixed-point scene, deterministic raw RGBA pixels,
-and SVG from one artistic source of truth.
+Target: a polished, security-oriented Rust rendering workspace with a canonical
+safe-Rust CPU renderer, SVG generated from the same private fixed-point scene,
+established raster formats plus AVIF, heapless rendering, a bounded schema
+adapter, and an optional GPU backend behind focused crate boundaries.
 
-This roadmap is intentionally granular. Every version is a review stop, not a
-promise that several adjacent versions will be implemented in one batch. Split
-a milestone again whenever its implementation, review, pentest, or migration
-surface becomes too large for one release.
+This plan incorporates the architecture, contracts, and public API recommended
+in `gapanalysis.md`, but supersedes its recommendation to defer GPU, AVIF,
+schema, and heapless storage. Those four components are now explicit 2.0
+requirements. It also supersedes the broader sequence in `2.0-idea.md`; both
+analyses remain useful background, while this document defines release scope
+and finish lines.
+
+The versions below are not a maximum or a demand to combine work. Add a patch
+release or split an alpha/beta before implementation whenever one milestone is
+no longer small enough to review, test, pentest, and stop cleanly.
+
+## Product Decision
+
+Hashavatar 2.0 is a Rust library API, not an HTTP service framework.
+
+The 2.0 critical path contains:
+
+1. The `hashavatar` facade crate.
+2. The canonical CPU and SVG implementation in `hashavatar-core`.
+3. Established formats and admitted AVIF support in `hashavatar-formats`.
+4. A safe caller-storage profile through `hashavatar-heapless`.
+5. A bounded transport-neutral request document in `hashavatar-schema`.
+6. An explicit optional GPU backend in `hashavatar-gpu`.
+7. The contracts, tests, migration work, and security evidence required to
+   support every published crate.
+
+The companion crates remain optional for downstream users and absent from the
+default dependency graph. They are nevertheless required release deliverables:
+Hashavatar `2.0.0` is not complete until all four pass their finish lines.
+
+External scene authoring and third-party avatar plugins remain deferred.
 
 ## Why 2.0 Exists
 
-The `1.x` renderer has a strong bounded-input and security foundation, but its
-raster and SVG implementations are separate artistic implementations. It also
-uses floating-point geometry, `StdRng`, direct `image::RgbaImage` coupling, and
-automatic selection based on mutable variant-list lengths.
+The `1.x` renderer has strong bounded-input and security controls, but raster
+and SVG are separate artistic implementations. It also relies on floating-point
+geometry, mutable RNG state, direct `image::RgbaImage` coupling, and mappings
+whose meaning can drift when enum lists change.
 
-The major release is justified by five linked changes:
+The major release is justified by these linked changes:
 
-1. A validated scene becomes the only source of family geometry.
-2. Fixed-point math and a canonical CPU rasterizer define the pixel contract.
-3. Trait and catalog derivation become explicitly versioned and frozen.
-4. Unsupported style combinations become strict errors in the primary API.
-5. The crate becomes a focused workspace so codecs, GPU dependencies, schemas,
-   and test infrastructure do not weaken or enlarge the canonical core.
+1. One validated private scene becomes the source of all family geometry.
+2. Fixed-point math and a canonical CPU rasterizer define raw output pixels.
+3. SVG is emitted from the same scene rather than separate family renderers.
+4. Trait derivation, catalogs, contracts, and asset keys become versioned.
+5. Unsupported explicit style combinations return typed errors.
+6. Request preparation binds validation, resolved style, resource estimates,
+   rendering, and cache-key derivation to one immutable request tuple.
+7. Codecs move out of the portable rendering core.
+8. Heapless, schema, GPU, and advanced codec support gain explicit boundaries
+   instead of leaking optional dependencies into the canonical core.
 
-`2.0` does not promise that its output matches `1.x`. It promises a clearer,
-stronger, versioned contract from `2.0` onward.
+`2.0` does not promise pixel compatibility with `1.x`. It establishes a
+stronger contract that later `2.x` releases must preserve or version explicitly.
 
-## Non-Negotiable Engineering Rules
+## Supported Public Rust API
 
-- Keep first-party production crates on stable Rust, edition 2024, with MSRV
-  checked independently from the pinned development toolchain.
-- Use the latest MSRV-compatible stable crate and tool versions unless a
-  documented security, license, regression, or maintenance reason requires an
-  older version.
-- Keep GitHub CodeQL on default setup unless a documented repository decision
-  explicitly replaces it.
-- First-party production crates use `#![forbid(unsafe_code)]`.
-- A future need for direct unsafe code must be isolated in a dedicated crate,
-  documented per block, tested with Miri or sanitizers where applicable, and
-  independently security-reviewed before admission.
-- Third-party unsafe code is not treated as first-party unsafe code, but it is
-  still a trust boundary. Record why each such dependency is needed and which
-  crate isolates it.
-- Normal non-generated Rust source files, including tests, examples, benches,
-  and fuzz targets, must stay at or below 500 lines.
-- Review every Rust file approaching 300 lines for a coherent split before it
-  reaches the hard limit.
-- Keep `lib.rs` files focused on crate documentation, module wiring, and public
-  re-exports.
-- New 2.0 crates inherit strict workspace lints: denied missing documentation
-  and unused results, forbidden panic/unwrap/expect in production, and strict
-  review of indexing, arithmetic side effects, truncating casts, and sign-loss
-  casts. Apply these to legacy 1.x code incrementally instead of hiding a large
-  lint waiver in the workspace root.
-- No HTTP server, async runtime, filesystem-writing API, CLI, rate limiter,
-  query-string parser, or network client belongs in the core or facade.
-- Hash modes remain explicit. A non-cryptographic hash must never be selected
-  accidentally through runtime distribution or Cargo feature unification.
-- Every parser and public resource boundary is bounded, rejects malformed input
-  with typed errors, and has panic-policy tests.
-- Rendering changes require deterministic fixtures and explicit release notes.
-- Kani, fuzzing, differential tests, golden tests, pentests, RustSec, dependency
-  policy, SBOMs, and CodeQL are complementary evidence. None replaces another.
-- Temporary root `PENTEST.md` files are review input and must be removed after
-  findings are handled.
-- No version is tagged until its exact implementation has passed local gates,
-  GitHub CI, CodeQL default setup, integration testing, and the requested
-  pentest/retest cycle.
+The facade must make normal applications easy to write without exposing web or
+renderer internals. The intended public vocabulary is:
 
-## Practices Adopted From `eth`
+- `AvatarIdentity` and bounded namespace/keyed identity construction;
+- `AvatarRequest` and `AvatarRequestBuilder`;
+- `PreparedAvatar`;
+- `ResolvedStyle` and `LayoutReport`;
+- `ResourceBudget`;
+- `CatalogVersion` and `RenderContractId`;
+- `IdentityCacheKey`, `AvatarAssetKey`, and `EncodedAssetKey`;
+- `RasterSurfaceMut` and an explicit external pixel format;
+- `render_into` and convenience owned-image rendering;
+- `write_svg` with document/fragment options;
+- writer-based and convenience encoding through the formats boundary;
+- a caller-storage profile that reports exact capacity failures without hidden
+  allocation;
+- strict conversion from the optional versioned schema document;
+- explicit GPU capability/status reporting and caller-selected CPU fallback;
+- typed identity, request, capability, capacity, surface, render, writer, and
+  encoding/backend errors.
 
-This roadmap intentionally adopts the parts of the `eth` workflow that scale to
-an image-generation project:
+The primary workflow should be concise:
 
-- a facade over focused inward dependencies rather than one implementation
-  crate that accumulates every optional backend;
-- independently versioned workspace crates and a machine-readable release
-  matrix instead of lockstep publication;
-- enforced 500-line Rust modules and early review at 300 lines;
-- scripts that validate dependency direction and minimal/default feature
-  graphs, not only manifest text;
-- release-only network checks for current stable Rust, cargo tools, crate
-  versions, and immutable GitHub Action pins;
-- semantic committed SBOM comparison rather than checking only that generation
-  succeeds;
-- release notes and permanent sanitized pentest evidence tied to the exact
-  reviewed implementation commit;
-- temporary detailed `PENTEST.md` findings removed after remediation;
-- one small implementation stop at a time with a named verification command
-  and no automatic tag.
+```rust,ignore
+let prepared = AvatarRequest::builder(identity)
+    .spec(spec)
+    .style(style)
+    .prepare()?;
 
-Ethereum-specific source/spec synchronization, fork matrices, node fixtures,
-and consensus policies do not belong here. Hashavatar replaces them with a
-versioned scene/pixel corpus, art-contract inventory, and cross-backend output
-evidence.
+let key = prepared.asset_key();
+let layout = prepared.layout_report();
+let budget = prepared.resource_budget();
 
-## Modularity Policy
+prepared.render_into(&mut surface)?;
+prepared.write_svg(&mut svg_writer, SvgOptions::document())?;
+```
 
-The workspace must have a one-way dependency graph:
+Encoding is supplied by the formats boundary:
+
+```rust,ignore
+hashavatar::formats::encode_to_writer(
+    &prepared,
+    AvatarOutputFormat::WebP,
+    &mut output,
+)?;
+```
+
+Convenience APIs may allocate an owned image or `Vec<u8>`, but writer and
+caller-surface APIs are first-class. Documentation must state where an
+underlying codec still allocates internally.
+
+### Prepared Request Invariant
+
+`PreparedAvatar` is the main safety and correctness boundary. Preparation must:
+
+- validate identity, namespace, dimensions, seed, contract, catalog, and style;
+- resolve automatic traits and all compatibility/fallback decisions;
+- produce immutable `ResolvedStyle` and `LayoutReport` values;
+- compute conservative CPU, scene, scratch, and output resource estimates;
+- derive canonical identity and avatar asset keys from the same validated tuple;
+- retain no raw identity input longer than the documented identity protocol
+  requires;
+- redact identity-bearing fields in `Debug` output;
+- complete transactionally without publishing a partially prepared value.
+
+A prepared value must not permit callers to change fields that affect pixels or
+keys. This prevents applications from validating one tuple, caching another,
+and rendering a third.
+
+### Format Result
+
+The formats crate may return an `EncodedAvatar` for allocating APIs and
+completion metadata for writer APIs. It should expose:
+
+- media type and conventional extension;
+- output format and encoder contract/version;
+- alpha support and relevant capability metadata;
+- an `EncodedAssetKey` derived from the prepared asset key and exact encoder
+  settings;
+- conservative scratch-memory information where the codec permits it;
+- documented cleanup limits for codec-owned buffers.
+
+HTTP ETag quoting, cache-control policy, CDN paths, and object-store key layout
+remain application policy. The library supplies stable key bytes and optional
+text formatting, not HTTP behavior.
+
+## Explicitly Excluded Service Concerns
+
+`hashavatar-website` is the hosted `hashavatar.app` reference implementation.
+It demonstrates the library in production but is not part of the reusable API.
+
+Hashavatar crates must not own:
+
+- Axum or another HTTP framework;
+- Tokio or another async runtime;
+- query-string or route parsing;
+- authentication or authorization;
+- rate limiting, concurrency permits, timeouts, or cancellation policy;
+- trusted-proxy, CORS, CSP, or other browser/HTTP security policy;
+- S3, object storage, persistence, redirects, or signed URLs;
+- CDN/cache-control policy;
+- observability and telemetry;
+- locale, website pages, or deployment configuration;
+- caller-specific identity normalization.
+
+The reference service recipe is:
+
+1. Parse and bound transport input under application-specific limits.
+2. Construct `AvatarIdentity` and `AvatarRequest`.
+3. Call `prepare()` before starting expensive work.
+4. Use `ResourceBudget` to acquire an application-owned concurrency permit.
+5. Render away from asynchronous runtime worker threads.
+6. Encode through `hashavatar-formats`.
+7. Build HTTP and storage metadata from canonical asset keys.
+
+## Workspace Boundary
+
+The release-critical workspace has a one-way dependency graph:
 
 ```text
 hashavatar (facade)
   |-- hashavatar-core
   |-- hashavatar-formats  --> hashavatar-core
-  |-- hashavatar-gpu      --> hashavatar-core
-  `-- hashavatar-schema   --> hashavatar-core
+  |-- hashavatar-heapless --> hashavatar-core
+  |-- hashavatar-schema   --> hashavatar-core
+  `-- hashavatar-gpu      --> hashavatar-core
 
-hashavatar-testkit --> every crate, dev/test use only
+integration tests/testkit --> facade and every companion crate
 ```
 
-No lower-level crate may depend on the facade. `hashavatar-core` may not depend
-on formats, GPU, schema, `image`, `wgpu`, web frameworks, or JSON libraries.
-The primary package remains named `hashavatar` on crates.io; the workspace split
-does not rename the crate existing users install. Companion crates start on
-independent `0.x` lines and are published only when their own finish line is
-met. Facade features may forward to them, but direct use remains possible.
+The primary package remains `hashavatar` on crates.io.
 
 ### `hashavatar-core`
 
-Published, `no_std + alloc` capable, and the owner of:
+Published, `no_std` capable with `alloc` and caller-storage profiles, and
+responsible for:
 
-- bounded identity and namespace derivation;
-- optional keyed pseudonymization primitives;
-- stable catalog and render-contract IDs;
-- request, style, family, rig, and capability models;
-- fixed-point arithmetic and integer color/compositing rules;
-- scene authoring, validation, canonical serialization, and scene digest;
-- canonical safe-Rust CPU rasterization into caller-provided RGBA memory;
-- `SceneSink`, `RasterSurfaceMut`, and bounded scratch/capacity contracts;
-- SVG writing through `core::fmt::Write` or a crate-local sink;
+- identity and namespace derivation;
+- optional keyed pseudonymization if admitted during 1.x;
+- catalog, render-contract, trait-derivation, and key protocols;
+- request preparation, style resolution, family rigs, and capabilities;
+- private fixed-point arithmetic, scene construction, and validation;
+- canonical safe-Rust CPU rendering into caller-provided memory;
+- streaming SVG document/fragment writing;
 - resource budgets and typed errors.
 
-The earlier `hashavatar-core` split was correctly rejected because the old
-architecture still fundamentally depended on image rendering and codecs. The
-2.0 fixed-point scene and raw-surface renderer provide a concrete, useful core
-boundary that did not exist then.
+It must not depend on `image`, codecs, GPU libraries, Serde, JSON, web
+frameworks, async runtimes, filesystems, clocks, OS entropy, or network clients.
 
 ### `hashavatar-formats`
 
-Published, `std`-oriented, default-empty, and the owner of:
+Published, `std`-oriented, and responsible for:
 
 - `image` compatibility adapters;
-- WebP, PNG, JPEG, GIF, and any later admitted raster encoders;
-- writer and caller-slice adapters where the underlying codec supports them;
-- a bounded `ByteSink` abstraction where `std::io::Write` is not the right
-  public boundary;
-- encoder capability metadata and codec-specific resource estimates;
+- WebP, PNG, JPEG, GIF, and admitted AVIF format features;
+- writer and allocating convenience APIs;
+- encoder contracts and encoded asset keys;
+- codec capability and resource metadata;
 - decode-and-compare tests against canonical core pixels;
-- documentation for codec-owned scratch buffers and zeroization limits.
+- accurate documentation of codec-owned scratch and cleanup limitations.
 
-The facade may enable WebP by default for compatibility. Extra formats remain
-explicit opt-ins. `all-formats` must include only fully admitted stable formats;
-experimental codecs do not join it.
+WebP may remain the facade default for compatibility. Other formats stay
+explicit opt-ins. Once admitted, AVIF joins `all-formats` but never the default
+feature set. JPEG XL is not planned; it may be reconsidered from current
+evidence in a future minor release.
 
-### `hashavatar-gpu`
+### `hashavatar-heapless`
 
-Published independently and never enabled by default. It owns:
-
-- GPU device/queue integration and backend-specific resources;
-- translation from validated core scenes into GPU commands;
-- explicit GPU resource ceilings;
-- buffer zero-fill and completion-fence policy before reuse when sensitive
-  cleanup is requested;
-- differential tests against the canonical CPU pixel corpus.
-
-GPU output starts as **visually conforming and noncanonical**. It may only gain
-a bit-identical claim after integer execution and multi-vendor evidence prove
-zero raw-pixel differences. The CPU renderer remains normative for `2.0.0`.
+Published, `no_std` and no-allocator capable, and responsible for ergonomic
+safe caller-owned scene/scratch storage adapters, capacity types, and
+compile-time or runtime storage sizing. It must not expose scene authoring,
+silently allocate, or require first-party unsafe code.
 
 ### `hashavatar-schema`
 
-Published independently and never enabled by default. It owns a versioned,
-transport-neutral `AvatarRequestDocument` plus optional Serde and JSON Schema
-support without adding those dependencies to core. It does not contain Axum
-extractors or parse HTTP query strings. Query parsing and service policy remain
-in `hashavatar-website` or another caller application.
+Published, optional, and responsible for a versioned bounded request document,
+strict conversion into core `AvatarRequest`, and optional Serde/JSON Schema
+integration. It does not contain HTTP routes, query parsing, OpenAPI endpoint
+policy, authentication, persistence, telemetry, or service configuration.
 
-### `hashavatar-testkit`
+### `hashavatar-gpu`
 
-Initially `publish = false`. It owns deterministic request vectors, raw pixel
-fixtures, scene fixtures, SVG structural fixtures, cross-backend comparisons,
-allocation counters, and downstream integration helpers. Production crates may
-not depend on it.
+Published, optional, and never enabled by default. It consumes a narrow,
+versioned, read-only backend protocol from validated core scenes. It owns GPU
+device/queue integration, capability negotiation, bounded resources, device
+failure handling, and differential evidence. CPU fallback is caller-selected
+and never silent.
 
-### Conditional `hashavatar-compat-v1`
+### Test Infrastructure
 
-Create this only if real downstream migration demand requires exact `1.x`
-pixels after `2.0`. It would contain the frozen legacy renderer, receive no new
-art features, and have a documented support end. Do not burden the normal 2.0
-facade with two permanent rendering engines by default.
+Shared test utilities are non-production workspace members or integration-test
+support. Dependency direction must avoid cycles:
 
-## Contract Vocabulary
+- generic fixture/testkit code may depend on core contracts;
+- top-level integration tests may depend on the facade, every companion crate,
+  and testkit;
+- production crates must not dev-depend on a testkit that imports them back;
+- no test-only crate is re-exported or published accidentally.
 
-- `CatalogVersion`: freezes family/background/style IDs, weights, and automatic
-  selection mappings.
-- `RenderContractId`: freezes trait derivation, scene semantics, fixed-point
-  rules, compositing, and canonical raster behavior.
-- `SceneDigest`: hashes a canonical internal representation of one validated
-  scene. The serialization need not become a public interchange format.
-- `PixelDigest`: hashes canonical premultiplied RGBA8 output from the reference
-  CPU rasterizer.
-- `IdentityCacheKey`: identifies one pseudonymous subject within an identity
-  protocol and domain.
-- `AvatarAssetKey`: additionally binds catalog, render contract, dimensions,
-  seed, resolved style, and pixel backend contract.
-- `EncodedAssetKey`: additionally binds output format, encoder contract/version,
-  and encoding settings.
+### Legacy Compatibility Decision
 
-## Website-Driven Reusable Building Blocks
+Demand for exact 1.x rendering must be measured by `v1.3.0`, before the legacy
+implementation is removed. Choose one outcome explicitly:
 
-`hashavatar-website` is the hosted `hashavatar.app` reference implementation,
-not the reusable API layer. Its current request path identifies several pieces
-that should become reusable without pulling web concerns into the workspace.
+1. Users requiring old pixels pin the supported 1.x crate.
+2. A separately maintained `hashavatar-compat-v1` crate freezes the old engine
+   with a documented support end.
 
-### Core Request Preparation
+The normal 2.0 facade must not carry both engines indefinitely.
 
-`hashavatar-core` should provide:
+## Private Scene Boundary
 
-- a transport-neutral `AvatarRequest` containing only rendering inputs;
-- an `AvatarRequestBuilder` for ergonomic Rust construction;
-- a validated `PreparedAvatar` that owns or borrows the derived identity,
-  validated spec, catalog/render IDs, resolved style, and resource budget;
-- `ResolvedStyle` and `LayoutReport` so callers do not independently normalize
-  unsupported family/accessory/expression combinations;
-- canonical `IdentityCacheKey` and `AvatarAssetKey` derivation;
-- strict and documented automatic-fallback policies;
-- redacted `Debug` and cleanup behavior for identity-bearing request stages.
+The scene is an implementation mechanism, not a general graphics API.
 
-The prepared form prevents applications from validating one request tuple and
-accidentally rendering or caching a different tuple.
+For 2.0:
 
-Illustrative API shape:
+- command, path, paint, arena, and transform layouts remain private;
+- fixed-point numeric types remain private unless a demonstrated public use
+  requires one;
+- no public scene deserialization or arbitrary scene authoring is provided;
+- no arbitrary SVG fragments, external images, filters, shaders, or unbounded
+  recursion enter the scene;
+- `hashavatar-gpu` receives only a narrow, versioned, read-only backend protocol
+  over an opaque validated scene;
+- the backend protocol exposes semantic commands and bounded iteration needed
+  for execution, but not arena layouts, mutable authoring, or deserialization;
+- public inspection is limited to stable bounds, budgets, capability metadata,
+  `SceneDigest`, and the documented backend protocol;
+- canonical scene serialization remains internal and one-way.
 
-```rust,ignore
-let prepared = AvatarRequest::builder(identity)
-    .namespace(namespace)
-    .spec(spec)
-    .style(style)
-    .catalog(CatalogVersion::V2)
-    .prepare()?;
+This preserves freedom to improve internal arena layouts throughout 2.x while
+keeping visible output, documented digests, and the narrow GPU protocol stable.
 
-let budget = prepared.resource_budget();
-let key = prepared.asset_key();
-prepared.render_into(&mut surface)?;
-```
+## Required Contracts
 
-### Encoded Asset Preparation
+The following contracts must be written and tested before beta. Their values
+cannot remain implicit in implementation code.
 
-`hashavatar-formats` should accept `PreparedAvatar` or canonical pixels and
-return an `EncodedAvatar` containing:
+### Pixel Contract
 
-- encoded bytes or writer completion metadata;
-- media type and conventional extension;
-- alpha support and encoder capability metadata;
-- `EncodedAssetKey` derived from the core asset key plus encoder contract and
-  settings;
-- documented scratch-memory and cleanup limitations.
+`PIXEL_CONTRACT.md` must freeze:
 
-The crate may expose stable key bytes and hex formatting. HTTP ETag quoting,
-cache-control durations, CDN headers, and object-storage path layout remain
-caller policy.
+- external output as straight-alpha RGBA8 in sRGB channel order;
+- private premultiplied representation used during compositing;
+- top-left row origin and the exact pixel-center/sample grid;
+- exact conversion and rounding from internal compositing to external RGBA;
+- canonical transparent pixels as `[0, 0, 0, 0]`;
+- checked stride and buffer-length validation;
+- preservation of caller-owned stride padding;
+- `PixelDigest` over dimensions, pixel contract ID, and tightly packed visible
+  rows only, excluding stride padding;
+- rejection semantics for empty, zero-sized, or unsupported surfaces.
 
-### Versioned Wire Document
+If another pixel representation is ever exposed, it receives a distinct type
+and contract ID rather than an ambiguous boolean flag.
 
-`hashavatar-schema` should provide a strict, bounded
-`AvatarRequestDocumentV1` that converts into core `AvatarRequest`. It includes
-only rendering fields. Website-only fields such as `persist`, `redirect`, S3
-configuration, locale, telemetry, and rate-limit policy are excluded.
+### Digest And Key Contracts
 
-The adapter must reject unknown or duplicate fields where the selected parser
-can express that policy, bound strings before excessive allocation where
-possible, and surface typed conversion errors. Its schema records supported
-catalog/render IDs and style capabilities. OpenAPI documents remain the
-responsibility of the hosting application, which can embed this schema.
+Each identity, scene, pixel, avatar-asset, and encoded-asset digest/key must
+freeze independently:
 
-### Reference Service Recipe
+- algorithm or PRF and protocol label;
+- protocol version and algorithm ID;
+- ordered fields and inclusion/exclusion rules;
+- length-prefix width and integer endianness;
+- output/truncation length and text encoding;
+- handling of dimensions, seed, catalog, render contract, resolved style,
+  backend contract, format, encoder version, and settings;
+- whether metadata, accessibility text, scene IDs, and stride padding
+  participate.
 
-The main documentation should show a short framework-neutral service recipe:
+A 2.0 request must never reuse a 1.x cache key for different pixels. Raw
+identity digests must not become cache keys merely for convenience.
 
-1. Parse transport input under application limits.
-2. Convert it into `AvatarRequestDocumentV1` or build `AvatarRequest` directly.
-3. Call `prepare()` before entering expensive work.
-4. Use the reported resource budget to acquire an application-owned permit.
-5. Run CPU rendering away from async runtime worker threads.
-6. Encode with `hashavatar-formats`.
-7. Build HTTP caching and storage metadata from canonical asset keys.
+### Stateless Trait Derivation
 
-`hashavatar-website` remains the full production example for Axum, semaphore
-limits, timeouts, proxy trust, security headers, telemetry, object storage,
-localization, CDN policy, and deployment.
+The derivation contract must freeze:
 
-The reusable workspace must not absorb:
+- the PRF/XOF or hash construction;
+- domain and trait-label encoding;
+- counter encoding and endianness;
+- seed handling;
+- range selection and rejection sampling or explicitly accepted modulo bias;
+- independence between traits;
+- catalog weighting and fallback behavior;
+- behavior when later catalogs are introduced.
 
-- Axum request/response types;
-- Tokio tasks, semaphores, or timeout policy;
-- service-specific limits stricter than the crate's hard safety bounds;
-- rate limiting, trusted-proxy handling, or browser security headers;
-- S3 clients, object-key prefixes, redirects, or signed URLs;
-- OpenTelemetry instruments, website pages, translations, or deployment code.
+Selecting SHA-512, BLAKE3, or XXH3 at build time must not silently claim the
+same identity/visual protocol. The active algorithm ID is bound into the
+identity and derivation contracts. XXH3 remains explicit, non-cryptographic,
+and unsuitable for adversarial or sensitive identifiers.
 
-Encoded WebP, PNG, JPEG, GIF, AVIF, or JPEG XL bytes are deterministic only when
-an explicitly versioned encoder contract says so. Decoding to identical pixels
-does not imply identical encoded bytes across dependency upgrades.
+### Failure And Partial-Output Contract
 
-SVG is a lossless serialization of scene semantics where supported. Browser
-rasterization is not the canonical pixel renderer and is not promised to match
-the CPU rasterizer byte-for-byte.
+Every sink and surface API must state:
 
-## Numeric And Scene Rules
+- which validation completes before output is touched;
+- whether a runtime failure may leave a partially modified raster surface;
+- that writer failures may leave a prefix that is not a complete SVG/image;
+- whether retry requires a fresh destination;
+- whether a capacity error reports a required size or only a safe lower bound;
+- cleanup behavior after validation, capacity, render, writer, and codec errors;
+- which errors are deterministic for the same prepared request.
 
-- Use signed Q16.16 scene coordinates backed by `i32`, with proven `i64`
-  intermediates for transforms and multiplication.
-- Do not model normalized `1.0` as an impossible Q0.16 `u16` value. Choose and
-  freeze either a checked `u32` range `0..=65536` or an explicitly named UNORM16
-  range `0..=65535` with denominator `65535`.
-- Define one signed division, remainder, tie-breaking, and rounding policy.
-- Reject invalid construction at trust boundaries; saturation is reserved for
-  explicitly documented resource estimates or clipping behavior.
-- Use exact premultiplied RGBA8 Porter-Duff source-over arithmetic.
-- Lower curves with bounded integer de Casteljau subdivision or another proven
-  deterministic method with an explicit stack and maximum depth.
-- Validate command ranges, path ranges, point ranges, stack balance, transform
-  depth, clip depth, coordinate bounds, command count, path complexity, and
-  estimated raster cost before execution.
-- Do not admit arbitrary SVG fragments, external images, shaders, filters, or
-  unbounded recursion into canonical scenes.
-- `OwnedScene` uses `alloc`; `BorrowedScene` and caller-provided scratch storage
-  are admitted only with typed capacity errors and without introducing
-  first-party unsafe code.
+Strong exception safety must not be claimed where it would require an
+undocumented second full-size image allocation.
 
-## Family Rig And Style Rules
+### SVG Contract
 
-- Use a hierarchy of optional semantic anchors rather than assuming every
-  family has human anatomy.
-- Provide focused `FaceRig`, `EyeRig`, `HeadRig`, or `BodyRig` capabilities only
-  where a family actually supports them.
-- Calibrate per-family slot transforms and exclusion zones before relying on a
-  generic collision solver.
-- Typed slots include back accessory, aura, headwear, earwear, facewear,
-  eyewear, neckwear, left/right handheld, and foreground effect.
-- Canonicalize accessory stacks by slot and stable accessory ID, never caller
-  insertion order.
-- Manual styles return errors for unsupported combinations in 2.0.
-- Automatic styles use a frozen, documented fallback policy.
-- Resolution returns a `LayoutReport` describing accepted, adjusted, rejected,
-  and automatically substituted layers.
-- Prefer a strict dynamic request/builder API. Do not add one marker type per
-  family unless compile-time capability APIs demonstrate clear downstream value
-  during alpha testing.
+The SVG contract must define:
+
+- complete-document and embeddable-fragment modes;
+- collision-free deterministic IDs for clips and gradients;
+- validated caller-supplied or scene-derived ID prefixes;
+- XML escaping for all caller-provided accessibility text;
+- title/description policy and whether metadata affects `EncodedAssetKey`;
+- locale-independent fixed-point numeric formatting;
+- stable element/attribute ordering only where explicitly promised;
+- unsupported scene-capability errors;
+- the distinction between scene-semantic parity and browser pixel parity.
+
+SVG derives from the canonical scene, but browser rasterization is not promised
+to match the reference CPU renderer byte-for-byte.
+
+### Canonical Execution Contract
+
+Canonical raw pixels must be independent of:
+
+- thread count and tile scheduling;
+- iteration order of hash maps or other unordered containers;
+- CPU features and runtime dispatch;
+- optimization level, LTO, and debug/release mode;
+- supported target architecture.
+
+The initial reference backend is single-threaded unless tiles are proven fully
+independent and produce the same compositing order.
+
+### Migration And Default Contract
+
+The migration guide must define changes to:
+
+- `AVATAR_STYLE_VERSION` and namespace defaults;
+- default catalog and render-contract selection;
+- default family/style mapping;
+- identity, avatar, and encoded cache keys;
+- CDN/object cache migration;
+- callers that omit explicit contract/catalog IDs;
+- 1.x output retention or deliberate non-retention.
+
+Defaults must be named constants with tests. A new default may select a new
+versioned contract; it may not mutate an old contract in place.
+
+### Heapless Storage Contract
+
+The heapless profile must define:
+
+- all caller-provided scene, command, point, paint, transform, clip, raster, and
+  scratch capacities;
+- exact or conservative required-capacity reporting for every failure;
+- whether failure occurs before a surface or sink is modified;
+- per-family and worst-case style storage budgets;
+- absence of hidden allocation, filesystem, clock, entropy, thread, and OS-I/O
+  dependencies;
+- safe preinitialized storage without first-party unsafe code;
+- behavior on reuse after success, error, and unwinding.
+
+### Schema Contract
+
+The schema crate must freeze:
+
+- a versioned `AvatarRequestDocumentV1` containing rendering fields only;
+- per-field length/range bounds and strict enum/ID handling;
+- unknown, duplicate, missing, and conflicting field behavior;
+- conversion into core `AvatarRequest` without a second interpretation path;
+- Serde/JSON Schema feature and MSRV boundaries;
+- compatibility rules for adding fields or document versions.
+
+The schema is transport-neutral. HTTP status codes, routes, authentication,
+query syntax, OpenAPI operations, and service policy remain application-owned.
+
+### GPU Backend Contract
+
+The GPU crate and core backend protocol must define:
+
+- supported scene capability negotiation and typed unsupported errors;
+- explicit device, queue, adapter, format, and backend selection;
+- resource ceilings and checked buffer/dispatch arithmetic;
+- deterministic command order and no silent CPU fallback;
+- device-loss, submission, mapping, timeout, and partial-output behavior;
+- buffer initialization, completion-fence reuse, and cleanup limitations;
+- whether output is canonical or visually conforming only.
+
+GPU output may ship as noncanonical in 2.0. The canonical CPU `PixelDigest`
+remains normative unless a declared multi-vendor matrix proves exact equality.
+
+### AVIF Contract
+
+AVIF support must define encoder provider/version, quality and speed settings,
+alpha/color handling, metadata policy, resource estimates, writer behavior,
+lossy comparison tolerances, and codec-owned cleanup limits. Encoded bytes are
+stable only under an explicitly frozen encoder contract; decoding to acceptable
+pixels does not make bytes stable across dependency upgrades.
+
+## Numeric And Rendering Rules
+
+- Use a documented signed fixed-point coordinate representation with wider
+  checked intermediates.
+- Freeze division, remainder, tie-breaking, conversion, and rounding behavior.
+- Reject invalid construction at trust boundaries. Reserve saturation for
+  explicitly documented clipping and resource estimates.
+- Use exact integer Porter-Duff source-over compositing.
+- Lower curves with a bounded deterministic algorithm and explicit maximum
+  work/depth.
+- Validate command/path ranges, stack balance, transform and clip depth,
+  coordinate bounds, command count, path complexity, and estimated raster cost
+  before execution.
+- Use checked `usize` resource and index math, including on 32-bit targets.
+- Never execute an unvalidated scene.
+
+## Family And Style Rules
+
+- Use optional semantic anchors rather than assuming human anatomy.
+- Model focused face, eye, head, and body capabilities only where supported.
+- Calibrate family-specific slot transforms and exclusion zones.
+- Use typed slots for back, aura, headwear, earwear, facewear, eyewear,
+  neckwear, handheld, and foreground layers where admitted.
+- Canonicalize stacks by slot and stable accessory ID, never insertion order.
+- Explicit unsupported styles return typed errors.
+- Automatic styles use a frozen fallback policy.
+- `LayoutReport` records accepted, adjusted, rejected, and substituted layers.
+- Do not add new avatar families merely to fill the 2.0 schedule. Port and
+  stabilize the existing catalog first; new art can resume after 2.0.
 
 ## Security And Privacy Rules
 
-- Use "pseudonymization," never "anonymization." Stable avatars and cache keys
-  remain correlators.
-- Keyed identity support must use a reviewed standard PRF/KDF construction with
-  fixed protocol labels, algorithm IDs, versions, domains, and length prefixes.
-  Do not invent a custom cryptographic protocol from ad hoc hash calls.
-- Keys have redacted `Debug`, no serialization, no accidental `Clone`, bounded
-  input, and sanitization on drop.
+- First-party production crates use `#![forbid(unsafe_code)]`.
+- Use pseudonymization, never anonymity, in security claims.
+- Keyed identity support uses a reviewed standard construction with protocol
+  labels, versions, domains, and key IDs.
+- Secret/key types have redacted `Debug`, bounded input, deliberate clone
+  policy, no accidental serialization, and sanitization on drop.
 - Identifier normalization remains caller policy.
-- Construct sanitizing scene, canvas, scratch, and partial-output owners before
-  sensitive derived data is written, not after rendering succeeds.
-- Cleanup claims cover hashavatar-owned allocations on normal return, errors,
-  and unwinding. Process abort, registers, compiler copies, paging, crash dumps,
-  driver memory, and inaccessible codec scratch remain explicit residuals.
-- Caller-owned final images and encoded output remain caller responsibility;
-  optional sanitizing output guards may be provided.
-- Rendering remains variable-time. High-assurance service timing, concurrency,
+- Hashavatar-owned sensitive buffers receive cleanup owners before data is
+  written, covering normal return, errors, and unwinding where Rust permits.
+- Process abort, registers, compiler copies, paging, crash dumps, allocator and
+  codec internals, and hardware/driver memory remain documented residuals.
+- Caller-owned final images and encoded buffers remain caller responsibility.
+- Rendering remains variable-time. Service concurrency, latency padding,
   caching, and rate limiting remain application responsibilities.
+- Every public untrusted-input path has bounded allocation/work, typed errors,
+  panic-policy tests, and focused fuzz targets.
 
-## Dependency And License Admission
+## Modularity And Engineering Policy
 
-Every new dependency or feature path requires:
+- Use Cargo resolver `3`, workspace package metadata, centralized dependency
+  versions, and `default-members` containing only the facade once the workspace
+  split exists.
+- Apply workspace Rust lints equivalent to `eth`: forbid unsafe code, deny
+  unused results and missing documentation, and apply strict Clippy policy for
+  panic, unwrap, expect, undocumented unsafe, indexing/slicing, arithmetic side
+  effects, truncating casts, and sign-loss casts.
+- Keep release overflow checks enabled. Use `panic = "abort"` for project-owned
+  release artifacts while documenting that final profile selection for a Rust
+  library dependency belongs to the consuming binary.
+- Keep `lib.rs` focused on crate docs, module wiring, and public re-exports.
+- Split by responsibility and dependency direction, not arbitrary line ranges.
+- Every non-generated first-party Rust source file, including tests, examples,
+  benches, and fuzz targets, must stay under 500 lines; CI fails closed on an
+  over-limit file.
+- Review modules approaching 300 lines during new development.
+- Enforce architecture with dependency-direction tests, strict lints,
+  complexity review, panic/unsafe policy, and public API snapshots rather than
+  relying on line count alone.
+- Do not spend 1.x releases splitting code that the 2.0 scene port will delete.
 
-- latest stable and latest MSRV-compatible version review;
-- complete feature and transitive graph review;
-- license review through `cargo-deny`;
-- RustSec and maintenance-history review;
-- default-feature and platform review;
-- unsafe/FFI/native-toolchain inventory;
-- resource and zeroization-boundary documentation;
-- focused tests and package-size evidence;
-- a decision whether it is runtime, optional backend, reference-only, fuzz-only,
-  or test-only.
+## Dependency And Release Policy
 
-As reviewed on 2026-07-20 (versions must be rechecked before implementation):
+- Use reviewed, MSRV-compatible crate and tool versions. Every version-specific
+  release gate runs a mandatory networked freshness check for stable Rust,
+  required Cargo tools, dependencies under review, and GitHub Actions.
+- Normal commit CI may avoid live network checks. A release gate fails closed
+  when required version metadata is unavailable or a reviewed pin is stale.
+- Pin every GitHub Action to a full immutable commit SHA with its release tag in
+  a comment, while keeping CodeQL on GitHub default setup.
+- Review complete feature graphs, licenses, advisories, maintenance history,
+  unsafe/FFI boundaries, platform defaults, package size, and resource behavior.
+- Run formatting, Clippy, tests, docs, MSRV, pinned stable, deny, audit, SBOM,
+  package, reproducibility, fuzz-build, and policy gates at every release stop.
+- Commit a semantic SPDX SBOM and compare stable package, version, license,
+  checksum, reference, and relationship fields against fresh generation.
+- Give every version a version-specific local verification command, release
+  notes under `docs/release-notes/`, explicit known limitations, dependency
+  evidence, and updated threat/security documentation where behavior changes.
+- Use cargo-semver-checks or equivalent API snapshots after beta.1.
+- Test downstream consumers from packaged archives, not only workspace paths.
+- Test valid feature combinations and duplicate public companion-crate versions.
+- Preserve temporary detailed `PENTEST.md` only while triaging findings; remove
+  it after disposition and retain sanitized exact-commit evidence where needed.
+- Track independently versioned workspace packages in `release-crates.toml` and
+  `docs/CRATE_VERSION_MATRIX.md` as `code`, `dependency`, `metadata`, or
+  `unchanged`; publish only changed crates in dependency order.
+- Validate the release matrix against Cargo metadata and reject accidental
+  lockstep publication or duplicate public dependency identities.
+- Validate this roadmap mechanically for release order, required milestone
+  sections, and exact pentest stop sentences. Give release, SBOM, dependency,
+  and policy scripts deliberate failing-fixture self-tests rather than testing
+  only their successful path.
 
-- `image 0.25.10`'s pure-Rust AVIF encoder path uses `ravif`; current
-  `ravif 0.13.0` and `rav1e 0.8.1` use BSD-3-Clause and BSD-2-Clause. Those
-  licenses are admitted by the existing policy, so AVIF is not currently
-  blocked by license. It is still blocked pending graph, assembly/threading,
-  compile-time, MSRV, resource, determinism, and security review in
-  `hashavatar-formats`.
-- `jpegxl-rs 0.15.0+libjxl-0.12.0`, the current reference-wrapper release, is
-  GPL-3.0-or-later and is not admissible under the permissive dependency policy.
-  It also declares Rust `1.92.0`, newer than the present MSRV.
-- `jxl-oxide 0.12.6` is permissively licensed but is a decoder, not the required
-  output encoder.
-- `zune-jpegxl 0.5.2` advertises a permissively licensed Rust encoder, but
-  license compatibility alone is insufficient. Conformance, feature
-  completeness, maintenance, security, output quality, resource bounds, and
-  MSRV must be evaluated before admission.
-- `wgpu 30.0.0` is permissively licensed and currently MSRV-compatible, but its
-  large, platform-specific dependency and unsafe boundary is exactly why it
-  belongs in `hashavatar-gpu`, never `hashavatar-core` or the default facade
-  graph.
+Every tagged version, including documentation-only patches and prereleases,
+requires exact-commit pentest evidence. The implementation commit is tested
+first; a permanent `security/pentest/vX.Y.Z.md` report then records `Status:
+PASS`, the full `Reviewed-Commit`, tester, scope, and date. The report-only
+commit may change only that report, and release readiness verifies the reviewed
+commit is its first parent. Root `PENTEST.md` remains temporary and must never be
+committed.
 
-These observations are time-sensitive and must be rechecked at implementation.
-
-## Release Discipline
-
-Every milestone below must include:
-
-- `Status`, `Goal`, `Deliverables`, `Verification`, and `Exit criteria` in its
-  release notes;
-- current dependency/tool checks and immutable GitHub Action pins;
-- formatting, clippy, tests, docs, panic/unsafe/modularity policies;
-- MSRV and pinned-stable checks for every supported feature profile;
-- `cargo deny`, `cargo audit`, lockfile review, and SBOM evidence;
-- package-content and reproducibility checks;
-- release-specific fixtures, fuzz builds, proofs, or differential evidence;
-- updated limitations, threat model, dependency policy, migration notes, and
-  crate-version matrix where relevant;
-- temporary pentest findings removed after remediation;
-- a sanitized permanent `security/pentest/vX.Y.Z.md` PASS report that identifies
-  the exact reviewed implementation commit without publishing exploit details;
-- GitHub CI and CodeQL default setup green before tagging.
-
-Once the workspace exists, crates use independent versions. A
-`release-crates.toml` file records whether each crate changed because of code,
-dependency metadata, documentation/metadata, or not at all. Do not republish
-every companion crate for every facade release.
-
-At each implementation stop, report exactly:
+Each release stop must end with:
 
 ```text
 vX.Y.Z implementation stop reached. Run pentest for this exact commit.
 ```
 
+No tag is created at that point. After a clean retest, GitHub CI and CodeQL
+default setup must be green for the report commit. A version-specific readiness
+gate verifies the tag is absent, metadata, release notes, semantic SBOM,
+packages, checksums, pentest evidence, and publish order before tagging.
+
+## Completeness Review Register
+
+Review this table whenever the roadmap or a pentest implies new work. A gap on
+the 2.0 critical path must be assigned to a release before implementation moves
+past its dependency point.
+
+| Gap | Assigned resolution |
+| --- | --- |
+| Raster and SVG use separate family geometry. | Prove one-scene Cat in `alpha.1`, complete the shared renderer in `alpha.2`, and port the catalog in `alpha.3`. |
+| Floating-point geometry prevents a clear cross-platform contract. | Private fixed math begins in `alpha.1`; numeric, compositing, and execution contracts finish in `alpha.2`. |
+| Mutable RNG and enum-list growth can change visual traits silently. | Freeze legacy IDs in `v1.2.0` and activate versioned stateless derivation in `alpha.1`. |
+| Unsupported style combinations can be silently skipped. | Add opt-in strict validation in `v1.2.0` and freeze typed layered resolution in `alpha.4`. |
+| Website integrations duplicate request preparation, resource math, and cache keys. | Preview `PreparedAvatar` in `v1.3.0`; complete the facade and packaged website trial in `alpha.5` and `beta.2`. |
+| External RGBA, digest, derivation, SVG, and partial-output behavior are underspecified. | Write and test the contracts in `alpha.2`; freeze them in `beta.1`. |
+| Codecs enlarge and constrain the rendering core. | Isolate established formats in `hashavatar-formats` at `alpha.5` and admit AVIF there at `alpha.8`. |
+| Existing 1.x cache keys could collide with different 2.0 pixels. | Introduce complete keys in `v1.2.0`; freeze migration/default vectors in `beta.1`. |
+| Resource/index behavior needs 32-bit evidence. | Exercise 32-bit targets from `alpha.1` through heapless `alpha.6` and publish the final matrix in `beta.2`. |
+| Public API drift and workspace duplicate types need automated detection. | Add API snapshots, semver checks, feature powersets, and packaged downstream tests in `beta.1`. |
+| Exact 1.x pixels may be required after the rewrite. | Decide pinning versus a separate compatibility crate by `v1.3.0`, before deleting legacy code. |
+| Heapless support could freeze unnecessary scene internals or hide allocation. | Add a safe caller-storage adapter and no-allocation evidence in `alpha.6` without exposing scene authoring. |
+| Service consumers need a shared request document without importing HTTP policy. | Add the bounded transport-neutral schema crate in `alpha.7`. |
+| AVIF adds a large codec/provider boundary. | Admit it fail-closed in `alpha.8`; no provider is accepted without license, MSRV, resource, conformance, and security evidence. |
+| GPU support requires scene access without making the scene a public graphics API. | Freeze a narrow read-only backend protocol in `alpha.9` and complete optional noncanonical execution in `alpha.10`. |
+| JPEG XL currently adds unnecessary license/provider uncertainty. | Leave it unplanned; reconsider only in a future minor release from current evidence. |
+| Release evidence could drift from the reviewed commit or package graph. | Use exact-commit report-only pentest commits, semantic SBOM comparison, package-archive tests, release matrices, and version-specific readiness gates for every tag. |
+
 ## 1.x Preparation Releases
 
-All `1.x` work is additive and preserves existing explicit render output unless
-a correctness or security fix is separately documented. Private prototypes are
-not public stability commitments.
-
-At the time this plan was written, the files over the future hard limit were
-`src/tests.rs` (2516 lines), `src/layers.rs` (1336), `src/model.rs` (894),
-`src/api.rs` (864), `src/core.rs` (686), and `src/primitives.rs` (584).
-`src/cat_support.rs` was already near the limit at 497 lines. The modularity
-releases below must split by ownership, not merely move arbitrary line ranges.
+All 1.x work is additive. Existing explicit outputs remain unchanged unless a
+separate security/correctness fix requires a documented fingerprint change.
+Private fixed-point, scene, and new renderer prototypes belong on the 2.0 alpha
+branch, not in published 1.x packages.
 
 ### v1.1.3 - Policy Corrections
 
 **Status:** Planned.
 
-**Goal:** Make current documentation match current code before planning new API.
+**Goal:** Make current documentation and checks accurately describe 1.1.x.
 
-**Deliverables:** Correct the Kani count from four to five; state that current
-public enums are exhaustive and adding variants is breaking until 2.0; fix the
-duplicate encoding example line in the idea document or supersede that document
-with this roadmap.
+**Deliverables:** Correct enum semver guidance and the Kani harness count;
+remove stale or duplicated roadmap claims; identify this document as the
+accepted 2.0 direction.
 
-**Verification:** Documentation links, Kani harness inventory, and semver review.
+**Verification:** Documentation links, Kani inventory, package contents,
+formatting, and release metadata.
 
-**Exit criteria:** No behavior or fingerprint change; policy contradictions are
-removed. `v1.1.3 implementation stop reached. Run pentest for this exact commit.`
+**Exit criteria:** No code or visual fingerprint changes; current API and
+security claims are internally consistent.
 
-### v1.2.0 - Release Assurance Foundation
+`v1.1.3 implementation stop reached. Run pentest for this exact commit.`
 
-**Status:** Planned.
-
-**Goal:** Adopt the useful release discipline from `eth` before architecture
-work begins.
-
-**Deliverables:** Add threat-model, modularity, unsafe, supply-chain, and release
-readiness documents; add networked latest-tool checks for release gates; add
-semantic SBOM drift checking; define exact pentest handoff and tag readiness.
-
-**Verification:** Script self-tests, clean/offline behavior tests, deliberate
-stale-tool fixtures, SBOM drift fixtures, and the existing stable gate.
-
-**Exit criteria:** Release gates fail closed on stale or missing required
-evidence without changing avatar output. `v1.2.0 implementation stop reached.
-Run pentest for this exact commit.`
-
-### v1.3.0 - Source Modularity, Part I
+### v1.2.0 - Contracts And Strict Preparation
 
 **Status:** Planned.
 
-**Goal:** Split the largest production modules without changing behavior.
+**Goal:** Give 1.x consumers the identifiers and validation path needed for a
+safe 2.0 migration.
 
-**Deliverables:** Split `api.rs`, `model.rs`, and `core.rs` by ownership; keep
-public re-exports stable; add a line-count report and a 300-line review warning.
+**Deliverables:** Add explicit legacy `CatalogVersion` and `RenderContractId`,
+stable built-in IDs and weights, complete identity/avatar/encoded asset keys,
+family capability manifests, opt-in strict style validation, and a keyed
+identity admission decision. If keyed identity is accepted, implement it behind
+an explicit feature using a reviewed standard construction.
 
-**Verification:** Public API diff, compile-tested examples, existing goldens,
-panic policy, and module-boundary tests.
+**Verification:** Frozen mapping vectors, key domain-separation and cache-bust
+tests, complete style compatibility matrix, unchanged legacy fingerprints, and
+known-answer/cleanup tests for keyed identity if implemented.
 
-**Exit criteria:** The named production files are at or below 500 lines and all
-fingerprints remain unchanged. `v1.3.0 implementation stop reached. Run pentest
-for this exact commit.`
+**Exit criteria:** New catalogs cannot reshuffle the legacy mapping; downstreams
+can detect unsupported styles without changing legacy skip behavior. A keyed
+identity implementation also receives focused cryptographic review.
+`v1.2.0 implementation stop reached. Run pentest for this exact commit.`
 
-### v1.4.0 - Source Modularity, Part II
-
-**Status:** Planned.
-
-**Goal:** Complete and enforce the 500-line policy.
-
-**Deliverables:** Split `layers.rs`, `primitives.rs`, `tests.rs`,
-`cat_support.rs`, and any other remaining first-party Rust file at or near 500
-lines; enforce the limit in CI while excluding generated/vendor output only.
-
-**Verification:** Deliberate over-limit fixture, module test ownership review,
-goldens, fuzz harness build, and full release gate.
-
-**Exit criteria:** Every non-generated first-party `.rs` file is at or below 500
-lines. `v1.4.0 implementation stop reached. Run pentest for this exact commit.`
-
-### v1.5.0 - Frozen Catalog And Contract IDs
+### v1.3.0 - Migration API And Corpus
 
 **Status:** Planned.
 
-**Goal:** Stop future art additions from silently reshuffling established
-automatic identities.
+**Goal:** Let real applications exercise the future workflow before the 2.0
+engine replaces rendering internals.
 
-**Deliverables:** Add explicit legacy `CatalogVersion`, `RenderContractId`,
-stable built-in IDs and weights, `IdentityCacheKey`, `AvatarAssetKey`, and
-`EncodedAssetKey`; preserve the existing automatic mapping as the legacy
-catalog.
+**Deliverables:** Add an additive `AvatarRequest`/builder and
+`PreparedAvatar` preview, `ResolvedStyle`, `LayoutReport`, `ResourceBudget`,
+writer-based SVG/encoding APIs where they genuinely help, validated raster
+surface adaptation, complete 1.x compatibility corpus, migration/deprecation
+guide, compat-v1 demand decision, and only the source splits necessary to own
+these APIs coherently.
 
-**Verification:** Frozen mapping vectors for all byte values, cache-key domain
-separation tests, and unchanged 1.x visual fingerprints.
+**Verification:** Short-write and writer-failure tests, stride/capacity tests,
+public API diff, packaged downstream trial with `hashavatar-website`, complete
+request/style/pixel/SVG/key fixtures, and unchanged existing output helpers.
 
-**Exit criteria:** New catalogs can be added later without mutating legacy
-mappings. `v1.5.0 implementation stop reached. Run pentest for this exact
-commit.`
+**Exit criteria:** A downstream can migrate request construction and cache-key
+logic before accepting 2.0 pixel changes; exact 1.x compatibility has an
+explicit keep-or-pin decision.
 
-### v1.6.0 - Strict Style Validation Preview
-
-**Status:** Planned.
-
-**Goal:** Expose compatibility errors without changing legacy skip behavior.
-
-**Deliverables:** Add family capability manifests, `validate_style`, a strict
-opt-in builder path, stable compatibility errors, and a preview `LayoutReport`.
-
-**Verification:** Every family/accessory/expression combination is classified;
-manual invalid combinations fail only on the strict path; legacy output stays
-unchanged.
-
-**Exit criteria:** Downstream applications can migrate away from silent skips
-before 2.0. `v1.6.0 implementation stop reached. Run pentest for this exact
-commit.`
-
-### v1.7.0 - Keyed Pseudonymization
-
-**Status:** Planned.
-
-**Goal:** Make dictionary-resistant identity preparation available without
-requiring every caller to design its own protocol.
-
-**Deliverables:** Add an optional keyed-identity feature using a reviewed
-standard construction; define identity domain, purpose, protocol version, and
-key ID; add non-clone key ownership and sanitization behavior.
-
-**Verification:** Published known-answer vectors, domain/tenant/purpose
-separation, key rotation, redacted logging, clone-policy, cleanup, malformed
-input, and independent cryptographic design review.
-
-**Exit criteria:** The feature is opt-in, default outputs are unchanged, and the
-security documentation does not claim anonymity. `v1.7.0 implementation stop
-reached. Run pentest for this exact commit.`
-
-### v1.8.0 - Compatibility Output Sinks
-
-**Status:** Planned.
-
-**Goal:** Let applications adopt writer and caller-buffer APIs before 2.0.
-
-**Deliverables:** Add `write_svg`, `encode_to_writer`, a validated raster surface
-adapter, and an additive prepared-request facade around the 1.x renderer.
-Expose effective style, resource budget, and canonical key material from one
-validated preparation step. Document honestly where the legacy engine or codec
-still allocates internally; do not claim zero allocation merely because the
-final `Vec` is avoided.
-
-**Verification:** Short writes, writer failures, stride errors, undersized
-buffers, unwind cleanup, decoded-pixel parity, and allocation-count evidence.
-
-**Exit criteria:** New APIs are additive and output-equivalent to existing
-helpers. `v1.8.0 implementation stop reached. Run pentest for this exact
-commit.`
-
-### v1.9.0 - Fixed-Point Arithmetic Shadow
-
-**Status:** Planned.
-
-**Goal:** Implement and prove the numeric contract without switching production
-rendering.
-
-**Deliverables:** Add private fixed coordinate, normalized value, transform,
-coverage, interpolation, and compositing modules with explicit rounding rules.
-
-**Verification:** Boundary/property tests and Kani proofs for construction,
-overflow, multiplication, division, transform composition, channel bounds, and
-source-over arithmetic.
-
-**Exit criteria:** Numeric rules are documented and proven for admitted bounds;
-1.x output is unchanged. `v1.9.0 implementation stop reached. Run pentest for
-this exact commit.`
-
-### v1.10.0 - Stateless Trait Derivation Shadow
-
-**Status:** Planned.
-
-**Goal:** Replace mutable RNG coupling in the future contract without changing
-the active 1.x renderer.
-
-**Deliverables:** Add private domain-separated stateless `derive_u16`/range
-selection under an explicit derivation version; freeze labels and counter
-rules; prevent modulo/catalog drift.
-
-**Verification:** Known-answer vectors on x86_64, AArch64, and WASM; domain
-collision tests; distribution sanity tests; no `StdRng` use in the shadow path.
-
-**Exit criteria:** The future trait genome is reproducible without mutable RNG
-state. `v1.10.0 implementation stop reached. Run pentest for this exact
-commit.`
-
-### v1.11.0 - Private Scene Prototype
-
-**Status:** Planned.
-
-**Goal:** Prove the scene architecture before exposing it publicly.
-
-**Deliverables:** Add private scene commands, paints, paths, transforms, clips,
-opacity groups, semantic IDs, validation, budgets, and canonical digest
-serialization; support `OwnedScene` first.
-
-**Verification:** Validator fuzz target, malformed range/stack/capacity corpus,
-canonical serialization tests, bounded-cost tests, and Kani range proofs.
-
-**Exit criteria:** A private scene can be built, validated, serialized, and
-rejected safely without becoming 1.x public API. `v1.11.0 implementation stop
-reached. Run pentest for this exact commit.`
-
-### v1.12.0 - Final 1.x Compatibility Corpus
-
-**Status:** Planned.
-
-**Goal:** Freeze complete migration evidence before the major-version branch.
-
-**Deliverables:** Publish request vectors, resolved styles, raw RGBA hashes,
-decoded codec hashes, SVG fixtures, cache-key fixtures, allocation/resource
-baselines, and deprecation guidance for APIs that will not survive 2.0.
-
-**Verification:** Reproduce the corpus on supported Rust versions and at least
-x86_64, AArch64, and WASM where applicable; verify signed/checksummed evidence.
-
-**Exit criteria:** The 1.x contract can be tested independently during the 2.0
-rewrite. `v1.12.0 implementation stop reached. Run pentest for this exact
-commit.`
+`v1.3.0 implementation stop reached. Run pentest for this exact commit.`
 
 ## 2.0 Alpha Releases
 
-Alpha releases may change API and output. Every alpha still receives normal
-security, dependency, documentation, and pentest treatment.
+Alpha APIs and pixels may change. Each alpha must compile examples, publish its
+current limitations, and pass the repository's local and GitHub gates. The
+sequence contains release-critical work only.
 
-### v2.0.0-alpha.1 - Workspace Boundary
-
-**Status:** Planned.
-
-**Goal:** Convert the repository to the planned workspace without implementing
-new rendering behavior.
-
-**Deliverables:** Create facade, core, formats, GPU, optional schema, and
-nonpublished testkit crate skeletons; establish inward dependency rules,
-independent versions, release matrix, workspace lints, and package checks.
-
-**Verification:** Dependency-direction tests, default graph assertions,
-individual package dry runs, and 500-line enforcement.
-
-**Exit criteria:** Empty or compatibility-backed crates compile with no cycles or
-accidental heavy default dependencies. `v2.0.0-alpha.1 implementation stop
-reached. Run pentest for this exact commit.`
-
-### v2.0.0-alpha.2 - Fixed Numeric Core
+### v2.0.0-alpha.1 - Cat Vertical Slice And Workspace
 
 **Status:** Planned.
 
-**Goal:** Promote the shadow fixed-point contract into `hashavatar-core`.
+**Goal:** Prove the complete architecture with real artwork before generalizing
+the rendering abstraction.
 
-**Deliverables:** Public checked numeric types, transforms, colors, coverage,
-premultiplied compositing, exact rounding documentation, and proof contracts.
+**Deliverables:** Create the minimal facade/core workspace boundary; implement
+private fixed-point math, stateless trait derivation, a minimal validated scene,
+Cat rig/compiler, themed background, canonical CPU raster output, and SVG from
+that same scene. Keep scene and numeric layouts private.
 
-**Verification:** Unit/property tests and mandatory Kani proofs for every public
-operation and valid boundary.
+**Verification:** Cat visual review; known-answer trait vectors; malformed scene
+tests; raw pixel equality on x86_64, AArch64, WASM, debug/release, and a 32-bit
+`usize` target where CI permits; parsed SVG semantic checks; bounded work and
+allocation evidence.
 
-**Exit criteria:** Core fixed math is float-free and proof-clean.
+**Exit criteria:** One request produces Cat pixels and SVG from one scene with
+no independent family geometry path. The abstractions remain changeable.
+
+`v2.0.0-alpha.1 implementation stop reached. Run pentest for this exact commit.`
+
+### v2.0.0-alpha.2 - Complete Canonical Renderer
+
+**Status:** Planned.
+
+**Goal:** Generalize only the scene operations demonstrated by real avatar
+needs and finish the canonical CPU/SVG contracts.
+
+**Deliverables:** Add required rectangles, ellipses, lines, bounded paths,
+integer curve lowering, fill/stroke rules, clips, opacity groups, gradients,
+exact compositing, scene validation and resource estimates, caller-provided
+surface execution, SVG document/fragment emission, and the pixel, digest,
+derivation, failure, SVG, and canonical execution specifications.
+
+**Verification:** Mandatory Kani for fixed math/index/compositing bounds;
+primitive and path goldens; validator/raster/SVG fuzz targets; adversarial stack,
+range, curve, stride, and writer inputs; locale-independent output; platform and
+optimization digest matrix.
+
+**Exit criteria:** Every operation needed by current artwork has a bounded,
+validated, float-free canonical implementation. This first complete canonical
+renderer receives focused adversarial review.
+
 `v2.0.0-alpha.2 implementation stop reached. Run pentest for this exact commit.`
 
-### v2.0.0-alpha.3 - Scene Storage And Validation
+### v2.0.0-alpha.3 - Existing Catalog Port
 
 **Status:** Planned.
 
-**Goal:** Establish bounded trusted scenes before any backend executes them.
+**Goal:** Port all existing 1.x families, backgrounds, and frames without
+expanding the art catalog.
 
-**Deliverables:** `OwnedScene`, validated display lists, arena/range types,
-command/path/paint/transform/clip limits, stack validation, resource estimates,
-and `SceneDigest`.
+**Deliverables:** Family-specific semantic rigs and scene compilers for every
+current family; all themed, fixed, transparent, patterned, gradient, and starry
+backgrounds; all current frame shapes; capability manifests; canonical corpus.
 
-**Verification:** Validator fuzzing, canonical digest vectors, malformed scenes,
-capacity exhaustion, stack imbalance, and Kani bounds.
+**Verification:** Every family at minimum/default/maximum dimensions, all
+background/frame combinations, raster/SVG scene parity, cross-platform pixel
+digests, unsupported-capability tests, resource ceilings, and visual review.
 
-**Exit criteria:** No backend can execute an unvalidated scene.
+**Exit criteria:** Every existing family/background/frame uses only the canonical
+scene; old family raster and SVG implementations can be removed or isolated by
+the prior compatibility decision.
+
 `v2.0.0-alpha.3 implementation stop reached. Run pentest for this exact commit.`
 
-### v2.0.0-alpha.4 - Canonical Raster Primitives
+### v2.0.0-alpha.4 - Layered Style And Layout
 
 **Status:** Planned.
 
-**Goal:** Build the safe-Rust reference raster foundation.
+**Goal:** Complete secure, deterministic style composition.
 
-**Deliverables:** Caller-provided RGBA surface, tiles/scanlines, fill rules,
-rectangles, ellipses, lines, integer coverage, clipping, and exact pixel-index
-validation.
+**Deliverables:** Typed accessory slots, bounded multi-accessory stacks,
+per-family anchors/transforms/exclusion zones, deterministic ordering,
+collision/fallback policy, expressions, integer palettes and color roles, and
+complete `ResolvedStyle`/`LayoutReport` behavior.
 
-**Verification:** Primitive goldens, arbitrary stride/dimension tests, fuzzing,
-Kani pixel-index proofs, debug/release/LTO equality, and resource ceilings.
+**Verification:** Full capability matrix, permutation invariance, invalid and
+capacity-exhaustion tests, collision/fallback fuzzing, every-family stress
+fixtures, color/compositing proofs, raster/SVG parity, and visual review.
 
-**Exit criteria:** Primitive raw pixels are canonical on the first supported
-platform matrix. `v2.0.0-alpha.4 implementation stop reached. Run pentest for
-this exact commit.`
+**Exit criteria:** Supported layers compose predictably; explicit unsupported
+requests fail with typed errors; automatic substitutions are frozen and
+reported.
 
-### v2.0.0-alpha.5 - Paths, Curves, Strokes, And Groups
+`v2.0.0-alpha.4 implementation stop reached. Run pentest for this exact commit.`
 
-**Status:** Planned.
-
-**Goal:** Complete the canonical scene operations required by current artwork.
-
-**Deliverables:** Bounded paths, integer curve flattening, stroke lowering,
-nested clips, opacity groups, gradients, and complete source-over compositing.
-
-**Verification:** Termination/depth proofs, endpoint preservation, fill-rule
-fixtures, adversarial paths, clip-stack fuzzing, and compositing vectors.
-
-**Exit criteria:** Every existing family can be represented without adding
-unbounded or backend-specific scene commands. `v2.0.0-alpha.5 implementation
-stop reached. Run pentest for this exact commit.`
-
-### v2.0.0-alpha.6 - Active Catalog And Trait Derivation
+### v2.0.0-alpha.5 - Portable Core, Formats Baseline, And Facade
 
 **Status:** Planned.
 
-**Goal:** Activate the frozen stateless identity-to-trait contract.
+**Goal:** Assemble the portable core, established formats baseline, and facade
+before adding the remaining isolated 2.0 components.
 
-**Deliverables:** Versioned trait labels, catalog IDs, frozen weighted mapping,
-explicit seed handling, stable style resolution, and asset-key integration.
+**Deliverables:** Finalize the `no_std + alloc` core, caller RGBA surfaces and
+reusable scratch, owned convenience output, `hashavatar-formats` with admitted
+WebP/PNG/JPEG/GIF features, the `hashavatar` facade, full recommended request
+API, encoded asset metadata/keys, typed error ownership, and 1.x migration map.
 
-**Verification:** Cross-architecture known-answer vectors, catalog permutation
-tests, domain separation, key uniqueness tests, and no `StdRng` in core.
+**Verification:** Minimal/default/all-established-format feature matrices;
+MSRV, WASM, AArch64, and 32-bit checks; per-feature dependency trees; package
+contents; codec decode-to-canonical-pixel comparisons; writer/error/cleanup
+tests; packaged downstream use from `hashavatar-website`.
 
-**Exit criteria:** Identical requests resolve to identical traits without
-mutable RNG state. `v2.0.0-alpha.6 implementation stop reached. Run pentest for
-this exact commit.`
+**Exit criteria:** Canonical CPU, SVG, and established-format workflows are
+possible through the facade; core has no codec/std leakage; the remaining
+companions have stable boundaries to build on without changing canonical
+pixels.
 
-### v2.0.0-alpha.7 - Cat Vertical Slice
+`v2.0.0-alpha.5 implementation stop reached. Run pentest for this exact commit.`
+
+### v2.0.0-alpha.6 - Heapless Caller Storage
 
 **Status:** Planned.
 
-**Goal:** Prove the complete architecture with one production-quality family.
+**Goal:** Support deterministic rendering without a global allocator while
+keeping scene authoring and storage layouts controlled by core.
 
-**Deliverables:** Cat rig and scene compiler, themed background, canonical CPU
-pixels, SVG from the same scene, shape clipping, and scene/pixel/SVG fixtures.
+**Deliverables:** Add the `hashavatar-heapless` crate, make core's `alloc`
+profile optional where required, provide safe preinitialized caller storage for
+scene/scratch/raster work, publish per-family and worst-case capacity budgets,
+and return typed capacity errors without hidden allocation or first-party unsafe
+code.
 
-**Verification:** Visual review, raw pixel corpus across x86_64/AArch64/WASM,
-SVG parsing/structural parity, and bounded resource evidence.
+**Verification:** `--no-default-features` and no-allocator builds; representative
+embedded and WASM32 targets; allocation instrumentation; every family and
+maximum style stack at exact/undersized/oversized capacities; reuse after
+success/error/unwind; fuzzed capacity descriptors; Kani range/index proofs.
 
-**Exit criteria:** Cat has no independent raster/SVG geometry path.
+**Exit criteria:** Every canonical CPU fixture can render through documented
+caller-owned storage with zero allocator calls, deterministic capacity failure,
+and unchanged visible pixels.
+
+`v2.0.0-alpha.6 implementation stop reached. Run pentest for this exact commit.`
+
+### v2.0.0-alpha.7 - Versioned Request Schema
+
+**Status:** Planned.
+
+**Goal:** Provide reusable service-building data contracts without importing
+HTTP or deployment policy into Hashavatar.
+
+**Deliverables:** Add `hashavatar-schema` with bounded
+`AvatarRequestDocumentV1`, strict conversion into core `AvatarRequest`, optional
+Serde and JSON Schema features, stable catalog/render/style IDs, compatibility
+rules, and examples for direct Rust and website integration.
+
+**Verification:** Schema snapshots; unknown, duplicate, missing, conflicting,
+oversized, and malformed field tests; bounded deserialization visitors where
+supported; feature/dependency isolation; MSRV; packaged trials in
+`hashavatar-website` and a minimal independent service fixture.
+
+**Exit criteria:** Consumers share one versioned rendering document while HTTP
+routes, query syntax, OpenAPI operations, authentication, storage, and service
+policy remain application-owned.
+
 `v2.0.0-alpha.7 implementation stop reached. Run pentest for this exact commit.`
 
-### v2.0.0-alpha.8 - Animal And Face Family Port
+### v2.0.0-alpha.8 - AVIF Format Admission
 
 **Status:** Planned.
 
-**Goal:** Port dog, fox, bear, panda, frog, penguin, and bird.
+**Goal:** Ship AVIF as a securely admitted, explicit output feature.
 
-**Deliverables:** Calibrated rigs, safe zones, semantic anchors, scene compilers,
-and canonical fixtures for the named families.
+**Deliverables:** Re-evaluate current AVIF providers and select one compatible
+with license/MSRV/security policy; add the optional `avif` feature, writer and
+convenience APIs, encoder settings contract, encoded asset keys, capability and
+resource metadata, and codec-owned cleanup documentation. Add AVIF to
+`all-formats` only after admission; never enable it by default.
 
-**Verification:** Per-family visual review, minimum/maximum dimensions, all
-frame shapes, SVG parsing, and cross-platform pixel digests.
+**Verification:** Complete transitive/default-feature/unsafe/assembly/threading
+review; deny/audit/SBOM; representative alpha and color corpus; encode/decode
+and lossy-tolerance tests; malformed writer/error behavior; peak memory and CPU
+benchmarks; WASM/platform matrix; package and compile-cost evidence.
 
-**Exit criteria:** Every named family uses the scene path only.
+**Exit criteria:** An admitted AVIF provider passes every gate and works through
+the same prepared request and encoded-key APIs. If no provider qualifies, 2.0
+waits rather than weakening policy or shipping a misleading feature.
+
 `v2.0.0-alpha.8 implementation stop reached. Run pentest for this exact commit.`
 
-### v2.0.0-alpha.9 - Fantasy And Constructed Family Port
+### v2.0.0-alpha.9 - GPU Backend Boundary
 
 **Status:** Planned.
 
-**Goal:** Port robot, alien, monster, ghost, wizard, skull, knight, dragon,
-ninja, and astronaut.
+**Goal:** Establish an optional GPU crate without exposing mutable scene
+authoring or contaminating default/core dependency graphs.
 
-**Deliverables:** Family-specific rigs/capabilities, scene compilers, and
-canonical fixtures.
+**Deliverables:** Add `hashavatar-gpu`; define the narrow versioned read-only
+core backend protocol, scene capability negotiation, device/backend status,
+checked resource budgets, explicit CPU fallback decision, typed unsupported and
+device errors, and reviewed GPU dependency/unsafe/driver boundaries.
 
-**Verification:** The same family, dimension, frame, SVG, and platform gates as
-alpha.8, plus complex-path resource checks.
+**Verification:** Dependency-direction and default-graph tests; public API and
+semver review of the backend protocol; malformed capability/resource tests;
+no-adapter/headless behavior; package/MSRV/platform review; deliberate proof
+that enabling unrelated facade features cannot enable GPU transitively.
 
-**Exit criteria:** Every named family uses the scene path only.
+**Exit criteria:** Applications can opt into and inspect GPU capability without
+executing an unvalidated scene, silently falling back, or adding GPU code to
+minimal/default builds.
+
 `v2.0.0-alpha.9 implementation stop reached. Run pentest for this exact commit.`
 
-### v2.0.0-alpha.10 - Object, Food, And Remaining Family Port
+### v2.0.0-alpha.10 - GPU Scene Execution
 
 **Status:** Planned.
 
-**Goal:** Port slime, paws, planet, rocket, mushroom, cactus, cupcake, pizza,
-icecream, octopus, diamond, coffee cup, and shield.
-
-**Deliverables:** Non-face capability manifests, scene compilers, and canonical
-fixtures without fake eye/head anchors.
-
-**Verification:** The same family, dimension, frame, SVG, and platform gates as
-earlier ports; verify unsupported face capabilities fail explicitly.
-
-**Exit criteria:** Every 1.x family is represented by the 2.0 scene system.
-`v2.0.0-alpha.10 implementation stop reached. Run pentest for this exact
-commit.`
-
-### v2.0.0-alpha.11 - Backgrounds And Frames
-
-**Status:** Planned.
-
-**Goal:** Move every background and frame into canonical scene geometry.
-
-**Deliverables:** Themed, fixed-color, transparent, pattern, gradient, and
-starry backgrounds plus circle, square, squircle, hexagon, and octagon frames.
-
-**Verification:** Raster/SVG scene parity, clipping boundaries, contrast review,
-identity-dependent pattern vectors, and integer geometry proofs.
-
-**Exit criteria:** No backend-specific background or frame implementation
-remains. `v2.0.0-alpha.11 implementation stop reached. Run pentest for this
-exact commit.`
-
-### v2.0.0-alpha.12 - SVG Backend Completion
-
-**Status:** Planned.
-
-**Goal:** Finish streaming SVG emission and delete independent family SVG code.
-
-**Deliverables:** Stable element/attribute ordering, exact fixed-point
-formatting, clips/groups/gradients, `core::fmt::Write` support, and SVG
-capability reporting.
-
-**Verification:** Parse every request fixture, compare scene semantics, inject
-writer failures, fuzz scene-to-SVG, and verify caller input never becomes raw
-markup.
-
-**Exit criteria:** SVG is generated only from validated scenes.
-`v2.0.0-alpha.12 implementation stop reached. Run pentest for this exact
-commit.`
-
-### v2.0.0-alpha.13 - Typed Accessory Slots
-
-**Status:** Planned.
-
-**Goal:** Replace the single accessory enum with a slot-aware model.
-
-**Deliverables:** Stable accessory IDs, typed slots, z-bands, required anchors,
-family capability checks, explicit exclusion groups, and one calibrated item per
-slot where current art supports it.
-
-**Verification:** Valid/invalid slot matrix, insertion-order canonicalization,
-family support tests, and raster/SVG parity.
-
-**Exit criteria:** One accessory per slot resolves deterministically without
-silent skipping. `v2.0.0-alpha.13 implementation stop reached. Run pentest for
-this exact commit.`
-
-### v2.0.0-alpha.14 - Multi-Accessory Layout
-
-**Status:** Planned.
-
-**Goal:** Support deterministic accessory stacks safely.
-
-**Deliverables:** Bounded stack length, priority ordering, calibrated placement
-candidates, scaling limits, frame-safe zones, limited collision hulls,
-fallback/rejection policy, and complete `LayoutReport`.
-
-**Verification:** Permutation invariance, capacity exhaustion, collision/fallback
-fuzzing, every-family stress fixtures, and maximum-cost bounds.
-
-**Exit criteria:** Multiple compatible slots work together and incompatible
-stacks fail predictably. `v2.0.0-alpha.14 implementation stop reached. Run
-pentest for this exact commit.`
-
-### v2.0.0-alpha.15 - Expressions And Color Layers
-
-**Status:** Planned.
-
-**Goal:** Complete layered style behavior on the scene model.
-
-**Deliverables:** Expression capabilities, integer palettes, primary/secondary
-color roles, sunglasses/expression conflict policy, and deterministic automatic
-fallbacks.
-
-**Verification:** Every expression/palette/family classification, integer color
-proofs, contrast checks, and raster/SVG parity.
-
-**Exit criteria:** The complete style tuple is scene-native and bounded.
-`v2.0.0-alpha.15 implementation stop reached. Run pentest for this exact
-commit.`
-
-### v2.0.0-alpha.16 - no_std And Caller Storage
-
-**Status:** Planned.
-
-**Goal:** Complete the portable raw-rendering profiles.
-
-**Deliverables:** `no_std + alloc` core, caller-provided RGBA surfaces,
-`OwnedScene`, optional preinitialized-slice `BorrowedScene`, reusable scratch
-arenas, `SceneBudget`, and typed capacity failures.
-
-**Verification:** `--no-default-features`, alloc profile, WASM, AArch64, and at
-least one embedded target; allocation-count tests; no hidden filesystem, clock,
-entropy, thread, or OS-I/O dependency.
-
-**Exit criteria:** Documented portable profiles compile and render canonical
-fixtures. `v2.0.0-alpha.16 implementation stop reached. Run pentest for this
-exact commit.`
-
-### v2.0.0-alpha.17 - Formats Crate Baseline
-
-**Status:** Planned.
-
-**Goal:** Isolate all standard raster codec and `image` integration costs.
-
-**Deliverables:** `hashavatar-formats` WebP, PNG, JPEG, and GIF features;
-`RgbaImage` adapters; writer APIs; capability metadata; scratch/resource and
-cleanup documentation.
-
-**Verification:** Per-feature dependency trees, deny/audit, MSRV, decoded-pixel
-parity, alpha handling, malformed writer behavior, package size, and no codec in
-the core graph.
-
-**Exit criteria:** Stable legacy formats work through the optional formats
-boundary. `v2.0.0-alpha.17 implementation stop reached. Run pentest for this
-exact commit.`
-
-### v2.0.0-alpha.18 - AVIF Admission Decision
-
-**Status:** Planned.
-
-**Goal:** Decide AVIF on current evidence without weakening defaults.
-
-**Deliverables:** Review the latest pure-Rust encoder graph, licenses, MSRV,
-assembly/threading defaults, unsafe boundaries, resource usage, output quality,
-determinism, WASM behavior, and codec scratch cleanup; admit `avif` only if all
-required gates pass.
-
-**Verification:** Dependency report, representative encode/decode corpus,
-resource benchmark, security review, and explicit accept/reject record.
-
-**Exit criteria:** AVIF is either an isolated non-default formats feature with
-evidence or a documented rejection; it does not block 2.0.
-`v2.0.0-alpha.18 implementation stop reached. Run pentest for this exact commit.`
-
-### v2.0.0-alpha.19 - JPEG XL Admission Decision
-
-**Status:** Planned.
-
-**Goal:** Re-evaluate JPEG XL providers without accepting GPL or immature code
-silently.
-
-**Deliverables:** Recheck `jpegxl-rs`, permissive Rust encoders, conformance,
-maintenance, MSRV, resource limits, native dependencies, and security posture.
-Do not admit GPL-3.0-or-later into the permissive workspace policy.
-
-**Verification:** Provider comparison, license evidence, corpus results for any
-candidate, deny/audit, and explicit accept/reject record.
-
-**Exit criteria:** JPEG XL is either isolated behind an admitted provider or
-remains deferred with a precise reason; it does not block 2.0.
-`v2.0.0-alpha.19 implementation stop reached. Run pentest for this exact commit.`
-
-### v2.0.0-alpha.20 - GPU Boundary Scaffold
-
-**Status:** Planned.
-
-**Goal:** Publish the optional GPU contract without claiming canonical output.
-
-**Deliverables:** `hashavatar-gpu` device-independent API, scene capability
-query, resource budget, unsupported-command errors, backend status, and a
-deterministic CPU fallback decision that never happens silently.
-
-**Verification:** Default graph exclusion, dependency/unsafe inventory,
-headless/no-device behavior, resource-limit tests, and package review.
-
-**Exit criteria:** Applications can opt into GPU integration explicitly while
-core/facade defaults remain unchanged. `v2.0.0-alpha.20 implementation stop
-reached. Run pentest for this exact commit.`
-
-### v2.0.0-alpha.21 - GPU Scene Execution
-
-**Status:** Planned.
-
-**Goal:** Render complete validated scenes through the selected GPU backend.
-
-**Deliverables:** Scene translation, integer-capable shader path where practical,
-bounded buffers, deterministic command order, explicit zero-fill/fence cleanup,
-and output-status metadata.
-
-**Verification:** Differential corpus across available vendors/drivers, device
-loss, timeout, allocation failure, malformed capability, cleanup, and stress
-tests.
-
-**Exit criteria:** GPU output is production-usable as explicitly noncanonical;
-any mismatch is measured and documented. `v2.0.0-alpha.21 implementation stop
-reached. Run pentest for this exact commit.`
-
-### v2.0.0-alpha.22 - Request Wire And Schema Adapter
-
-**Status:** Planned.
-
-**Goal:** Make it easier to build services without making HTTP or JSON part of
-rendering core.
-
-**Deliverables:** Add independently versioned `hashavatar-schema` with bounded
-`AvatarRequestDocumentV1`, strict conversion into core `AvatarRequest`, optional
-Serde/JSON Schema support, catalog/render IDs, compatibility metadata, and
-strict unknown/duplicate-value policy where supported.
-
-**Verification:** Schema snapshots, malformed/unknown/duplicate field tests in
-the chosen parser integration, feature-tree isolation, and MSRV review.
-
-**Exit criteria:** Schema dependencies never enter core or default facade; HTTP
-query parsing remains in `hashavatar-website` or another caller application.
-`v2.0.0-alpha.22 implementation stop reached. Run pentest for this exact
-commit.`
-
-### v2.0.0-alpha.23 - Facade And Migration API
-
-**Status:** Planned.
-
-**Goal:** Assemble the intended user-facing 2.0 API.
-
-**Deliverables:** `#[non_exhaustive]` built-in enums or stable IDs where
-appropriate, strict dynamic builder, `PreparedAvatar`, resolved style/layout,
-surface/SVG/encode helpers, canonical asset keys, optional formats/GPU/schema
-forwarding, and complete 1.x migration mapping.
-
-**Verification:** Public API review, compile-pass/fail examples, feature powerset
-for valid combinations, downstream `hashavatar-website` migration, and no
-accidental heavy dependencies in minimal/default graphs.
-
-**Exit criteria:** All intended 2.0 workflows are possible through the facade.
-`v2.0.0-alpha.23 implementation stop reached. Run pentest for this exact
-commit.`
-
-### v2.0.0-alpha.24 - Testkit And Compatibility Decision
-
-**Status:** Planned.
-
-**Goal:** Centralize assurance evidence and decide whether legacy compatibility
-is justified.
-
-**Deliverables:** `hashavatar-testkit`, shared corpus runner, CPU/GPU/SVG/codec
-differential helpers, allocation/resource fixtures, and a documented decision
-on conditional `hashavatar-compat-v1` based on downstream demand.
-
-**Verification:** Corpus reproducibility, tamper detection, cross-crate use,
-package exclusion, and compatibility cost review.
-
-**Exit criteria:** Every backend consumes one evidence corpus; legacy renderer
-code is either isolated with an end-of-support policy or omitted.
-`v2.0.0-alpha.24 implementation stop reached. Run pentest for this exact commit.`
+**Goal:** Render the complete supported scene through the optional GPU backend
+with explicit conformance and cleanup limits.
+
+**Deliverables:** Implement bounded scene translation/execution, deterministic
+command order, output readback, buffer initialization and completion-fence
+reuse policy, device-loss/submission/mapping failure handling, backend metadata,
+and caller-selected fallback. Declare GPU output visually conforming and
+noncanonical unless exact equality is proven.
+
+**Verification:** Differential corpus against CPU across the declared
+vendor/driver/software-adapter matrix; all families/styles/dimensions; device
+loss and allocation/dispatch bounds; repeated reuse and cleanup tests;
+headless/no-device fixtures; performance and resource baselines; packaged
+downstream example.
+
+**Exit criteria:** Every supported scene either renders within the declared GPU
+contract or returns a typed error; mismatches are measured and documented; CPU
+remains the canonical pixel authority unless zero-difference evidence supports
+a stronger backend-specific claim.
+
+`v2.0.0-alpha.10 implementation stop reached. Run pentest for this exact commit.`
 
 ## 2.0 Beta Releases
 
-No new architecture enters after beta. Betas close APIs, performance,
-portability, security, and documentation gaps.
+No new architecture or art enters after beta. A breaking correction resets the
+line to another alpha.
 
-### v2.0.0-beta.1 - Public API Freeze
-
-**Status:** Planned.
-
-**Goal:** Freeze public types, IDs, errors, builders, scenes, sinks, and crate
-ownership.
-
-**Deliverables:** Semver audit, rustdoc completion, sealed/internal boundaries,
-and explicit stability policy for catalog, scene, pixels, SVG, and encoders.
-
-**Verification:** API snapshot/diff tooling, downstream compile matrix, and
-manual ownership review.
-
-**Exit criteria:** Later betas require compatibility-preserving changes or a
-documented reset to another alpha. `v2.0.0-beta.1 implementation stop reached.
-Run pentest for this exact commit.`
-
-### v2.0.0-beta.2 - Feature And Dependency Freeze
+### v2.0.0-beta.1 - Public API And Contract Freeze
 
 **Status:** Planned.
 
-**Goal:** Freeze default/minimal/optional feature topology and crate graphs.
+**Goal:** Freeze the Rust API and all identifiers that downstream code or
+caches depend on.
 
-**Deliverables:** Final facade defaults, mutually exclusive hash policy,
-per-crate dependency allowlists, optional backend classifications, duplicate
-exceptions, and independent crate version matrix.
+**Deliverables:** Complete rustdoc; freeze builders, prepared values, style and
+layout reports, budgets, surfaces, writer APIs, errors, IDs, keys, feature graph,
+defaults, pixel/digest/derivation/SVG contracts, and the opaque/private scene
+boundary; freeze heapless capacity/storage APIs, schema V1, AVIF settings, and
+the narrow GPU backend protocol. Add checked per-crate public API snapshots and
+cargo-semver-checks.
 
-**Verification:** Valid feature powerset, forbidden combinations, cargo trees,
-deny/audit, MSRV, package size, and default graph assertions.
+**Verification:** API snapshot/diff for every published crate,
+compile-pass/fail UI tests, valid feature powerset, duplicate public dependency
+tests, packaged downstream builds, default/cache migration vectors, schema
+compatibility snapshots, backend protocol review, and manual API/security
+review.
 
-**Exit criteria:** No optional codec, GPU, schema, or test dependency leaks into
-core or minimal facade builds. `v2.0.0-beta.2 implementation stop reached. Run
-pentest for this exact commit.`
+**Exit criteria:** Later changes are compatibility-preserving or explicitly
+return to alpha. No internal numeric or scene representation is accidentally a
+public stability commitment.
 
-### v2.0.0-beta.3 - Resource And Performance Contract
+`v2.0.0-beta.1 implementation stop reached. Run pentest for this exact commit.`
 
-**Status:** Planned.
-
-**Goal:** Make memory, CPU, scene, scratch, and backend costs measurable and
-bounded.
-
-**Deliverables:** Per-family scene budgets, raster tile/scratch bounds, encoder
-capabilities, GPU resource bounds, benchmark baselines, and regression
-thresholds.
-
-**Verification:** Minimum/maximum dimensions, worst-case style stacks,
-concurrency math, allocation counts, wall-time smoke ceilings, and denial-of-
-service review.
-
-**Exit criteria:** Documentation and measured limits agree for every supported
-backend. `v2.0.0-beta.3 implementation stop reached. Run pentest for this exact
-commit.`
-
-### v2.0.0-beta.4 - Cleanup And Secret-Lifetime Audit
+### v2.0.0-beta.2 - Assurance And Migration Freeze
 
 **Status:** Planned.
 
-**Goal:** Close hashavatar-owned cleanup gaps and document external residuals.
+**Goal:** Close resource, cleanup, portability, integration, performance, and
+documentation gaps against the frozen API.
 
-**Deliverables:** Allocation-time sanitizing owners, error/unwind cleanup,
-optional caller output guards, codec scratch boundaries, GPU zero-fill/fence
-policy, and updated threat model.
+**Deliverables:** Final CPU/heapless/codec/GPU resource budgets and performance
+baselines; cleanup and secret-lifetime audit; x86_64/AArch64/WASM/32-bit CPU and
+heapless determinism matrix; declared GPU conformance matrix;
+debug/release/LTO evidence; migrated `hashavatar-website`; packaged minimal,
+formats, heapless, schema, and GPU consumers; README, migration guide, service
+recipe, threat model, limitations, dependency inventory, SBOM, and release
+evidence drafts.
 
-**Verification:** Normal/error/unwind tests, deliberate writer/device failures,
-memory-lifetime review, and security pentest focused on identity and derived
-buffers.
+**Verification:** Worst-case dimensions/styles, allocation and concurrency
+math, normal/error/unwind cleanup, cross-platform scene/pixel/SVG fixtures,
+zero-allocation heapless evidence, AVIF corpus, schema malformed-input corpus,
+GPU differential/device-failure tests, benchmark thresholds, examples under
+documented feature profiles, reproducible package tests, CI, and CodeQL default
+setup.
 
-**Exit criteria:** Every owned sensitive allocation has an explicit cleanup
-owner and honest limits. `v2.0.0-beta.4 implementation stop reached. Run pentest
-for this exact commit.`
+**Exit criteria:** Real consumers need no undocumented workaround; documentation
+and measured behavior agree; no unresolved canonical mismatch remains. This
+cleanup/security boundary receives focused adversarial review.
 
-### v2.0.0-beta.5 - Cross-Platform Determinism
-
-**Status:** Planned.
-
-**Goal:** Prove the advertised scene and pixel contracts across supported
-platforms.
-
-**Deliverables:** Native x86_64 and AArch64 runs, WASM execution, multiple
-optimization/LTO profiles, optional big-endian supplemental evidence, and
-published digest matrices.
-
-**Verification:** Every canonical `SceneDigest` and `PixelDigest` matches; SVG
-structural fixtures match; encoded outputs are compared only under admitted
-encoder contracts.
-
-**Exit criteria:** No unresolved canonical scene/pixel mismatch remains.
-`v2.0.0-beta.5 implementation stop reached. Run pentest for this exact commit.`
-
-### v2.0.0-beta.6 - Downstream Migration Trials
-
-**Status:** Planned.
-
-**Goal:** Validate 2.0 in real consumers before RC.
-
-**Deliverables:** Migrate `hashavatar-website`, at least one minimal no_std/alloc
-fixture, one formats consumer, and one GPU example; complete 1.x-to-2.0 guide
-and a concise service-construction recipe.
-
-**Verification:** Integration tests, cache migration, style-version rollout,
-concurrency/resource behavior, and API ergonomics review.
-
-**Exit criteria:** Real consumers need no undocumented workaround.
-`v2.0.0-beta.6 implementation stop reached. Run pentest for this exact commit.`
-
-### v2.0.0-beta.7 - Documentation And Evidence Freeze
-
-**Status:** Planned.
-
-**Goal:** Finish user, author, security, and release documentation before RC.
-
-**Deliverables:** README, crate docs, family-authoring guide, scene contract,
-no_std profiles, format/GPU status, security controls, dependency inventory,
-SBOM, and limitations.
-
-**Verification:** All examples compile in their documented feature profiles;
-links, package contents, and generated evidence are reproducible.
-
-**Exit criteria:** RC work is verification and remediation, not missing
-documentation. `v2.0.0-beta.7 implementation stop reached. Run pentest for this
-exact commit.`
+`v2.0.0-beta.2 implementation stop reached. Run pentest for this exact commit.`
 
 ## 2.0 Release Candidates
 
-### v2.0.0-rc.1 - Formal And Adversarial Verification
+### v2.0.0-rc.1 - Exact Candidate Verification
 
 **Status:** Planned.
 
-**Goal:** Run the complete assurance program against the frozen API and output
-contracts.
+**Goal:** Test the frozen packages as an adversarial release candidate.
 
-**Deliverables:** Mandatory pinned Kani job, defined fuzz CPU-hour campaign,
-Miri where meaningful, sanitizer builds for adapters, differential CPU/GPU
-tests, codec decode comparisons, dependency review, and full pentest.
+**Deliverables:** Mandatory pinned Kani job, defined fuzz campaign, Miri or
+sanitizers where meaningful, dependency/license/unsafe review, semantic SBOM,
+reproducibility and provenance evidence, final package archives, migration
+trials, and a full independent pentest against the exact commit.
 
-**Verification:** Kani cannot silently skip; fuzz targets have no unresolved
-crash/hang; security findings are classified with concrete reproductions.
+**Verification:** Kani cannot silently skip; fuzzing has no unresolved
+crash/hang; local archives install in clean downstream fixtures; package hashes
+and evidence reproduce; GitHub and CodeQL are green; findings have concrete
+dispositions.
 
-**Exit criteria:** All critical/high findings and actionable correctness gaps are
-resolved before promotion. `v2.0.0-rc.1 implementation stop reached. Run
-pentest for this exact commit.`
+**Exit criteria:** No critical/high finding or release-blocking correctness,
+contract, portability, packaging, or documentation gap remains.
 
-### v2.0.0-rc.2 - Remediation Candidate
+`v2.0.0-rc.1 implementation stop reached. Run pentest for this exact commit.`
 
-**Status:** Planned.
+### v2.0.0-rc.2 And Later - Remediation Candidates
 
-**Goal:** Retest every RC1 change without adding unrelated features.
+**Status:** Planned as needed.
 
-**Deliverables:** Focused fixes, regression tests, refreshed corpus/SBOM, updated
-security controls, and exact finding dispositions.
+**Goal:** Retest fixes without adding unrelated features.
 
-**Verification:** Full release gate, complete pentest retest, GitHub CI, CodeQL,
-downstream integrations, and artifact reproducibility.
+**Deliverables:** Focused remediation, regression tests, refreshed
+corpus/SBOM/packages/provenance, updated finding dispositions, and release notes.
 
-**Exit criteria:** No unresolved release-blocking finding remains.
+**Verification:** Repeat the full RC gate and independent retest for every code
+change. Install and test the exact package archives intended for publication.
+
+**Exit criteria:** The latest RC commit and package bytes are the exact approved
+GA candidate. Any further code, dependency, metadata, or artifact change creates
+another `rc.N`; there is no fixed maximum RC count.
+
 `v2.0.0-rc.2 implementation stop reached. Run pentest for this exact commit.`
 
-### v2.0.0-rc.3 - Exact Release Artifact Candidate
-
-**Status:** Planned.
-
-**Goal:** Produce the exact packages and evidence intended for GA.
-
-**Deliverables:** Final independently versioned crate set, checksummed package
-archives, committed semantic SBOMs, provenance, corpus/proof/fuzz summary,
-migration guide, and final release notes.
-
-**Verification:** Install packages from local archives in clean downstream
-fixtures; tags are absent; package checksums and evidence are reproducible.
-
-**Exit criteria:** GA can be a same-commit tag promotion. Any code, dependency,
-metadata, or artifact change requires another RC. `v2.0.0-rc.3 implementation
-stop reached. Run pentest for this exact commit.`
-
-Additional `rc.N` releases are added whenever remediation changes the candidate.
-Do not force GA because the roadmap happened to name three candidates.
+Every later candidate uses the same exact sentence with its concrete `rc.N`
+version rather than a placeholder.
 
 ## v2.0.0 - Stable Release
 
 **Status:** Planned.
 
-**Goal:** Publish the first stable canonical-scene release.
+**Goal:** Publish the first stable canonical-scene Hashavatar library.
 
-**Deliverables:** Publish only workspace crates marked for release in dependency
-order; tag the exact approved RC commit; publish immutable release evidence and
-the supported-target/backend matrix.
+**Deliverables:** Promote the exact approved RC commit; publish
+`hashavatar-core`, `hashavatar-formats`, `hashavatar-heapless`,
+`hashavatar-schema`, `hashavatar-gpu`, and `hashavatar` in dependency order; tag
+immutable source and release evidence; publish final migration and security
+documentation.
 
-**Verification:** Final readiness gate verifies tag target, package checksums,
-SBOMs, provenance, release notes, pentest evidence, GitHub status, and crate
-publish order.
+**Verification:** Final readiness confirms tag target, package checksums,
+provenance, SBOMs, release notes, pentest evidence, supported-target matrix,
+GitHub status, CodeQL status, and crates.io publish order.
 
-**Exit criteria:**
+**Exit criteria:** All of the following are true:
 
-- `hashavatar-core` is the canonical scene/CPU/SVG implementation.
-- `hashavatar-formats` isolates codec dependencies.
-- `hashavatar-gpu` is optional and clearly canonical or noncanonical per its
-  evidence; CPU remains normative for 2.0.0.
-- `hashavatar-schema`, if published, remains optional and separate.
-- Every first-party Rust file satisfies the 500-line policy.
-- Supported feature profiles pass MSRV and pinned stable Rust.
-- Scene and raw-pixel contracts match the published corpus.
-- No unresolved critical/high security or correctness finding remains.
-- Documentation makes no ambiguous bit-identical, zero-allocation,
-  zeroization, anonymity, codec, or GPU claim.
+- the public request/preparation/render/encode workflow is stable and documented;
+- canonical CPU pixels and SVG derive from one validated private scene;
+- external RGBA, digest, derivation, SVG, failure, and cache contracts are frozen;
+- all existing 1.x families, styles, backgrounds, and frames are represented;
+- the portable core supports documented `no_std + alloc` and no-allocator
+  caller-storage profiles while remaining codec-free;
+- WebP, PNG, JPEG, GIF, and admitted AVIF are isolated and feature-controlled;
+- schema V1 is bounded, versioned, transport-neutral, and HTTP-free;
+- the optional GPU backend passes its declared device/conformance matrix and
+  reports noncanonical status honestly;
+- supported targets match the published scene/pixel corpus;
+- the reference website works from published package archives;
+- no unresolved critical/high security or correctness finding remains;
+- no documentation claims anonymity, universal constant time, guaranteed total
+  zeroization, browser pixel parity, zero allocation, or encoded-byte stability
+  beyond the contracts actually proven;
+- every required companion crate or advanced feature is published and absent
+  from the default dependency graph unless explicitly selected;
+- external scene authoring and plugin execution remain out of scope.
 
-`v2.0.0 implementation stop reached. Run final release readiness for this exact
-commit before tagging.`
+`v2.0.0 implementation stop reached. Run pentest for this exact commit.` The
+stable tag may reuse the exact approved RC evidence only when commit, package
+archives, checksums, SBOM, provenance, and metadata are unchanged; otherwise
+another RC is required.
 
-## Explicitly Deferred Beyond 2.0
+## Required 2.0 Component Roadmaps
 
-- Promoting GPU output to canonical without multi-vendor zero-difference proof.
-- A general external plugin or third-party art execution system. Stable string
-  IDs alone do not create a safe extension mechanism.
-- HTTP query parsing or service middleware in this workspace.
-- Custom hand-written SIMD in first-party crates.
-- Async rendering APIs in core.
-- Unbounded scene graphs, arbitrary SVG, user-provided shaders, or external
-  image loading.
-- New avatar families added merely to fill a release; catalog additions can
-  resume after the 2.0 contract is stable.
+The following documents provide deeper admission criteria for components with
+explicit alpha milestones in the main sequence:
+
+- `roadmaps/gpu.md`
+- `roadmaps/avif.md`
+- `roadmaps/schema.md`
+- `roadmaps/heapless.md`
+
+No component may change the canonical CPU pixel contract silently or add its
+heavy dependencies to `hashavatar-core`. Each companion crate uses an
+independent version line, remains optional for downstream users, and must meet
+its own roadmap plus assigned alpha finish line before Hashavatar 2.0 can reach
+beta.
+
+JPEG XL has no active roadmap. A future minor release may reconsider it only
+from then-current implementation, license, conformance, security, maintenance,
+resource, and MSRV evidence.
 
 ## Critical Path
 
-The critical path is:
-
 ```text
-policy and modularity
-  -> frozen catalog/contracts
-  -> fixed numeric core
-  -> validated scene
-  -> canonical CPU rasterizer
-  -> Cat vertical slice
-  -> all family/background ports
-  -> SVG parity
-  -> layered rig/layout
-  -> portable core and formats isolation
-  -> facade freeze
-  -> cross-platform assurance
-  -> RC remediation
+1.x contract and migration preparation
+  -> Cat vertical slice from one private scene
+  -> complete canonical CPU and SVG renderer
+  -> existing catalog port
+  -> layered style/layout
+  -> portable core and established formats isolation
+  -> heapless caller storage
+  -> bounded request schema
+  -> AVIF admission
+  -> GPU boundary and execution
+  -> public API and contract freeze
+  -> assurance and downstream migration
+  -> RC verification/remediation
   -> 2.0.0
 ```
 
-AVIF, JPEG XL, GPU, schema generation, and a legacy compatibility crate each
-have explicit decision releases, but rejection or deferral of any one of them
-must not weaken or block the canonical CPU 2.0 release.
+JPEG XL and external plugins remain outside this path. GPU, AVIF, schema, and
+heapless storage are explicit 2.0 requirements even though downstream users
+must opt into their Cargo features or companion crates.
