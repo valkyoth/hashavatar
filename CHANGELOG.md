@@ -1,5 +1,34 @@
 # Changelog
 
+## 1.1.3
+
+- Bumped the crate and fuzz path dependency metadata to `1.1.3`.
+- Prevented encoded output growth from retiring unsanitized `Vec` allocations
+  by routing encoders through a sanitizing writer with controlled replacement.
+- Rejected custom renderer output whose dimensions or RGBA length do not match
+  the validated `AvatarSpec` before encoding.
+- Namespaced generated SVG definition IDs so multiple inline avatars cannot
+  resolve clip paths or paint servers from another generated asset.
+- Made stable release mode fail closed when Kani or SBOM tooling is unavailable
+  and changed reproducibility evidence to compare complete `.crate` archives.
+- Updated `sanitization` and `sanitization-crypto-interop` from `1.2.4` to
+  `1.2.5`, `serde` from `1.0.228` to `1.0.229`, optional `xxhash-rust` from
+  `0.8.16` to `0.8.17`, and development `serde_json` from `1.0.150` to
+  `1.0.151`, together with compatible lockfile dependencies.
+- Corrected the documented Kani harness count from four to five and added a
+  release-metadata check that prevents the source and documented inventories
+  from drifting.
+- Clarified that all current public option enums are exhaustive and that adding
+  variants is a breaking change reserved for 2.0, rather than a 1.x minor
+  release.
+- Made `plan-towards-2.0.0.md` the accepted future roadmap and marked
+  `docs/VERSION_PLAN.md` as historical context.
+- Documented that the crate remains a single package through `1.3.0` and that
+  the workspace split begins at `2.0.0-alpha.1`.
+- Updated README dependency examples, provenance, security controls, and
+  release metadata for `1.1.3`. Raster fingerprints remain unchanged; SVG
+  definition IDs intentionally change for safe inline composition.
+
 ## 1.1.2
 
 - Bumped the crate to `1.1.2`.

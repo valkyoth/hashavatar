@@ -628,13 +628,14 @@ branch, not in published 1.x packages.
 
 ### v1.1.3 - Policy Corrections
 
-**Status:** Planned.
+**Status:** Initial pentest findings addressed; awaiting exact-commit retest.
 
 **Goal:** Make current documentation and checks accurately describe 1.1.x.
 
 **Deliverables:** Correct enum semver guidance and the Kani harness count;
 remove stale or duplicated roadmap claims; identify this document as the
-accepted 2.0 direction.
+accepted 2.0 direction; harden encoded-output cleanup, custom-renderer bounds,
+SVG definition isolation, and fail-closed release evidence.
 
 **Verification:** Documentation links, Kani inventory, package contents,
 formatting, and release metadata.

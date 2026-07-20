@@ -69,7 +69,7 @@ Both sanitization crates continue to declare Rust `1.90` support.
   `1.92.0`, `1.93.0`, `1.94.0`, `1.95.0`, `1.96.0`, `1.96.1`, and `1.97.0`.
 - Passed the stable release gate: formatting, metadata, dependency boundary,
   unsafe and panic policies, clippy, unit tests, doctests, MSRV feature checks,
-  documentation, cargo-deny, RustSec audit, fuzz harness compilation, four
+  documentation, cargo-deny, RustSec audit, fuzz harness compilation, five
   bounded Kani proofs, reproducible packaging, SBOM generation, and crates.io
   publish dry run.
 - Confirmed both the root and fuzz direct dependency sets are current with

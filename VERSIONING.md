@@ -47,6 +47,13 @@ Visual output may change when:
 
 The repository includes golden fingerprint regression tests. Those tests are meant to catch unintended visual changes before release.
 
+## Exhaustive Public Enums
+
+The public option enums in the 1.x crate are exhaustive and are not marked
+`#[non_exhaustive]`. Their variant sets and `ALL` slices are therefore frozen
+for the remainder of 1.x. New variants require a major release or a separate
+additive API that leaves the existing enum unchanged.
+
 ## Cross-Platform Determinism
 
 The current renderer uses floating-point geometry internally. Golden

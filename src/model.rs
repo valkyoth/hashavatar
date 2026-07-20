@@ -13,6 +13,11 @@ fn parse_ascii_label<T: Copy>(
 }
 
 /// Trait for renderers that can draw reusable avatar styles onto an image buffer.
+///
+/// Implementations must return an RGBA image whose dimensions exactly match
+/// `spec`. [`encode_avatar`](crate::encode_avatar) rejects mismatched output
+/// before invoking an encoder, but direct callers of this trait should enforce
+/// the same invariant when accepting third-party renderer implementations.
 pub trait AvatarRenderer {
     fn render(&self, spec: AvatarSpec) -> Result<RgbaImage, AvatarSpecError>;
 }

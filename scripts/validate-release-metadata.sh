@@ -107,6 +107,45 @@ if ! grep -q "^## $cargo_version" CHANGELOG.md; then
     exit 1
 fi
 
+kani_source_count="$(grep -c '^#\[kani::proof\]$' src/kani_proofs.rs)"
+kani_documented_count="$(
+    sed -n 's/^- Current admitted harness count: `\([0-9][0-9]*\)`\.$/\1/p' docs/KANI.md
+)"
+
+if [ -z "$kani_documented_count" ] || [ "$kani_documented_count" != "$kani_source_count" ]; then
+    echo "release metadata: docs/KANI.md harness count does not match src/kani_proofs.rs" >&2
+    exit 1
+fi
+
+if ! grep -q 'scripts/check_kani.sh --required' scripts/stable_release_gate.sh \
+    || ! grep -q 'scripts/generate-sbom.sh --required' scripts/stable_release_gate.sh
+then
+    echo "release metadata: stable release mode must require Kani and SBOM evidence" >&2
+    exit 1
+fi
+
+if ! grep -q 'cmp "$first_crate" "$second_crate"' scripts/reproducible_build_check.sh; then
+    echo "release metadata: reproducibility check must compare complete crate archives" >&2
+    exit 1
+fi
+
+if command -v git >/dev/null 2>&1 && git rev-parse --git-dir >/dev/null 2>&1; then
+    previous_tag="${HASHAVATAR_PREVIOUS_TAG:-$(
+        git tag --list 'v*' --sort=-version:refname \
+            | grep -vx "v$cargo_version" \
+            | sed -n '1p'
+    )}"
+    release_notes="docs/release-notes/RELEASE_NOTES_${cargo_version}.md"
+    if [ -n "$previous_tag" ] \
+        && ! git diff --quiet "$previous_tag" -- \
+            Cargo.toml Cargo.lock fuzz/Cargo.toml fuzz/Cargo.lock \
+        && grep -q 'No dependency changes' "$release_notes"
+    then
+        echo "release metadata: dependency changes since $previous_tag contradict $release_notes" >&2
+        exit 1
+    fi
+fi
+
 package_list="$(
     cargo package --locked --allow-dirty --list
 )"

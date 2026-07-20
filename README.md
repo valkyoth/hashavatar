@@ -10,7 +10,7 @@
   |
   <a href="docs/STABILITY.md">Stability Policy</a>
   |
-  <a href="docs/VERSION_PLAN.md">Roadmap</a>
+  <a href="plan-towards-2.0.0.md">Roadmap</a>
   |
   <a href="SECURITY.md">Security</a>
 </div>
@@ -29,7 +29,7 @@ The crate starts conservative: validated avatar dimensions, bounded identity inp
 
 ## Current Status
 
-The current crate version is `1.1.2`.
+The current crate version is `1.1.3`.
 
 Implemented now:
 
@@ -70,14 +70,16 @@ Implemented now:
 - Isolated fuzz harness for avatar identities, families, backgrounds, SVG
   rendering, default WebP encoding, and feature-gated encoder paths.
 - Local release gates for formatting, clippy, tests, docs, dependency policy,
-  RustSec advisories, bounded Kani proofs when the documented verifier is
-  available, package contents, SBOM generation, reproducible build checks, and
-  crates.io publish dry runs.
+  RustSec advisories, bounded Kani proofs, package contents, SBOM generation,
+  byte-identical `.crate` package checks, and crates.io publish dry runs. Stable
+  release mode requires Kani and SBOM tooling; ordinary check mode may report
+  explicit tooling skips.
 
 Planned or intentionally external:
 
 - HTTP serving, rate limits, cache headers, security headers, observability, and abuse controls live in [`hashavatar-api`](https://github.com/valkyoth/hashavatar-api).
-- Additional output formats such as AVIF or JPEG XL require dependency-policy review before admission.
+- AVIF is planned behind an explicit formats boundary for 2.0 and requires
+  dependency-policy review before admission. JPEG XL is currently unplanned.
 - Larger identity inputs should be normalized or mapped by the application before calling this crate.
 
 ## Trust Dashboard
@@ -96,15 +98,16 @@ Planned or intentionally external:
 | Namespace limits | 128 bytes per tenant/style-version component |
 | Hashing posture | SHA-512 default with length-prefixed domain, namespace, style, and identity components; optional BLAKE3 and non-cryptographic XXH3-128 |
 | SVG posture | Generated numeric markup only; caller input is not inserted into SVG fragments |
-| Kani | Bounded no-default-features harnesses for spec/resource/geometry arithmetic through the Rust `1.90.0` verifier toolchain when available; not a whole-crate formal-verification claim |
-| Release evidence | fmt, clippy, tests, docs, deny, audit, fuzz harness compile, Kani proof run or explicit skip, package check, SBOM, reproducibility |
+| Kani | Bounded no-default-features harnesses for spec/resource/geometry arithmetic through the Rust `1.90.0` verifier toolchain; mandatory in stable release mode, but not a whole-crate formal-verification claim |
+| Release evidence | fmt, clippy, tests, docs, deny, audit, fuzz harness compile, mandatory Kani and SBOM evidence in release mode, byte-identical package check, publish dry run |
 
 Security-control details live in [docs/SECURITY_CONTROLS.md](docs/SECURITY_CONTROLS.md). Dependency policy lives in [docs/DEPENDENCIES.md](docs/DEPENDENCIES.md). Panic policy lives in [docs/PANIC_POLICY.md](docs/PANIC_POLICY.md). Kani proof policy lives in [docs/KANI.md](docs/KANI.md). Stable API and rendering policy lives in [docs/STABILITY.md](docs/STABILITY.md).
 
-Future version planning lives in [docs/VERSION_PLAN.md](docs/VERSION_PLAN.md).
-`hashavatar` remains a single image-generation crate; low-level core planning
-is kept internal unless a future release has a concrete image-generation reason
-to split it.
+The accepted preparation and 2.0 roadmap lives in
+[plan-towards-2.0.0.md](plan-towards-2.0.0.md). The historical path to the
+current crate remains in [docs/VERSION_PLAN.md](docs/VERSION_PLAN.md).
+`hashavatar` remains one crate through `1.1.3`, `1.2.0`, and `1.3.0`; the
+workspace split begins with `2.0.0-alpha.1`.
 
 ## Rust Version Support
 
@@ -114,7 +117,7 @@ The minimum supported Rust version is Rust `1.90.0`, as declared by
 to Rust `1.90.0` so the MSRV stays honest. New deployments should prefer the
 latest stable Rust; as of July 20, 2026, that is Rust `1.97.1`.
 
-Compatibility evidence for `1.1.2`:
+Compatibility evidence for `1.1.3`:
 
 | Rust | Local Evidence |
 | --- | --- |
@@ -136,7 +139,7 @@ Optional hash modes are mutually exclusive, so `hashavatar` cannot use a single
 
 ```toml
 [dependencies]
-hashavatar = "1.1.2"
+hashavatar = "1.1.3"
 ```
 
 Optional identity hash modes and extra raster encoders are disabled by default.
@@ -144,28 +147,28 @@ Hash modes are mutually exclusive, so enable at most one of `blake3` or `xxh3`:
 
 ```toml
 [dependencies]
-hashavatar = { version = "1.1.2", features = ["blake3"] }
+hashavatar = { version = "1.1.3", features = ["blake3"] }
 ```
 
 Enable additional raster formats explicitly:
 
 ```toml
 [dependencies]
-hashavatar = { version = "1.1.2", features = ["png", "jpeg", "gif"] }
+hashavatar = { version = "1.1.3", features = ["png", "jpeg", "gif"] }
 ```
 
 Or enable every optional raster encoder at once:
 
 ```toml
 [dependencies]
-hashavatar = { version = "1.1.2", features = ["all-formats"] }
+hashavatar = { version = "1.1.3", features = ["all-formats"] }
 ```
 
 Enable string serialization/deserialization for public style enums:
 
 ```toml
 [dependencies]
-hashavatar = { version = "1.1.2", features = ["serde"] }
+hashavatar = { version = "1.1.3", features = ["serde"] }
 ```
 
 Combine these as needed, for example `features = ["blake3", "png", "serde"]`.
@@ -190,6 +193,12 @@ license = "MIT OR Apache-2.0"
 `AvatarBuilder` is the recommended entry point for application code. It keeps
 the same validation and security boundaries as the lower-level functions while
 avoiding long positional argument lists.
+
+The builder stores the supplied identifier until it is consumed and derives
+`Clone`, so cloning a builder also clones an owned identifier. For sensitive
+identifiers, pass a short-lived borrow to sanitized storage or derive a keyed
+pseudonym first, as shown below. The builder cannot sanitize an arbitrary
+caller-owned `String`, `Vec<u8>`, or custom identifier type.
 
 ```rust
 use hashavatar::prelude::*;
@@ -254,9 +263,9 @@ For example, using keyed BLAKE3 from the sanitization sister crate:
 
 ```toml
 [dependencies]
-hashavatar = "1.1.2"
-sanitization = "1.2.4"
-sanitization-crypto-interop = { version = "1.2.4", features = ["blake3"] }
+hashavatar = "1.1.3"
+sanitization = "1.2.5"
+sanitization-crypto-interop = { version = "1.2.5", features = ["blake3"] }
 ```
 
 ```rust
@@ -287,10 +296,10 @@ logging policy.
 The `1.x` series keeps the crate's public API shape and documented rendering contract stable.
 Patch releases should not intentionally change output for the same explicit
 rendering tuple except for correctness or security fixes. Minor releases may
-add opt-in features, output formats, avatar families, backgrounds, or visual
-layer variants when they are documented and tested. Automatic style rendering
-can change distribution when public enum `ALL` lists grow, so services that
-need precise visual rollout control should use namespace `style_version`
+add source-compatible APIs and opt-in capabilities, but the current public
+option enums are exhaustive and their variants remain frozen for 1.x. The 2.0
+line introduces explicitly versioned catalog evolution. Services that need
+precise visual rollout control should continue using namespace `style_version`
 values deliberately.
 
 See [docs/STABILITY.md](docs/STABILITY.md) for the full semver and rendering
@@ -325,7 +334,8 @@ All public option enums expose an `ALL` slice, `from_byte`, `as_str`,
 `Display`, and `FromStr` support. With the optional `serde` feature enabled,
 these enums serialize and deserialize as the same lowercase string labels.
 Byte-to-variant mapping always indexes through `ALL`, so adding variants does
-not require duplicated modulo constants in caller code.
+not require duplicated modulo constants. Because these enums are exhaustive,
+their current variants and `ALL` lists remain frozen for the rest of 1.x.
 
 | Enum | Controls | Values |
 | --- | --- | --- |
@@ -483,8 +493,9 @@ assert!(AvatarKind::ALL.contains(&options.kind));
 assert!(AvatarBackground::ALL.contains(&options.background));
 ```
 
-The `from_byte` helpers use each enum's `ALL` slice, so new public variants do
-not require duplicated modulo constants in caller code.
+The `from_byte` helpers use each enum's `ALL` slice, so selection does not rely
+on duplicated modulo constants. The current exhaustive variants remain frozen
+for the rest of 1.x.
 
 ## Example: Automatic Visual Layers
 
@@ -567,7 +578,7 @@ your namespace style version when intentionally migrating output.
 
 ```toml
 [dependencies]
-hashavatar = { version = "1.1.2", features = ["blake3"] }
+hashavatar = { version = "1.1.3", features = ["blake3"] }
 ```
 
 ```rust
@@ -595,7 +606,7 @@ assert!(svg.contains("alien avatar"));
 
 ```toml
 [dependencies]
-hashavatar = { version = "1.1.2", features = ["xxh3"] }
+hashavatar = { version = "1.1.3", features = ["xxh3"] }
 ```
 
 ```rust
@@ -824,11 +835,12 @@ entry points keep those extra layer choices at `none`, `default`, `default`,
 and `square`, so explicitly selected `AvatarOptions` output remains stable
 within a major release unless a documented correctness or security fix requires
 new output. Automatic style rendering derives choices through public `ALL`
-variant lists, so adding variants in a future minor release can change
-automatic distribution. Services that need controlled rollouts should keep
-their existing namespace style version until they intentionally migrate. Some
-family/layer combinations are deterministic no-ops when the layer has no
-sensible anchor for that family.
+variant lists, which remain frozen with the exhaustive enums for the rest of
+1.x. The 2.0 migration will use explicitly versioned catalogs for future
+evolution. Services that need controlled rollouts should keep their existing
+namespace style version until they intentionally migrate. Some family/layer
+combinations are deterministic no-ops when the layer has no sensible anchor for
+that family.
 
 Frame shapes are applied as masks in raster output and as SVG clip paths in SVG
 output. Non-square shapes therefore trim the background, avatar body, color
@@ -908,12 +920,12 @@ The repository includes:
 - transparent background checks
 - golden visual fingerprint tests
 - fuzz harness compilation
-- bounded Kani proof run, or an explicit verifier skip when the documented Kani
-  setup is unavailable
+- bounded Kani proof run; ordinary check mode reports unavailable tooling as an
+  explicit skip, while stable release mode requires the verifier
 - `cargo deny` policy
 - RustSec advisory scanning
-- reproducible package/build checks
-- SBOM generation
+- byte-identical `.crate` package reproducibility checks
+- SBOM generation, required by stable release mode
 - crates.io publish dry run
 
 Run the standard local gate:

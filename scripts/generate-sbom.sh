@@ -1,12 +1,34 @@
 #!/usr/bin/env sh
 set -eu
 
+required=false
+case "${1:-}" in
+    "")
+        ;;
+    --required)
+        required=true
+        ;;
+    *)
+        echo "usage: scripts/generate-sbom.sh [--required]" >&2
+        exit 2
+        ;;
+esac
+
+fail_or_skip() {
+    message="$1"
+    if [ "$required" = true ]; then
+        echo "generate sbom: required; $message" >&2
+        exit 1
+    fi
+    echo "generate sbom: skipping; $message" >&2
+    exit 0
+}
+
 output_dir="${HASHAVATAR_SBOM_DIR:-target/release-evidence}"
 mkdir -p "$output_dir"
 
 if ! cargo sbom --version >/dev/null 2>&1; then
-    echo "generate sbom: skipping; install with: cargo install --locked cargo-sbom --version 0.10.0" >&2
-    exit 0
+    fail_or_skip "install with: cargo install --locked cargo-sbom --version 0.10.0"
 fi
 
 spdx_output="$output_dir/hashavatar.spdx.json"

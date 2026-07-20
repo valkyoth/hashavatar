@@ -9,7 +9,22 @@ pub fn encode_avatar<R: AvatarRenderer>(
     let image = renderer
         .render(spec)
         .map_err(avatar_spec_error_to_image_error)?;
-    encode_owned_rgba_image(image, format)
+    let image = SanitizingRgbaImage::new(image);
+    validate_renderer_output(spec, image.as_image())?;
+    encode_rgba_image(image.as_image(), format)
+}
+
+fn validate_renderer_output(spec: AvatarSpec, image: &RgbaImage) -> ImageResult<()> {
+    if image.dimensions() != (spec.width(), spec.height())
+        || image.as_raw().len() != spec.rgba_buffer_len()
+        || image.as_raw().len() > MAX_AVATAR_RGBA_BYTES
+    {
+        return Err(ImageError::Limits(LimitError::from_kind(
+            LimitErrorKind::DimensionError,
+        )));
+    }
+
+    Ok(())
 }
 
 /// Render and encode a cat avatar into memory.
@@ -446,7 +461,8 @@ impl AvatarRenderPlan {
     }
 
     pub(crate) fn render_svg(&self) -> String {
-        let background = self.render_svg_background();
+        let definition_prefix = self.svg_definition_prefix();
+        let background = self.render_svg_background(&definition_prefix);
 
         let content = format!(
             "{}{}{}",
@@ -455,7 +471,7 @@ impl AvatarRenderPlan {
             render_style_svg_layers(self.spec, self.style, &self.identity)
         );
         let (clip_defs, clipped_content) =
-            render_shape_svg_clip(self.spec, self.style.shape, &content);
+            render_shape_svg_clip(self.spec, self.style.shape, &definition_prefix, &content);
         let shape_layer = render_shape_svg_layer(
             self.spec,
             self.style.shape,
@@ -473,7 +489,18 @@ impl AvatarRenderPlan {
         )
     }
 
-    fn render_svg_background(&self) -> String {
+    fn svg_definition_prefix(&self) -> String {
+        format!(
+            "hashavatar-{}-{}x{}-{}-{}",
+            self.identity.cache_key(),
+            self.spec.width,
+            self.spec.height,
+            self.style.shape.as_str(),
+            self.style.background.as_str(),
+        )
+    }
+
+    fn render_svg_background(&self, definition_prefix: &str) -> String {
         match self.style.background {
             AvatarBackground::Transparent => String::new(),
             AvatarBackground::Themed
@@ -487,25 +514,46 @@ impl AvatarRenderPlan {
                 )
             }
             AvatarBackground::PolkaDot => {
-                r##"<defs><pattern id="hashavatar-bg-polka-dot" width="16" height="16" patternUnits="userSpaceOnUse"><rect width="16" height="16" fill="#f8faf7"/><circle cx="8" cy="8" r="2" fill="#d1d5db"/></pattern></defs><rect width="100%" height="100%" fill="url(#hashavatar-bg-polka-dot)"/>"##.to_owned()
+                let id = format!("{definition_prefix}-bg-polka-dot");
+                format!(
+                    r##"<defs><pattern id="{id}" width="16" height="16" patternUnits="userSpaceOnUse"><rect width="16" height="16" fill="#f8faf7"/><circle cx="8" cy="8" r="2" fill="#d1d5db"/></pattern></defs><rect width="100%" height="100%" fill="url(#{id})"/>"##
+                )
             }
             AvatarBackground::Striped => {
-                r##"<defs><pattern id="hashavatar-bg-striped" width="18" height="18" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="18" height="18" fill="#f8faf7"/><rect width="9" height="18" fill="#e5e7eb"/></pattern></defs><rect width="100%" height="100%" fill="url(#hashavatar-bg-striped)"/>"##.to_owned()
+                let id = format!("{definition_prefix}-bg-striped");
+                format!(
+                    r##"<defs><pattern id="{id}" width="18" height="18" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="18" height="18" fill="#f8faf7"/><rect width="9" height="18" fill="#e5e7eb"/></pattern></defs><rect width="100%" height="100%" fill="url(#{id})"/>"##
+                )
             }
             AvatarBackground::Checkerboard => {
-                r##"<defs><pattern id="hashavatar-bg-checkerboard" width="24" height="24" patternUnits="userSpaceOnUse"><rect width="24" height="24" fill="#f8faf7"/><rect width="12" height="12" fill="#e8ece7"/><rect x="12" y="12" width="12" height="12" fill="#e8ece7"/></pattern></defs><rect width="100%" height="100%" fill="url(#hashavatar-bg-checkerboard)"/>"##.to_owned()
+                let id = format!("{definition_prefix}-bg-checkerboard");
+                format!(
+                    r##"<defs><pattern id="{id}" width="24" height="24" patternUnits="userSpaceOnUse"><rect width="24" height="24" fill="#f8faf7"/><rect width="12" height="12" fill="#e8ece7"/><rect x="12" y="12" width="12" height="12" fill="#e8ece7"/></pattern></defs><rect width="100%" height="100%" fill="url(#{id})"/>"##
+                )
             }
             AvatarBackground::Grid => {
-                r##"<defs><pattern id="hashavatar-bg-grid" width="16" height="16" patternUnits="userSpaceOnUse"><rect width="16" height="16" fill="#f8faf7"/><path d="M 16 0 L 0 0 0 16" fill="none" stroke="#dde2dd" stroke-width="1"/></pattern></defs><rect width="100%" height="100%" fill="url(#hashavatar-bg-grid)"/>"##.to_owned()
+                let id = format!("{definition_prefix}-bg-grid");
+                format!(
+                    r##"<defs><pattern id="{id}" width="16" height="16" patternUnits="userSpaceOnUse"><rect width="16" height="16" fill="#f8faf7"/><path d="M 16 0 L 0 0 0 16" fill="none" stroke="#dde2dd" stroke-width="1"/></pattern></defs><rect width="100%" height="100%" fill="url(#{id})"/>"##
+                )
             }
             AvatarBackground::Sunrise => {
-                r##"<defs><linearGradient id="hashavatar-bg-sunrise" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#fff7d4"/><stop offset="100%" stop-color="#ffb86b"/></linearGradient></defs><rect width="100%" height="100%" fill="url(#hashavatar-bg-sunrise)"/>"##.to_owned()
+                let id = format!("{definition_prefix}-bg-sunrise");
+                format!(
+                    r##"<defs><linearGradient id="{id}" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#fff7d4"/><stop offset="100%" stop-color="#ffb86b"/></linearGradient></defs><rect width="100%" height="100%" fill="url(#{id})"/>"##
+                )
             }
             AvatarBackground::Ocean => {
-                r##"<defs><linearGradient id="hashavatar-bg-ocean" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#dcf8fc"/><stop offset="100%" stop-color="#4b91be"/></linearGradient></defs><rect width="100%" height="100%" fill="url(#hashavatar-bg-ocean)"/>"##.to_owned()
+                let id = format!("{definition_prefix}-bg-ocean");
+                format!(
+                    r##"<defs><linearGradient id="{id}" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#dcf8fc"/><stop offset="100%" stop-color="#4b91be"/></linearGradient></defs><rect width="100%" height="100%" fill="url(#{id})"/>"##
+                )
             }
             AvatarBackground::Starry => {
-                r##"<defs><pattern id="hashavatar-bg-starry" width="40" height="40" patternUnits="userSpaceOnUse"><rect width="40" height="40" fill="#111827"/><circle cx="8" cy="9" r="1.2" fill="#ffffff" opacity="0.7"/><circle cx="28" cy="14" r="1" fill="#ffffff" opacity="0.55"/><circle cx="18" cy="31" r="1.4" fill="#ffffff" opacity="0.65"/></pattern></defs><rect width="100%" height="100%" fill="url(#hashavatar-bg-starry)"/>"##.to_owned()
+                let id = format!("{definition_prefix}-bg-starry");
+                format!(
+                    r##"<defs><pattern id="{id}" width="40" height="40" patternUnits="userSpaceOnUse"><rect width="40" height="40" fill="#111827"/><circle cx="8" cy="9" r="1.2" fill="#ffffff" opacity="0.7"/><circle cx="28" cy="14" r="1" fill="#ffffff" opacity="0.55"/><circle cx="18" cy="31" r="1.4" fill="#ffffff" opacity="0.65"/></pattern></defs><rect width="100%" height="100%" fill="url(#{id})"/>"##
+                )
             }
         }
     }

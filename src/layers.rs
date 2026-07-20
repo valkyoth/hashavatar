@@ -1262,13 +1262,14 @@ pub(crate) fn render_shape_svg_layer(
 pub(crate) fn render_shape_svg_clip(
     spec: AvatarSpec,
     shape: AvatarShape,
+    definition_prefix: &str,
     content: &str,
 ) -> (String, String) {
     if shape == AvatarShape::Square {
         return (String::new(), content.to_owned());
     }
 
-    let clip_id = "hashavatar-frame-clip";
+    let clip_id = format!("{definition_prefix}-frame-clip");
     let clip = render_shape_svg_clip_body(spec, shape);
     (
         format!(r#"<defs><clipPath id="{clip_id}">{clip}</clipPath></defs>"#),

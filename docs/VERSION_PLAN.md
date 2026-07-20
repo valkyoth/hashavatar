@@ -1,5 +1,12 @@
 # Version Plan
 
+Status: historical plan through the 1.0-era milestones
+
+The accepted preparation and 2.0 roadmap is
+[`plan-towards-2.0.0.md`](../plan-towards-2.0.0.md). This document preserves the
+post-`0.6.0` decisions that led to the current 1.x crate; it no longer defines
+future release scope.
+
 This plan describes the intended post-`0.6.0` direction for `hashavatar`.
 Each version has a concrete finish line so the project can stop, review, and
 release without letting exploratory work blur into the release criteria.

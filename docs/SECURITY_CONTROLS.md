@@ -10,8 +10,10 @@
   by a regression test. It is a deterministic convenience value, not a random
   or production policy default.
 - Public raster/SVG dimensions are bounded by `MIN_AVATAR_DIMENSION` and `MAX_AVATAR_DIMENSION`.
-- Raw RGBA raster memory is bounded by `MAX_AVATAR_RGBA_BYTES` per render before
-  encoder overhead.
+- Raw RGBA raster memory is bounded by `MAX_AVATAR_RGBA_BYTES` per built-in
+  render before encoder overhead. `encode_avatar` also rejects a custom
+  `AvatarRenderer` result unless its dimensions and RGBA length exactly match
+  the validated `AvatarSpec`.
 - Identity inputs are bounded by `MAX_AVATAR_ID_BYTES`.
 - Namespace tenant and style-version components are bounded by `MAX_AVATAR_NAMESPACE_COMPONENT_BYTES`.
 - Image-generation APIs return typed errors for unsupported dimensions before allocating or encoding raster output.
@@ -59,6 +61,12 @@
 - `AvatarBuilder` has a redacted `Debug` implementation so accidental builder
   logging does not print the raw identity input, tenant, or style-version
   namespace values.
+- `AvatarBuilder<T>` owns or borrows the caller-provided `T` until the builder
+  is consumed or dropped, and cloning a builder clones `T`. It cannot sanitize
+  arbitrary caller-defined storage. High-assurance integrations should pass a
+  short-lived borrow to sanitized storage or, preferably, derive a keyed
+  pseudonym first and build only from that pseudonym. The prepared,
+  identity-only builder boundary is planned for the 1.2 contract work.
 - `AvatarIdentity::cache_key()` derives an opaque display key by hashing the
   internal identity digest under a cache-key domain instead of returning raw
   digest bytes. Cache keys are still stable correlators for the same identity
@@ -113,7 +121,10 @@
   so pixel data is cleared during normal returns, encoder errors, and unwinding
   panics. Encoded output is accumulated in a local `SanitizingVec` until
   successful return, so partially encoded bytes are scrubbed on encoder errors.
-  JPEG export also wraps the temporary RGB flattening buffer in `SanitizingVec`.
+  The encoded-output writer owns its allocation and performs growth by copying
+  into a replacement allocation, sanitizing the retired allocation, and only
+  then installing the replacement. JPEG export also wraps the temporary RGB
+  flattening buffer in `SanitizingVec`.
   Returned encoded bytes and images returned by render APIs are caller-owned
   and must be cleared by the caller if their environment requires that. The
   README includes `sanitization` examples for returned `Vec<u8>` and
@@ -148,7 +159,13 @@
   images, widens scanline interpolation math before rounding, and is covered by
   a dedicated fuzz harness for arbitrary image dimensions, degenerate polygons,
   negative coordinates, and extreme `i32` points.
-- The SVG renderer emits generated shape markup from structured numeric values rather than from caller-provided SVG fragments.
+- The SVG renderer emits generated shape markup from structured numeric values
+  rather than from caller-provided SVG fragments. Paint-server and clip-path
+  IDs use a deterministic namespace derived from the opaque identity cache key,
+  dimensions, frame shape, and background. Different generated assets can
+  therefore be embedded inline in one document without resolving references to
+  another asset's definitions. These IDs are stable public correlators, not
+  authentication secrets.
 - SVG output is covered by parser-backed well-formedness tests across every
   avatar family, background mode, representative identity inputs, and every
   public visual-layer option. The fuzz harness also parses rendered SVG with
@@ -159,6 +176,13 @@
 - Golden fingerprint tests protect deterministic rendering output.
 - The crate package excludes fuzz harnesses and generated build output.
 - `scripts/checks.sh` runs formatting, metadata, dependency, unsafe-boundary, panic-policy, tests, `cargo deny`, and `cargo audit`.
+- Stable release mode fails closed when the pinned Kani verifier/toolchain or
+  `cargo-sbom` is unavailable. The ordinary local check mode may report an
+  explicit skip so contributors can run the rest of the gate without those
+  optional tools.
+- Reproducibility evidence packages the crate in two isolated target
+  directories and requires the resulting `.crate` archives to be
+  byte-identical.
 - Dependency additions and upgrades are expected to use current upstream
   documentation and latest compatible crate releases unless an older version is
   explicitly justified.

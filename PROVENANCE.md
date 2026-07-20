@@ -13,20 +13,20 @@ This repository is intended to be a code-generated avatar system.
 
 - Identity input is hashed with `SHA-512`.
 - Digest bytes are mapped into visual parameters such as proportions, colors, spacing, and facial details.
-- Final images are rendered using drawing primitives provided by Rust crates such as `image` and `imageproc`.
+- Final images are rendered using first-party geometric primitives and the
+  `image` crate's RGBA buffers and encoders.
 
 ## Current avatar families
 
-- Cat
-- Dog
-- Robot
-- Fox
-- Alien
+- Cat, dog, robot, fox, alien, monster, ghost, slime, bird, wizard, and skull
+- Paws, planet, rocket, mushroom, cactus, frog, panda, cupcake, pizza, ice
+  cream, octopus, and knight
+- Bear, penguin, dragon, ninja, astronaut, diamond, coffee cup, and shield
 
 ## Background modes
 
-- Themed
-- White
+- Themed, white, black, dark, light, and transparent
+- Polka dot, striped, checkerboard, grid, sunrise, ocean, and starry
 
 ## Practical implication
 
@@ -34,6 +34,6 @@ The repository is materially different from avatar systems that depend on pre-ma
 
 ## Output formats
 
-- Lossless WebP
-- PNG
-- SVG
+- Lossless WebP is available in default builds.
+- PNG, JPEG, and GIF are explicit opt-in Cargo features.
+- SVG string rendering is available without an encoder feature.

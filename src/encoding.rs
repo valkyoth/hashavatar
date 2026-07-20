@@ -5,10 +5,7 @@ pub(crate) fn encode_rgba_image(
     format: AvatarOutputFormat,
 ) -> ImageResult<Vec<u8>> {
     let mut bytes = SanitizingVec::with_capacity(image.as_raw().len());
-    let result = {
-        let cursor = Cursor::new(bytes.as_mut_vec());
-        encode_into_writer(image, format, cursor)
-    };
+    let result = encode_into_writer(image, format, &mut bytes);
     match result {
         Ok(()) => Ok(bytes.into_inner()),
         Err(error) => Err(error),
@@ -28,11 +25,11 @@ pub(crate) struct SanitizingRgbaImage {
 }
 
 impl SanitizingRgbaImage {
-    fn new(image: RgbaImage) -> Self {
+    pub(crate) fn new(image: RgbaImage) -> Self {
         Self { image }
     }
 
-    fn as_image(&self) -> &RgbaImage {
+    pub(crate) fn as_image(&self) -> &RgbaImage {
         &self.image
     }
 }
@@ -64,10 +61,6 @@ impl SanitizingVec {
         Self { bytes }
     }
 
-    fn as_mut_vec(&mut self) -> &mut Vec<u8> {
-        &mut self.bytes
-    }
-
     #[cfg(feature = "jpeg")]
     fn as_slice(&self) -> &[u8] {
         &self.bytes
@@ -75,6 +68,34 @@ impl SanitizingVec {
 
     fn into_inner(mut self) -> Vec<u8> {
         std::mem::take(&mut self.bytes)
+    }
+}
+
+impl std::io::Write for SanitizingVec {
+    fn write(&mut self, input: &[u8]) -> std::io::Result<usize> {
+        let required = self
+            .bytes
+            .len()
+            .checked_add(input.len())
+            .ok_or_else(|| std::io::Error::other("encoded output length overflow"))?;
+
+        if required > self.bytes.capacity() {
+            let new_capacity = required.checked_next_power_of_two().unwrap_or(required);
+            let mut replacement = Vec::new();
+            replacement
+                .try_reserve_exact(new_capacity)
+                .map_err(std::io::Error::other)?;
+            replacement.extend_from_slice(&self.bytes);
+            volatile_sanitize_vec(&mut self.bytes);
+            self.bytes = replacement;
+        }
+
+        self.bytes.extend_from_slice(input);
+        Ok(input.len())
+    }
+
+    fn flush(&mut self) -> std::io::Result<()> {
+        Ok(())
     }
 }
 
@@ -138,4 +159,24 @@ pub(crate) fn rgba_to_rgb_over_white(image: &RgbaImage) -> Vec<u8> {
         rgb.push(((u32::from(blue) * alpha + 255 * inverse_alpha + 127) / 255) as u8);
     }
     rgb
+}
+
+#[cfg(test)]
+mod tests {
+    use std::io::Write;
+
+    use super::SanitizingVec;
+
+    #[test]
+    fn sanitizing_writer_preserves_bytes_across_controlled_growth() {
+        let mut bytes = SanitizingVec::with_capacity(2);
+        bytes
+            .write_all(b"ab")
+            .expect("initial write should succeed");
+        bytes
+            .write_all(b"cdefgh")
+            .expect("growth write should succeed");
+
+        assert_eq!(bytes.into_inner(), b"abcdefgh");
+    }
 }

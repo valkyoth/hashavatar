@@ -28,7 +28,6 @@ compile_error!(
     "hashavatar's fuzzing feature exposes internal fuzz harness entry points and must not be enabled in non-fuzzing release builds"
 );
 
-use std::io::Cursor;
 use std::mem::swap;
 use std::str::FromStr;
 

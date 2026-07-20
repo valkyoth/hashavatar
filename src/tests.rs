@@ -804,9 +804,32 @@ fn decorative_svg_backgrounds_use_structured_defs() {
         );
 
         assert_svg_is_well_formed(&svg);
-        assert!(svg.contains("hashavatar-bg-"), "{background}");
+        assert!(svg.contains("-bg-"), "{background}");
         assert!(!svg.contains("<script"), "{background}");
     }
+}
+
+#[test]
+fn svg_definition_ids_are_namespaced_per_identity() {
+    let spec = valid_spec(128, 128, 0);
+    let options = AvatarOptions::new(AvatarKind::Robot, AvatarBackground::Grid);
+    let left = render_avatar_svg_for_id(spec, "left@example.com", options);
+    let right = render_avatar_svg_for_id(spec, "right@example.com", options);
+
+    let left_document = roxmltree::Document::parse(&left).expect("left SVG should parse");
+    let right_document = roxmltree::Document::parse(&right).expect("right SVG should parse");
+    let left_id = left_document
+        .descendants()
+        .find_map(|node| node.attribute("id"))
+        .expect("left SVG should contain a definition ID");
+    let right_id = right_document
+        .descendants()
+        .find_map(|node| node.attribute("id"))
+        .expect("right SVG should contain a definition ID");
+
+    assert_ne!(left_id, right_id);
+    assert!(left.contains(&format!("url(#{left_id})")));
+    assert!(right.contains(&format!("url(#{right_id})")));
 }
 
 #[test]
@@ -1760,8 +1783,14 @@ fn non_square_svg_frame_shapes_clip_content() {
     );
     let svg = render_avatar_svg_style_for_id(spec, "shape-clip@example.com", shaped);
 
-    assert!(svg.contains(r#"<defs><clipPath id="hashavatar-frame-clip">"#));
-    assert!(svg.contains(r#"<g clip-path="url(#hashavatar-frame-clip)">"#));
+    let document = roxmltree::Document::parse(&svg).expect("shaped SVG should parse");
+    let clip_id = document
+        .descendants()
+        .find(|node| node.tag_name().name() == "clipPath")
+        .and_then(|node| node.attribute("id"))
+        .expect("non-square SVG should define a clip path");
+    assert!(clip_id.starts_with("hashavatar-"));
+    assert!(svg.contains(&format!(r#"<g clip-path="url(#{clip_id})">"#)));
     assert!(svg.contains(r#"data-layer="shape-hexagon""#));
 
     let square = render_avatar_svg_style_for_id(
@@ -2054,9 +2083,30 @@ fn encoded_output_buffer_is_sanitizing_until_success() {
         .expect("encode helper should exist");
 
     assert!(helper.contains("SanitizingVec::with_capacity"));
-    assert!(helper.contains("encode_into_writer(image, format, cursor)"));
+    assert!(helper.contains("encode_into_writer(image, format, &mut bytes)"));
+    assert!(!helper.contains("as_mut_vec"));
     assert!(helper.contains("Ok(()) => Ok(bytes.into_inner())"));
     assert!(helper.contains("Err(error) => Err(error)"));
+}
+
+#[test]
+fn encode_avatar_rejects_custom_renderer_dimension_mismatch() {
+    struct MismatchedRenderer;
+
+    impl AvatarRenderer for MismatchedRenderer {
+        fn render(&self, spec: AvatarSpec) -> Result<RgbaImage, AvatarSpecError> {
+            Ok(RgbaImage::new(spec.width() + 1, spec.height()))
+        }
+    }
+
+    let error = encode_avatar(
+        &MismatchedRenderer,
+        valid_spec(64, 64, 0),
+        AvatarOutputFormat::WebP,
+    )
+    .expect_err("mismatched renderer output must be rejected");
+
+    assert!(matches!(error, ImageError::Limits(_)));
 }
 
 #[test]

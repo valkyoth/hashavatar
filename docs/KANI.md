@@ -10,8 +10,10 @@ a whole-crate formal verification claim and do not prove image-codec internals.
 - Active release toolchain: Rust `1.97.1`.
 - Kani verifier toolchain: Rust `1.90.0`.
 - Locally targeted Kani: `cargo-kani 0.67.0`.
-- Current result: `scripts/check_kani.sh` verifies 4 bounded
-  no-default-features harnesses with 0 failures.
+- Current admitted harness count: `5`.
+- Current result: `scripts/check_kani.sh` verifies all five bounded
+  no-default-features harnesses with 0 failures when the documented verifier is
+  available.
 
 Kani runs are compiler-integration-sensitive because Kani is a verifier with
 its own compiler integration. Updating the normal development toolchain does
@@ -46,10 +48,11 @@ cargo kani --harness <name> --no-default-features
 The explicit list keeps the release gate practical for this image-generation
 crate and avoids depending on full-crate harness discovery behavior.
 
-If Kani is not installed, the Rust `1.90.0` verifier toolchain is not present,
-or the installed Kani compiler is incompatible with this crate, the script
-prints an explicit skip and exits successfully. The stable release gate treats
-that as a policy skip, not as completed formal verification.
+Without arguments, missing or incompatible Kani tooling produces an explicit
+successful skip so contributors can run the remaining local checks. Stable
+release mode invokes `scripts/check_kani.sh --required`; missing tooling, a
+missing Rust `1.90.0` verifier toolchain, or compiler incompatibility then fails
+closed and blocks the release.
 
 ## Harness Scope
 
@@ -82,17 +85,11 @@ the Kani harness avoids overclaiming table-selection proof coverage.
 
 ## Release Policy
 
-For each future release, the project must choose one of these outcomes:
-
-- run Kani proofs with a compatible Kani release
-- pin a documented compatible Kani workflow
-- document a verifier exception and the replacement evidence required before
-  release
-
-Replacement evidence may include deterministic tests, golden fingerprints,
-fuzz-corpus evidence, panic-policy validation, dependency review, generated SVG
-parser coverage, and release metadata checks, but it must be named explicitly.
-A Kani skip is not the same as a proof.
+Every stable release must run all admitted harnesses with the documented Kani
+version and verifier toolchain. A missing verifier, incompatible compiler, or
+failed harness blocks `scripts/stable_release_gate.sh release`. Updating the
+Kani/toolchain pairing requires updating this document and passing the complete
+admitted harness set before release.
 
 ## Upgrade Guidance
 

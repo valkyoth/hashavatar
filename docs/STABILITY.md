@@ -11,11 +11,12 @@ The crate follows Cargo semver for exported Rust API items:
 - Changing public function signatures, error types, constructor behavior, or
   feature names requires a major version unless the change is strictly
   additive and source-compatible.
-- Adding new enum variants to public non-exhaustive-style option enums such as
-  `AvatarKind`, `AvatarBackground`, `AvatarAccessory`, `AvatarColor`,
-  `AvatarExpression`, `AvatarShape`, or `AvatarOutputFormat` is allowed in a
-  minor release. Callers should include wildcard arms when matching these
-  enums if they want minor-version compatibility.
+- `AvatarKind`, `AvatarBackground`, `AvatarAccessory`, `AvatarColor`,
+  `AvatarExpression`, `AvatarShape`, and `AvatarOutputFormat` are currently
+  exhaustive Rust enums; they are not marked `#[non_exhaustive]`.
+- Adding a variant to one of those enums is therefore a breaking API change and
+  is not allowed in the remaining 1.x series. New variants require a major
+  release or a new additive type that does not alter an existing enum.
 - New optional Cargo features may be added in minor releases when they are
   disabled by default and documented.
 
@@ -30,17 +31,17 @@ crate identity hash mode + namespace tenant + namespace style version + identity
 
 Within a major release, patch releases should not intentionally change output
 for the same tuple except to fix a correctness or security bug. Minor releases
-may add variants or visual capabilities, and release notes must state whether
-automatic style distribution changes.
+may add source-compatible APIs and opt-in capabilities, but existing exhaustive
+enum variant sets remain frozen for 1.x.
 
 `AvatarOptions` keeps `accessory = none`, `color = default`,
 `expression = default`, and `shape = square`. `AvatarStyleOptions` includes the
 full visual-layer tuple.
 
-Automatic style rendering derives options from public enum `ALL` lists. Adding
-a variant can change automatic distribution. Services that need controlled
-rollouts should use `AvatarNamespace::new(tenant, style_version)` and only bump
-`style_version` when they are ready for a new visual distribution.
+Automatic style rendering derives options from public enum `ALL` lists. Those
+lists remain frozen with their enums for the rest of 1.x. The 2.0 migration may
+introduce explicitly versioned catalogs; services should continue using
+`AvatarNamespace::new(tenant, style_version)` for controlled visual rollouts.
 
 ## Security And Resource Contract
 
