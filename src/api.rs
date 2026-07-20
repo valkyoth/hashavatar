@@ -491,8 +491,7 @@ impl AvatarRenderPlan {
 
     fn svg_definition_prefix(&self) -> String {
         format!(
-            "hashavatar-{}-{}x{}-{}-{}",
-            self.identity.cache_key(),
+            "hashavatar-{}x{}-{}-{}",
             self.spec.width,
             self.spec.height,
             self.style.shape.as_str(),

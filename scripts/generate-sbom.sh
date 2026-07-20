@@ -27,8 +27,13 @@ fail_or_skip() {
 output_dir="${HASHAVATAR_SBOM_DIR:-target/release-evidence}"
 mkdir -p "$output_dir"
 
-if ! cargo sbom --version >/dev/null 2>&1; then
+if ! actual_sbom="$(cargo sbom --version 2>/dev/null)"; then
     fail_or_skip "install with: cargo install --locked cargo-sbom --version 0.10.0"
+fi
+
+expected_sbom="cargo-sbom 0.10.0"
+if [ "$actual_sbom" != "$expected_sbom" ]; then
+    fail_or_skip "expected $expected_sbom, found $actual_sbom"
 fi
 
 spdx_output="$output_dir/hashavatar.spdx.json"

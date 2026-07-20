@@ -4,8 +4,8 @@ set -eu
 work_root="$(mktemp -d)"
 trap 'rm -rf "$work_root"' EXIT
 
-first_target="${HASHAVATAR_REPRO_TARGET_A:-$work_root/reproducible-a}"
-second_target="${HASHAVATAR_REPRO_TARGET_B:-$work_root/reproducible-b}"
+first_target="$work_root/reproducible-a"
+second_target="$work_root/reproducible-b"
 package_name="$(sed -n 's/^name = "\([^"]*\)"/\1/p' Cargo.toml | sed -n '1p')"
 version="$(sed -n 's/^version = "\([^"]*\)"/\1/p' Cargo.toml | sed -n '1p')"
 

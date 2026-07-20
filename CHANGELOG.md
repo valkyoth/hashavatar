@@ -7,10 +7,12 @@
   by routing encoders through a sanitizing writer with controlled replacement.
 - Rejected custom renderer output whose dimensions or RGBA length do not match
   the validated `AvatarSpec` before encoding.
-- Namespaced generated SVG definition IDs so multiple inline avatars cannot
-  resolve clip paths or paint servers from another generated asset.
-- Made stable release mode fail closed when Kani or SBOM tooling is unavailable
-  and changed reproducibility evidence to compare complete `.crate` archives.
+- Namespaced generated SVG definition IDs using only dimensions, frame shape,
+  and background, preventing both cross-asset definition mismatches and
+  identity cache-key disclosure.
+- Made stable release mode require exact Kani and SBOM tool versions and changed
+  reproducibility evidence to compare complete `.crate` archives in two
+  non-overrideable temporary target directories.
 - Updated `sanitization` and `sanitization-crypto-interop` from `1.2.4` to
   `1.2.5`, `serde` from `1.0.228` to `1.0.229`, optional `xxhash-rust` from
   `0.8.16` to `0.8.17`, and development `serde_json` from `1.0.150` to
@@ -27,7 +29,8 @@
   the workspace split begins at `2.0.0-alpha.1`.
 - Updated README dependency examples, provenance, security controls, and
   release metadata for `1.1.3`. Raster fingerprints remain unchanged; SVG
-  definition IDs intentionally change for safe inline composition.
+  definition IDs intentionally change for safe, identity-independent inline
+  composition.
 
 ## 1.1.2
 

@@ -66,7 +66,7 @@
   arbitrary caller-defined storage. High-assurance integrations should pass a
   short-lived borrow to sanitized storage or, preferably, derive a keyed
   pseudonym first and build only from that pseudonym. The prepared,
-  identity-only builder boundary is planned for the 1.2 contract work.
+  identity-only request/builder boundary is planned for the 1.3 migration API.
 - `AvatarIdentity::cache_key()` derives an opaque display key by hashing the
   internal identity digest under a cache-key domain instead of returning raw
   digest bytes. Cache keys are still stable correlators for the same identity
@@ -161,11 +161,10 @@
   negative coordinates, and extreme `i32` points.
 - The SVG renderer emits generated shape markup from structured numeric values
   rather than from caller-provided SVG fragments. Paint-server and clip-path
-  IDs use a deterministic namespace derived from the opaque identity cache key,
-  dimensions, frame shape, and background. Different generated assets can
-  therefore be embedded inline in one document without resolving references to
-  another asset's definitions. These IDs are stable public correlators, not
-  authentication secrets.
+  IDs use a deterministic namespace derived only from dimensions, frame shape,
+  and background. Definitions that differ receive different IDs, while
+  identical definitions can safely share an ID when multiple avatars are
+  embedded inline. Identity digests and cache keys are not included in SVG IDs.
 - SVG output is covered by parser-backed well-formedness tests across every
   avatar family, background mode, representative identity inputs, and every
   public visual-layer option. The fuzz harness also parses rendered SVG with
@@ -176,13 +175,14 @@
 - Golden fingerprint tests protect deterministic rendering output.
 - The crate package excludes fuzz harnesses and generated build output.
 - `scripts/checks.sh` runs formatting, metadata, dependency, unsafe-boundary, panic-policy, tests, `cargo deny`, and `cargo audit`.
-- Stable release mode fails closed when the pinned Kani verifier/toolchain or
-  `cargo-sbom` is unavailable. The ordinary local check mode may report an
-  explicit skip so contributors can run the rest of the gate without those
-  optional tools.
+- Stable release mode requires exactly `cargo-kani 0.67.0`, its pinned Rust
+  `1.90.0` verifier toolchain, and `cargo-sbom 0.10.0`. Missing or mismatched
+  tooling fails closed. The ordinary local check mode may report an explicit
+  skip so contributors can run the rest of the gate without those tools.
 - Reproducibility evidence packages the crate in two isolated target
-  directories and requires the resulting `.crate` archives to be
-  byte-identical.
+  directories under one fresh private temporary root and requires the resulting
+  `.crate` archives to be byte-identical. Environment variables cannot override
+  the two evidence paths.
 - Dependency additions and upgrades are expected to use current upstream
   documentation and latest compatible crate releases unless an older version is
   explicitly justified.

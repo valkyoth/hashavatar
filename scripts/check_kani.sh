@@ -38,8 +38,13 @@ cargo_kani() {
     rustup run "$kani_toolchain" cargo kani "$@"
 }
 
-if ! cargo_kani --version >/dev/null 2>&1; then
+if ! actual_kani="$(cargo_kani --version 2>/dev/null)"; then
     fail_or_skip "cargo kani is not installed"
+fi
+
+expected_kani="cargo-kani 0.67.0"
+if [ "$actual_kani" != "$expected_kani" ]; then
+    fail_or_skip "expected $expected_kani, found $actual_kani"
 fi
 
 log="$(mktemp)"

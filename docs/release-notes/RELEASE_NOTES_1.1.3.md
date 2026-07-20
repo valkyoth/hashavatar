@@ -10,12 +10,14 @@ public Rust API, Cargo feature names, raster rendering, or raster fingerprints.
   growth and clears a retired allocation before replacing it.
 - Added strict dimension and RGBA-length validation for output returned by
   custom `AvatarRenderer` implementations before encoding.
-- Namespaced SVG paint-server and clip-path IDs per generated asset to prevent
-  cross-resolution when multiple avatars are embedded inline in one document.
-- Made stable release mode require Kani and SBOM tooling instead of accepting
-  explicit skips.
+- Namespaced SVG paint-server and clip-path IDs using only dimensions, frame
+  shape, and background. Differing definitions cannot cross-resolve, and SVG
+  output does not disclose an identity-derived cache key.
+- Made stable release mode require exactly `cargo-kani 0.67.0`, its documented
+  Rust `1.90.0` verifier toolchain, and `cargo-sbom 0.10.0`.
 - Replaced filename-list reproducibility evidence with two isolated package
-  builds whose complete `.crate` archives must be byte-identical.
+  builds whose non-overrideable target directories are created under a fresh
+  temporary root and whose complete `.crate` archives must be byte-identical.
 
 ## Documentation Corrections
 
@@ -47,9 +49,9 @@ public Rust API, Cargo feature names, raster rendering, or raster fingerprints.
   `1.0.151`. Compatible transitive lockfile dependencies were also refreshed.
 - No intentional raster, identity, cache-key, or encoded-output changes; golden
   raster fingerprints remain unchanged.
-- SVG definition IDs intentionally change. SVG geometry and appearance remain
-  unchanged, but consumers comparing complete SVG strings must account for the
-  corrected namespacing.
+- SVG definition IDs intentionally change without embedding identity-derived
+  material. SVG geometry and appearance remain unchanged, but consumers
+  comparing complete SVG strings must account for the corrected namespacing.
 - Rust `1.90.0` remains the MSRV and Rust `1.97.1` remains the pinned
   development toolchain.
 

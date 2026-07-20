@@ -124,8 +124,20 @@ then
     exit 1
 fi
 
+if ! grep -q 'expected_kani="cargo-kani 0.67.0"' scripts/check_kani.sh \
+    || ! grep -q 'expected_sbom="cargo-sbom 0.10.0"' scripts/generate-sbom.sh
+then
+    echo "release metadata: Kani and SBOM tool versions must remain pinned" >&2
+    exit 1
+fi
+
 if ! grep -q 'cmp "$first_crate" "$second_crate"' scripts/reproducible_build_check.sh; then
     echo "release metadata: reproducibility check must compare complete crate archives" >&2
+    exit 1
+fi
+
+if grep -q 'HASHAVATAR_REPRO_TARGET_' scripts/reproducible_build_check.sh; then
+    echo "release metadata: reproducibility target isolation must not be overrideable" >&2
     exit 1
 fi
 

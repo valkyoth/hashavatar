@@ -810,11 +810,12 @@ fn decorative_svg_backgrounds_use_structured_defs() {
 }
 
 #[test]
-fn svg_definition_ids_are_namespaced_per_identity() {
+fn svg_definition_ids_do_not_expose_identity_correlators() {
     let spec = valid_spec(128, 128, 0);
     let options = AvatarOptions::new(AvatarKind::Robot, AvatarBackground::Grid);
     let left = render_avatar_svg_for_id(spec, "left@example.com", options);
     let right = render_avatar_svg_for_id(spec, "right@example.com", options);
+    let resized = render_avatar_svg_for_id(valid_spec(129, 128, 0), "left@example.com", options);
 
     let left_document = roxmltree::Document::parse(&left).expect("left SVG should parse");
     let right_document = roxmltree::Document::parse(&right).expect("right SVG should parse");
@@ -826,10 +827,19 @@ fn svg_definition_ids_are_namespaced_per_identity() {
         .descendants()
         .find_map(|node| node.attribute("id"))
         .expect("right SVG should contain a definition ID");
+    let resized_document = roxmltree::Document::parse(&resized).expect("resized SVG should parse");
+    let resized_id = resized_document
+        .descendants()
+        .find_map(|node| node.attribute("id"))
+        .expect("resized SVG should contain a definition ID");
+    let cache_key = valid_identity("left@example.com").cache_key();
 
-    assert_ne!(left_id, right_id);
+    assert_eq!(left_id, right_id);
+    assert_ne!(left_id, resized_id);
+    assert!(!left.contains(&cache_key));
     assert!(left.contains(&format!("url(#{left_id})")));
     assert!(right.contains(&format!("url(#{right_id})")));
+    assert!(resized.contains(&format!("url(#{resized_id})")));
 }
 
 #[test]

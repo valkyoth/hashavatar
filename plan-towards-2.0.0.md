@@ -628,7 +628,7 @@ branch, not in published 1.x packages.
 
 ### v1.1.3 - Policy Corrections
 
-**Status:** Initial pentest findings addressed; awaiting exact-commit retest.
+**Status:** Retest findings addressed; awaiting final exact-commit retest.
 
 **Goal:** Make current documentation and checks accurately describe 1.1.x.
 

@@ -50,9 +50,9 @@ crate and avoids depending on full-crate harness discovery behavior.
 
 Without arguments, missing or incompatible Kani tooling produces an explicit
 successful skip so contributors can run the remaining local checks. Stable
-release mode invokes `scripts/check_kani.sh --required`; missing tooling, a
-missing Rust `1.90.0` verifier toolchain, or compiler incompatibility then fails
-closed and blocks the release.
+release mode invokes `scripts/check_kani.sh --required`; anything other than
+exactly `cargo-kani 0.67.0`, a missing Rust `1.90.0` verifier toolchain, or
+compiler incompatibility then fails closed and blocks the release.
 
 ## Harness Scope
 

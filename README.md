@@ -72,8 +72,8 @@ Implemented now:
 - Local release gates for formatting, clippy, tests, docs, dependency policy,
   RustSec advisories, bounded Kani proofs, package contents, SBOM generation,
   byte-identical `.crate` package checks, and crates.io publish dry runs. Stable
-  release mode requires Kani and SBOM tooling; ordinary check mode may report
-  explicit tooling skips.
+  release mode requires the documented exact Kani and SBOM tool versions;
+  ordinary check mode may report explicit tooling skips.
 
 Planned or intentionally external:
 
