@@ -37,10 +37,14 @@
 - Updated `sanitization` and `sanitization-crypto-interop` from `1.2.5` to
   `2.0.1`, adopting the 2.x `sanitization::wipe` API while retaining the
   existing bounded secret-container and cleaned crypto-hasher boundaries.
+- Updated immutable GitHub Actions pins to `actions/checkout` `v7.0.1` and
+  `taiki-e/install-action` `v2.84.0`; confirmed `Swatinem/rust-cache` remains
+  current at `v2.9.1`.
 - Kept keyed identity derivation outside Hashavatar 1.x. Applications that need
   dictionary resistance should derive a tenant/domain pseudonym with a managed
   key before constructing an avatar identity.
 - Bumped crate and fuzz path dependency metadata to `1.2.0`.
+- Confirmed all direct crate dependencies are current before release.
 - Existing raster golden fingerprints remain unchanged.
 
 ## 1.1.3

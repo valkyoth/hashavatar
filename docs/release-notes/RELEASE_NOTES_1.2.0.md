@@ -45,7 +45,7 @@ APIs and pixels remain compatible.
   their exact previous output for existing caches.
 - Added `examples/asset_keys.rs` for the recommended typed-key workflow.
 
-All three key types are public cache identifiers. They support stable storage
+All typed key values are public cache identifiers. They support stable storage
 and correlation; they are not secrets, password hashes, or authorization
 tokens.
 
@@ -65,6 +65,10 @@ crate from implying a key-management guarantee it cannot enforce.
   `sanitization::wipe::vec`.
 - The 2.x dependencies retain the crate's Rust `1.90.0` MSRV and the existing
   SHA-512/BLAKE3 internal-state cleanup boundary.
+- Confirmed every direct crate dependency is current.
+- Updated immutable GitHub Actions pins to `actions/checkout` `v7.0.1` and
+  `taiki-e/install-action` `v2.84.0`; `Swatinem/rust-cache` remains current at
+  `v2.9.1`.
 
 ## Verification
 
@@ -90,5 +94,6 @@ crate from implying a key-management guarantee it cannot enforce.
   all five Kani proofs, byte-identical package archives, required SBOM
   generation, and crates.io publish dry-run.
 
-`1.2.0` must still complete independent pentest, GitHub validation, and
-downstream `hashavatar-website` integration testing before tagging.
+`1.2.0` has completed independent pentesting and the local release gate. It
+must still complete GitHub validation and downstream `hashavatar-website`
+integration testing before tagging.
