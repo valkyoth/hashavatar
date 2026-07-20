@@ -199,4 +199,5 @@ must include regression tests whenever the behavior can be tested locally.
 
 The crate does not ship an HTTP server. Public web/API concerns such as request
 concurrency, maximum simultaneous large renders, rate limiting, CDN caching,
-security headers, observability, and abuse controls belong in `hashavatar-api`.
+security headers, observability, and abuse controls belong in the integrating
+application. `hashavatar-website` is the hosted reference implementation.

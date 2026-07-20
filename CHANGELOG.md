@@ -31,6 +31,9 @@
   release metadata for `1.1.3`. Raster fingerprints remain unchanged; SVG
   definition IDs intentionally change for safe, identity-independent inline
   composition.
+- Updated current integration documentation for the renamed
+  `hashavatar-website` reference project and recorded the clean pentest retest
+  before the final documentation-only readiness commit.
 
 ## 1.1.2
 

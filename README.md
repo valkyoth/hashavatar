@@ -77,7 +77,9 @@ Implemented now:
 
 Planned or intentionally external:
 
-- HTTP serving, rate limits, cache headers, security headers, observability, and abuse controls live in [`hashavatar-api`](https://github.com/valkyoth/hashavatar-api).
+- HTTP serving, rate limits, cache headers, security headers, observability, and
+  abuse controls live at the application boundary. The hosted reference
+  implementation is [`hashavatar-website`](https://github.com/valkyoth/hashavatar-website).
 - AVIF is planned behind an explicit formats boundary for 2.0 and requires
   dependency-policy review before admission. JPEG XL is currently unplanned.
 - Larger identity inputs should be normalized or mapped by the application before calling this crate.
@@ -964,7 +966,9 @@ The repository is intended to remain code-generated and asset-free. For a direct
 
 ## Web API And Demo
 
-The crate is focused on reusable rendering code. The public HTTP API and demo website live in the separate [`hashavatar-api`](https://github.com/valkyoth/hashavatar-api) project.
+The crate is focused on reusable rendering code. The public generator and
+reference website live in the separate
+[`hashavatar-website`](https://github.com/valkyoth/hashavatar-website) project.
 
 ## Changelog
 

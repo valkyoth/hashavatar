@@ -628,7 +628,9 @@ branch, not in published 1.x packages.
 
 ### v1.1.3 - Policy Corrections
 
-**Status:** Retest findings addressed; awaiting final exact-commit retest.
+**Status:** Release-ready. The runtime and release-control state at `7d0cb53`
+passed the final pentest retest; the final readiness commit is documentation
+only and awaits GitHub validation before tagging.
 
 **Goal:** Make current documentation and checks accurately describe 1.1.x.
 

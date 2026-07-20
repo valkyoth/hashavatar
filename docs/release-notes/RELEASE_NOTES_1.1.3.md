@@ -39,6 +39,8 @@ public Rust API, Cargo feature names, raster rendering, or raster fingerprints.
   `1.3.0`; the workspace split starts at `2.0.0-alpha.1`.
 - Kept JPEG XL unplanned. GPU, AVIF, schema, and heapless storage remain
   explicit 2.0 deliverables behind optional crate or feature boundaries.
+- Updated service-boundary links for the renamed `hashavatar-website` hosted
+  reference implementation.
 
 ## Compatibility
 
@@ -63,3 +65,7 @@ one explicitly ignored diagnostic test, the doctest, MSRV feature combinations,
 documentation, cargo-deny, RustSec audit, fuzz harness compilation, all five
 bounded Kani harnesses, byte-identical `.crate` packaging, SBOM generation, and
 a crates.io publish dry run.
+
+The runtime and release-control state at commit `7d0cb53` completed the final
+independent pentest retest without an unaccepted finding. The subsequent
+release-readiness commit changes documentation only before GitHub validation.

@@ -39,7 +39,9 @@ keep the smaller conservative dependency graph and only compile extra support
 they use. The `blake3` and `xxh3` features are mutually exclusive because
 identity hashing is a crate-wide mode, not a runtime selection.
 
-The crate must not depend on web frameworks, async runtimes, network clients, or service infrastructure. Those concerns belong in `hashavatar-api`.
+The crate must not depend on web frameworks, async runtimes, network clients,
+or service infrastructure. Those concerns belong in integrating applications;
+`hashavatar-website` is the hosted reference implementation.
 
 Dependency changes should be reviewed for:
 
