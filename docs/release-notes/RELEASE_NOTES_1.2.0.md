@@ -94,6 +94,6 @@ crate from implying a key-management guarantee it cannot enforce.
   all five Kani proofs, byte-identical package archives, required SBOM
   generation, and crates.io publish dry-run.
 
-`1.2.0` has completed independent pentesting and the local release gate. It
-must still complete GitHub validation and downstream `hashavatar-website`
-integration testing before tagging.
+`1.2.0` completed independent pentesting, the full local release gate, GitHub
+validation, and downstream `hashavatar-website` integration testing before
+tagging.
