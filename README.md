@@ -86,7 +86,7 @@ Planned or intentionally external:
 | --- | --- |
 | License | `MIT OR Apache-2.0` |
 | MSRV | Rust `1.90.0` |
-| Development toolchain | Rust `1.97.0` |
+| Development toolchain | Rust `1.97.1` |
 | Crate shape | Library only |
 | Runtime graph | `image`, `palette`, `rand`, `sanitization`, `sanitization-crypto-interop`, transitive `sha2`, `subtle`; optional `blake3`, `xxhash-rust`, `image/png`, `image/jpeg`, `image/gif` |
 | Unsafe policy | `#![forbid(unsafe_code)]` |
@@ -110,9 +110,9 @@ to split it.
 
 The minimum supported Rust version is Rust `1.90.0`, as declared by
 `Cargo.toml`. Local development and release checks use the pinned
-`rust-toolchain.toml` toolchain, currently Rust `1.97.0`. CI also checks back
+`rust-toolchain.toml` toolchain, currently Rust `1.97.1`. CI also checks back
 to Rust `1.90.0` so the MSRV stays honest. New deployments should prefer the
-latest stable Rust; as of July 10, 2026, that is Rust `1.97.0`.
+latest stable Rust; as of July 20, 2026, that is Rust `1.97.1`.
 
 Compatibility evidence for `1.1.2`:
 
@@ -127,6 +127,7 @@ Compatibility evidence for `1.1.2`:
 | `1.96.0` | ✓ `cargo check --features all-formats` |
 | `1.96.1` | ✓ `cargo check --features all-formats` |
 | `1.97.0` | ✓ full release gate; ✓ `cargo check --features all-formats` |
+| `1.97.1` | ✓ full release gate; ✓ `cargo check --features all-formats` |
 
 Optional hash modes are mutually exclusive, so `hashavatar` cannot use a single
 `--all-features` evidence run.

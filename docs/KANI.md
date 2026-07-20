@@ -7,7 +7,7 @@ a whole-crate formal verification claim and do not prove image-codec internals.
 
 ## Current Status
 
-- Active release toolchain: Rust `1.97.0`.
+- Active release toolchain: Rust `1.97.1`.
 - Kani verifier toolchain: Rust `1.90.0`.
 - Locally targeted Kani: `cargo-kani 0.67.0`.
 - Current result: `scripts/check_kani.sh` verifies 4 bounded
@@ -33,7 +33,7 @@ By default, `scripts/check_kani.sh` runs through the documented
 experiments:
 
 ```sh
-HASHAVATAR_KANI_TOOLCHAIN=1.97.0-x86_64-unknown-linux-gnu scripts/check_kani.sh
+HASHAVATAR_KANI_TOOLCHAIN=1.97.1-x86_64-unknown-linux-gnu scripts/check_kani.sh
 ```
 
 If the installed Kani compiler is compatible, `scripts/check_kani.sh` runs the

@@ -34,8 +34,8 @@ if [ "$cargo_rust_version" != "1.90" ]; then
     exit 1
 fi
 
-if [ "$toolchain_version" != "1.97.0" ]; then
-    echo "release metadata: rust-toolchain.toml channel must be the development toolchain 1.97.0, got $toolchain_version" >&2
+if [ "$toolchain_version" != "1.97.1" ]; then
+    echo "release metadata: rust-toolchain.toml channel must be the development toolchain 1.97.1, got $toolchain_version" >&2
     exit 1
 fi
 
