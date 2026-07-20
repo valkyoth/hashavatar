@@ -77,6 +77,25 @@
   a separately managed per-domain or per-tenant key and pass only that
   pseudonym to `hashavatar`. Key rotation changes avatar/cache identity and
   must be coordinated with cache invalidation and visual-stability policy.
+- `IdentityCacheKey`, `AvatarAssetKey`, and `EncodedAssetKey` are separate,
+  domain-separated public identifiers. The avatar key binds the active hash
+  mode, frozen catalog and render contracts, dimensions, seed, and complete
+  effective style. Unsupported legacy face layers are canonicalized before key
+  derivation so identical output has one avatar key. The semantic encoded key
+  additionally binds fixed encoder settings, but not transitive codec versions,
+  target, or build revision. Applications sharing byte caches across builds
+  should use `EncoderBuildId` with `encoded_for_build()`; content-addressed
+  stores must hash actual output bytes. These keys are correlators, not secrets,
+  content digests, or authorization tokens.
+- Unsupported accessories and expressions remain deterministic no-ops in the
+  legacy rendering APIs. Applications that accept explicit user style choices
+  can fail closed before rendering with
+  `AvatarStyleOptions::validate_strict()` or `StrictAvatarBuilder`. Automatic
+  derivation remains total under the frozen legacy compatibility behavior.
+- Hashavatar does not own keyed identity secrets in 1.x. Key storage, rotation,
+  tenant separation, and pseudonym lifetime are application policy. Sensitive,
+  guessable identifiers should be mapped through a reviewed keyed construction
+  at that boundary and only the resulting pseudonym passed to Hashavatar.
 - `AvatarIdentity` implements `Clone`; every clone is sanitized independently
   on drop. High-assurance integrations should keep identity clones
   short-lived so digest bytes do not remain live in multiple memory locations
@@ -90,13 +109,16 @@
   If a preimage ever outgrows its expected capacity, `SecretVec` clears the old
   allocation before replacing it. Process aborts and environments that bypass
   Rust destructors remain outside this cleanup guarantee.
-- SHA-512 hashing is routed through `sanitization-crypto-interop`, which enables
+- SHA-512 hashing is routed through `sanitization-crypto-interop` 2.x, which enables
   upstream `sha2` hasher cleanup for SHA-512 state. BLAKE3 hashing is routed
   through the same interop crate when the `blake3` feature is enabled, so the
   BLAKE3 hasher and XOF reader are explicitly cleared after output extraction.
   The interop crate necessarily uses those crypto crates' own cleanup hooks;
   callers that audit dependency internals should keep
   `sanitization-crypto-interop`, `sha2`, and `blake3` in scope.
+- Direct cleanup of caller-accessible byte slices and temporary `Vec<u8>`
+  allocations uses the audited `sanitization::wipe::bytes` and
+  `sanitization::wipe::vec` boundaries from Sanitization 2.x.
 - Identity hash preimage allocation is sized from the tenant, style-version,
   and identity input lengths. Debug builds verify the expected capacity and
   final length as a correctness check, while `SecretVec` cleanup remains the
@@ -118,7 +140,8 @@
   and embedded applications that use OS-backed randomness elsewhere in the same
   binary must configure and test `getrandom` for their target explicitly.
 - Encode APIs wrap temporary owned raster buffers in RAII sanitization guards,
-  so pixel data is cleared during normal returns, encoder errors, and unwinding
+  so the complete backing-vector capacity, including spare capacity from custom
+  renderers, is cleared during normal returns, encoder errors, and unwinding
   panics. Encoded output is accumulated in a local `SanitizingVec` until
   successful return, so partially encoded bytes are scrubbed on encoder errors.
   The encoded-output writer owns its allocation and performs growth by copying

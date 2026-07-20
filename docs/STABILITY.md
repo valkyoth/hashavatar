@@ -39,9 +39,34 @@ enum variant sets remain frozen for 1.x.
 full visual-layer tuple.
 
 Automatic style rendering derives options from public enum `ALL` lists. Those
-lists remain frozen with their enums for the rest of 1.x. The 2.0 migration may
-introduce explicitly versioned catalogs; services should continue using
+lists and the equivalent `CatalogVersion::LEGACY_V1` manifests remain frozen
+with their explicit IDs and weights for the rest of 1.x. The active renderer is
+identified by `RenderContractId::LEGACY_V1`. A future mapping or rendering
+contract must receive a new identifier instead of changing either legacy
+contract in place. Services should continue using
 `AvatarNamespace::new(tenant, style_version)` for controlled visual rollouts.
+
+The typed cache-key hierarchy introduced in 1.2 is also contract-versioned:
+
+- `IdentityCacheKey` covers the active identity hash mode and derived identity;
+- `AvatarAssetKey` additionally covers catalog, renderer, dimensions, seed, and
+  every effective style layer, canonicalizing legacy layers a family ignores;
+- `EncodedAssetKey` from `encoded()` additionally covers the output format and
+  fixed encoder settings as a semantic request key;
+- `EncodedAssetKey` from `encoded_for_build()` additionally binds a
+  caller-supplied `EncoderBuildId` for deployment-specific byte caches.
+
+Neither encoded-key method is a digest of actual output bytes. Content-addressed
+storage must hash the bytes after encoding. Applications own the build-ID
+policy and should include resolved codec versions, target, relevant build
+flags, and application revision whenever those can affect output.
+
+The older string `cache_key()` output remains frozen for existing 1.1 caches.
+Typed keys are the preferred path for new application caches.
+
+Legacy rendering skips unsupported face layers. Strict validation is additive:
+`AvatarStyleOptions::validate_strict()` and `StrictAvatarBuilder` reject those
+combinations without changing legacy output.
 
 ## Security And Resource Contract
 

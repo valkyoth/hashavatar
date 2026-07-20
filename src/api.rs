@@ -201,6 +201,26 @@ impl AvatarRenderPlan {
         })
     }
 
+    pub(crate) fn validate_style_strict(&self) -> Result<(), AvatarStyleValidationError> {
+        self.style.validate_strict()
+    }
+
+    pub(crate) fn avatar_asset_key(&self) -> AvatarAssetKey {
+        self.identity.avatar_asset_key(self.spec, self.style)
+    }
+
+    pub(crate) fn encoded_asset_key(&self, format: AvatarOutputFormat) -> EncodedAssetKey {
+        self.avatar_asset_key().encoded(format)
+    }
+
+    pub(crate) fn encoded_asset_key_for_build(
+        &self,
+        format: AvatarOutputFormat,
+        build_id: EncoderBuildId,
+    ) -> EncodedAssetKey {
+        self.avatar_asset_key().encoded_for_build(format, build_id)
+    }
+
     pub(crate) fn render_rgba(&self) -> Result<RgbaImage, AvatarSpecError> {
         let mut image = match self.style.kind {
             AvatarKind::Cat => render_cat_avatar_for_identity_with_background(
@@ -698,6 +718,43 @@ impl<'a, T: AsRef<[u8]>> AvatarBuilder<'a, T> {
         Ok(self.identity()?.cache_key())
     }
 
+    /// Returns a typed, domain-separated identity cache key.
+    pub fn identity_cache_key(&self) -> Result<IdentityCacheKey, AvatarError> {
+        Ok(self.identity()?.identity_cache_key())
+    }
+
+    /// Returns the complete cache key for this resolved unencoded avatar.
+    pub fn avatar_asset_key(&self) -> Result<AvatarAssetKey, AvatarError> {
+        Ok(self.render_plan()?.avatar_asset_key())
+    }
+
+    /// Returns the semantic cache key for this resolved encoded avatar.
+    pub fn encoded_asset_key(
+        &self,
+        format: AvatarOutputFormat,
+    ) -> Result<EncodedAssetKey, AvatarError> {
+        Ok(self.render_plan()?.encoded_asset_key(format))
+    }
+
+    /// Returns a deployment-specific key for this resolved encoded avatar.
+    pub fn encoded_asset_key_for_build(
+        &self,
+        format: AvatarOutputFormat,
+        build_id: EncoderBuildId,
+    ) -> Result<EncodedAssetKey, AvatarError> {
+        Ok(self
+            .render_plan()?
+            .encoded_asset_key_for_build(format, build_id))
+    }
+
+    /// Switches to an opt-in builder that rejects unsupported style layers.
+    ///
+    /// Configure the ordinary builder first, then call this method before
+    /// rendering, encoding, or deriving a complete asset key.
+    pub fn strict_style_validation(self) -> StrictAvatarBuilder<'a, T> {
+        StrictAvatarBuilder { inner: self }
+    }
+
     pub fn render(self) -> Result<RgbaImage, AvatarError> {
         self.render_plan()?.render_rgba().map_err(AvatarError::from)
     }
@@ -728,6 +785,121 @@ impl<'a, T: AsRef<[u8]>> AvatarBuilder<'a, T> {
                 self.id.as_ref(),
             )?),
         }
+    }
+}
+
+/// Error returned by opt-in strict builder operations.
+#[non_exhaustive]
+#[derive(Debug)]
+pub enum StrictAvatarError {
+    Avatar(AvatarError),
+    Style(AvatarStyleValidationError),
+}
+
+impl From<AvatarError> for StrictAvatarError {
+    fn from(error: AvatarError) -> Self {
+        Self::Avatar(error)
+    }
+}
+
+impl From<AvatarStyleValidationError> for StrictAvatarError {
+    fn from(error: AvatarStyleValidationError) -> Self {
+        Self::Style(error)
+    }
+}
+
+impl std::fmt::Display for StrictAvatarError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Avatar(error) => error.fmt(f),
+            Self::Style(error) => error.fmt(f),
+        }
+    }
+}
+
+impl std::error::Error for StrictAvatarError {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        match self {
+            Self::Avatar(error) => Some(error),
+            Self::Style(error) => Some(error),
+        }
+    }
+}
+
+/// Opt-in high-level API that rejects unsupported explicit style layers.
+///
+/// Legacy rendering intentionally skips accessories and expressions for
+/// families without face anchors. This wrapper changes only validation: a
+/// style that would be skipped is returned as [`StrictAvatarError::Style`]
+/// before rendering or encoding starts.
+#[derive(Clone)]
+pub struct StrictAvatarBuilder<'a, T> {
+    inner: AvatarBuilder<'a, T>,
+}
+
+impl<T> std::fmt::Debug for StrictAvatarBuilder<'_, T> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("StrictAvatarBuilder")
+            .field("inner", &self.inner)
+            .finish()
+    }
+}
+
+impl<'a, T> StrictAvatarBuilder<'a, T> {
+    /// Returns to the legacy skip-on-unsupported builder behavior.
+    pub fn into_legacy_builder(self) -> AvatarBuilder<'a, T> {
+        self.inner
+    }
+}
+
+impl<'a, T: AsRef<[u8]>> StrictAvatarBuilder<'a, T> {
+    fn validated_plan(&self) -> Result<AvatarRenderPlan, StrictAvatarError> {
+        let plan = self.inner.render_plan()?;
+        plan.validate_style_strict()?;
+        Ok(plan)
+    }
+
+    pub fn avatar_asset_key(&self) -> Result<AvatarAssetKey, StrictAvatarError> {
+        Ok(self.validated_plan()?.avatar_asset_key())
+    }
+
+    pub fn encoded_asset_key(
+        &self,
+        format: AvatarOutputFormat,
+    ) -> Result<EncodedAssetKey, StrictAvatarError> {
+        Ok(self.validated_plan()?.encoded_asset_key(format))
+    }
+
+    /// Returns a deployment-specific key after strict style validation.
+    pub fn encoded_asset_key_for_build(
+        &self,
+        format: AvatarOutputFormat,
+        build_id: EncoderBuildId,
+    ) -> Result<EncodedAssetKey, StrictAvatarError> {
+        Ok(self
+            .validated_plan()?
+            .encoded_asset_key_for_build(format, build_id))
+    }
+
+    pub fn render(self) -> Result<RgbaImage, StrictAvatarError> {
+        self.validated_plan()?
+            .render_rgba()
+            .map_err(AvatarError::from)
+            .map_err(StrictAvatarError::from)
+    }
+
+    pub fn render_svg(self) -> Result<String, StrictAvatarError> {
+        Ok(self.validated_plan()?.render_svg())
+    }
+
+    pub fn encode(self, format: AvatarOutputFormat) -> Result<Vec<u8>, StrictAvatarError> {
+        let image = self
+            .validated_plan()?
+            .render_rgba()
+            .map_err(AvatarError::from)?;
+        encode_owned_rgba_image(image, format)
+            .map_err(AvatarError::from)
+            .map_err(StrictAvatarError::from)
     }
 }
 

@@ -36,13 +36,16 @@ impl SanitizingRgbaImage {
 
 impl Drop for SanitizingRgbaImage {
     fn drop(&mut self) {
-        sanitize_rgba_pixels(&mut self.image);
+        let image = std::mem::take(&mut self.image);
+        let mut pixels = image.into_raw();
+        wipe::vec(&mut pixels);
     }
 }
 
+#[cfg(test)]
 pub(crate) fn sanitize_rgba_pixels(image: &mut RgbaImage) {
     let pixels: &mut [u8] = image.as_mut();
-    sanitize_bytes(pixels);
+    wipe::bytes(pixels);
 }
 
 pub(crate) struct SanitizingVec {
@@ -86,7 +89,7 @@ impl std::io::Write for SanitizingVec {
                 .try_reserve_exact(new_capacity)
                 .map_err(std::io::Error::other)?;
             replacement.extend_from_slice(&self.bytes);
-            volatile_sanitize_vec(&mut self.bytes);
+            wipe::vec(&mut self.bytes);
             self.bytes = replacement;
         }
 
@@ -101,7 +104,7 @@ impl std::io::Write for SanitizingVec {
 
 impl Drop for SanitizingVec {
     fn drop(&mut self) {
-        volatile_sanitize_vec(&mut self.bytes);
+        wipe::vec(&mut self.bytes);
     }
 }
 
@@ -165,7 +168,9 @@ pub(crate) fn rgba_to_rgb_over_white(image: &RgbaImage) -> Vec<u8> {
 mod tests {
     use std::io::Write;
 
-    use super::SanitizingVec;
+    use image::{ImageBuffer, Rgba};
+
+    use super::{SanitizingRgbaImage, SanitizingVec};
 
     #[test]
     fn sanitizing_writer_preserves_bytes_across_controlled_growth() {
@@ -178,5 +183,15 @@ mod tests {
             .expect("growth write should succeed");
 
         assert_eq!(bytes.into_inner(), b"abcdefgh");
+    }
+
+    #[test]
+    fn owned_rgba_guard_accepts_overallocated_backing_vectors() {
+        let mut pixels = Vec::with_capacity(64);
+        pixels.extend_from_slice(&[1, 2, 3, 4]);
+        let image = ImageBuffer::<Rgba<u8>, _>::from_raw(1, 1, pixels)
+            .expect("one RGBA pixel should construct");
+
+        drop(SanitizingRgbaImage::new(image));
     }
 }

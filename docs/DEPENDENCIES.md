@@ -10,8 +10,8 @@
 - transitive `sha2` for default SHA-512 identity hashing through
   `sanitization-crypto-interop`
 - `subtle` for constant-time identity digest comparison
-- `sanitization` for clearing derived identity digests, temporary hash preimage
-  buffers, renderer seed copies, and temporary image/encoder buffers
+- `sanitization` 2.x for clearing derived identity digests, temporary hash
+  preimage buffers, renderer seed copies, and temporary image/encoder buffers
 - `sanitization-crypto-interop` for SHA-512 hashing and hasher-state cleanup
   through the upstream `sha2` zeroization hooks, and for BLAKE3 hasher/XOF
   cleanup when the `blake3` feature is enabled
@@ -79,6 +79,9 @@ Dependency changes should be reviewed for:
 - Optional dependency features must be tested in valid feature combinations
   before release. Do not use `cargo test --all-features` because the `blake3`
   and `xxh3` identity-hash modes are intentionally mutually exclusive.
+- The standard gate executes the full test suite with `all-formats serde` in
+  SHA-512, BLAKE3, and XXH3 modes. Encoder fixtures use fixed pixels so codec
+  contracts are tested independently from identity-hash selection.
 
 `scripts/validate-dependencies.sh` enforces the current dependency allowlist.
 

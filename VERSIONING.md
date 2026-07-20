@@ -47,6 +47,19 @@ Visual output may change when:
 
 The repository includes golden fingerprint regression tests. Those tests are meant to catch unintended visual changes before release.
 
+## Explicit Contract And Cache IDs
+
+Hashavatar 1.2 names the frozen 1.x automatic-selection mapping as
+`CatalogVersion::LEGACY_V1` and the renderer behavior as
+`RenderContractId::LEGACY_V1`. Built-in catalog entries expose stable IDs and
+weights; those values must not be reordered or changed during 1.x.
+
+New caches should use `IdentityCacheKey`, `AvatarAssetKey`, and
+`EncodedAssetKey` according to the level of artifact being stored. The latter
+two prevent dimensions, seed, style, format, or encoder-setting changes from
+reusing an incomplete cache key. Existing `cache_key()` strings remain stable
+for compatibility.
+
 ## Exhaustive Public Enums
 
 The public option enums in the 1.x crate are exhaustive and are not marked

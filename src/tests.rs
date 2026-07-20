@@ -1505,6 +1505,534 @@ fn avatar_style_options_has_human_readable_summary() {
 }
 
 #[test]
+fn legacy_catalog_contracts_and_vectors_are_frozen() {
+    assert_eq!(CatalogVersion::CURRENT.as_str(), "hashavatar-catalog-v1");
+    assert_eq!(RenderContractId::CURRENT.as_str(), "hashavatar-render-v1");
+
+    let kinds = LEGACY_AVATAR_KINDS
+        .iter()
+        .map(|entry| format!("{}:{}:{}", entry.id(), entry.weight(), entry.value()))
+        .collect::<Vec<_>>()
+        .join(",");
+    assert_eq!(
+        kinds,
+        "0:1:cat,1:1:dog,2:1:robot,3:1:fox,4:1:alien,5:1:monster,6:1:ghost,7:1:slime,8:1:bird,9:1:wizard,10:1:skull,11:1:paws,12:1:planet,13:1:rocket,14:1:mushroom,15:1:cactus,16:1:frog,17:1:panda,18:1:cupcake,19:1:pizza,20:1:icecream,21:1:octopus,22:1:knight,23:1:bear,24:1:penguin,25:1:dragon,26:1:ninja,27:1:astronaut,28:1:diamond,29:1:coffee-cup,30:1:shield"
+    );
+
+    let backgrounds = LEGACY_AVATAR_BACKGROUNDS
+        .iter()
+        .map(|entry| format!("{}:{}:{}", entry.id(), entry.weight(), entry.value()))
+        .collect::<Vec<_>>()
+        .join(",");
+    assert_eq!(
+        backgrounds,
+        "0:1:themed,1:1:white,2:1:black,3:1:dark,4:1:light,5:1:transparent,6:1:polka-dot,7:1:striped,8:1:checkerboard,9:1:grid,10:1:sunrise,11:1:ocean,12:1:starry"
+    );
+
+    let accessories = LEGACY_AVATAR_ACCESSORIES
+        .iter()
+        .map(|entry| format!("{}:{}:{}", entry.id(), entry.weight(), entry.value()))
+        .collect::<Vec<_>>()
+        .join(",");
+    assert_eq!(
+        accessories,
+        "0:1:none,1:1:glasses,2:1:hat,3:1:headphones,4:1:crown,5:1:bowtie,6:1:eyepatch,7:1:scarf,8:1:halo,9:1:horns"
+    );
+
+    let colors = LEGACY_AVATAR_COLORS
+        .iter()
+        .map(|entry| format!("{}:{}:{}", entry.id(), entry.weight(), entry.value()))
+        .collect::<Vec<_>>()
+        .join(",");
+    assert_eq!(
+        colors,
+        "0:1:default,1:1:neon-mint,2:1:pastel-pink,3:1:crimson,4:1:gold,5:1:deep-sea-blue"
+    );
+
+    let expressions = LEGACY_AVATAR_EXPRESSIONS
+        .iter()
+        .map(|entry| format!("{}:{}:{}", entry.id(), entry.weight(), entry.value()))
+        .collect::<Vec<_>>()
+        .join(",");
+    assert_eq!(
+        expressions,
+        "0:1:default,1:1:happy,2:1:grumpy,3:1:surprised,4:1:sleepy,5:1:winking,6:1:cool,7:1:crying"
+    );
+
+    let shapes = LEGACY_AVATAR_SHAPES
+        .iter()
+        .map(|entry| format!("{}:{}:{}", entry.id(), entry.weight(), entry.value()))
+        .collect::<Vec<_>>()
+        .join(",");
+    assert_eq!(
+        shapes,
+        "0:1:square,1:1:circle,2:1:squircle,3:1:hexagon,4:1:octagon"
+    );
+}
+
+#[test]
+fn catalog_metadata_matches_frozen_public_lists() {
+    assert_eq!(LEGACY_AVATAR_KINDS.len(), AvatarKind::ALL.len());
+    assert_eq!(LEGACY_AVATAR_BACKGROUNDS.len(), AvatarBackground::ALL.len());
+    assert_eq!(LEGACY_AVATAR_ACCESSORIES.len(), AvatarAccessory::ALL.len());
+    assert_eq!(LEGACY_AVATAR_COLORS.len(), AvatarColor::ALL.len());
+    assert_eq!(LEGACY_AVATAR_EXPRESSIONS.len(), AvatarExpression::ALL.len());
+    assert_eq!(LEGACY_AVATAR_SHAPES.len(), AvatarShape::ALL.len());
+
+    for (index, entry) in LEGACY_AVATAR_KINDS.iter().enumerate() {
+        assert_eq!(entry.value(), AvatarKind::ALL[index]);
+        assert_eq!(entry.id(), index as u16);
+        assert_eq!(entry.value().legacy_catalog_id(), entry.id());
+        assert_eq!(entry.value().legacy_catalog_weight(), 1);
+    }
+    for (index, entry) in LEGACY_AVATAR_BACKGROUNDS.iter().enumerate() {
+        assert_eq!(entry.value(), AvatarBackground::ALL[index]);
+        assert_eq!(entry.id(), index as u16);
+        assert_eq!(entry.value().legacy_catalog_id(), entry.id());
+        assert_eq!(entry.value().legacy_catalog_weight(), 1);
+    }
+    for (index, entry) in LEGACY_AVATAR_ACCESSORIES.iter().enumerate() {
+        assert_eq!(entry.value(), AvatarAccessory::ALL[index]);
+        assert_eq!(entry.id(), index as u16);
+        assert_eq!(entry.value().legacy_catalog_id(), entry.id());
+        assert_eq!(entry.value().legacy_catalog_weight(), 1);
+    }
+    for (index, entry) in LEGACY_AVATAR_COLORS.iter().enumerate() {
+        assert_eq!(entry.value(), AvatarColor::ALL[index]);
+        assert_eq!(entry.id(), index as u16);
+        assert_eq!(entry.value().legacy_catalog_id(), entry.id());
+        assert_eq!(entry.value().legacy_catalog_weight(), 1);
+    }
+    for (index, entry) in LEGACY_AVATAR_EXPRESSIONS.iter().enumerate() {
+        assert_eq!(entry.value(), AvatarExpression::ALL[index]);
+        assert_eq!(entry.id(), index as u16);
+        assert_eq!(entry.value().legacy_catalog_id(), entry.id());
+        assert_eq!(entry.value().legacy_catalog_weight(), 1);
+    }
+    for (index, entry) in LEGACY_AVATAR_SHAPES.iter().enumerate() {
+        assert_eq!(entry.value(), AvatarShape::ALL[index]);
+        assert_eq!(entry.id(), index as u16);
+        assert_eq!(entry.value().legacy_catalog_id(), entry.id());
+        assert_eq!(entry.value().legacy_catalog_weight(), 1);
+    }
+}
+
+#[test]
+fn legacy_catalog_preserves_every_automatic_byte_mapping() {
+    for value in u8::MIN..=u8::MAX {
+        assert_eq!(
+            CatalogVersion::LEGACY_V1
+                .derive_style(&identity_with_digest_byte(AVATAR_STYLE_KIND_BYTE, value))
+                .kind,
+            AvatarKind::from_byte(value)
+        );
+        assert_eq!(
+            CatalogVersion::LEGACY_V1
+                .derive_style(&identity_with_digest_byte(
+                    AVATAR_STYLE_BACKGROUND_BYTE,
+                    value
+                ))
+                .background,
+            AvatarBackground::from_byte(value)
+        );
+        assert_eq!(
+            CatalogVersion::LEGACY_V1
+                .derive_style(&identity_with_digest_byte(
+                    AVATAR_STYLE_ACCESSORY_BYTE,
+                    value
+                ))
+                .accessory,
+            AvatarAccessory::from_byte(value)
+        );
+        assert_eq!(
+            CatalogVersion::LEGACY_V1
+                .derive_style(&identity_with_digest_byte(AVATAR_STYLE_COLOR_BYTE, value))
+                .color,
+            AvatarColor::from_byte(value)
+        );
+        assert_eq!(
+            CatalogVersion::LEGACY_V1
+                .derive_style(&identity_with_digest_byte(
+                    AVATAR_STYLE_EXPRESSION_BYTE,
+                    value
+                ))
+                .expression,
+            AvatarExpression::from_byte(value)
+        );
+        assert_eq!(
+            CatalogVersion::LEGACY_V1
+                .derive_style(&identity_with_digest_byte(AVATAR_STYLE_SHAPE_BYTE, value))
+                .shape,
+            AvatarShape::from_byte(value)
+        );
+    }
+}
+
+#[test]
+fn family_capability_manifest_and_strict_matrix_are_complete() {
+    assert_eq!(LEGACY_FAMILY_CAPABILITIES.len(), AvatarKind::ALL.len());
+
+    for (index, manifest) in LEGACY_FAMILY_CAPABILITIES.iter().enumerate() {
+        let kind = AvatarKind::ALL[index];
+        let capabilities = manifest.capabilities();
+        assert_eq!(manifest.kind(), kind);
+        assert_eq!(capabilities, kind.capabilities());
+        assert!(capabilities.supports_backgrounds());
+        assert!(capabilities.supports_colors());
+        assert!(capabilities.supports_shapes());
+
+        for &background in AvatarBackground::ALL {
+            for &accessory in AvatarAccessory::ALL {
+                for &color in AvatarColor::ALL {
+                    for &expression in AvatarExpression::ALL {
+                        for &shape in AvatarShape::ALL {
+                            let style = AvatarStyleOptions::new(
+                                kind, background, accessory, color, expression, shape,
+                            );
+                            let expected = (accessory == AvatarAccessory::None
+                                || kind.supports_face_layers())
+                                && (expression == AvatarExpression::Default
+                                    || kind.supports_face_layers());
+                            assert_eq!(style.validate_strict().is_ok(), expected, "{style}");
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+#[test]
+fn strict_builder_rejects_skipped_layers_before_rendering() {
+    let strict = AvatarBuilder::for_id("strict@example.com")
+        .kind(AvatarKind::Planet)
+        .accessory(AvatarAccessory::Eyepatch)
+        .strict_style_validation();
+    let error = strict
+        .render()
+        .expect_err("strict validation must reject a skipped accessory");
+    let StrictAvatarError::Style(error) = error else {
+        panic!("expected a strict style error");
+    };
+    assert_eq!(error.kind(), AvatarKind::Planet);
+    assert_eq!(error.layer(), AvatarStyleLayer::Accessory);
+    assert_eq!(error.selection(), "eyepatch");
+
+    let expression_error = AvatarStyleOptions::new(
+        AvatarKind::Planet,
+        AvatarBackground::Themed,
+        AvatarAccessory::None,
+        AvatarColor::Default,
+        AvatarExpression::Happy,
+        AvatarShape::Square,
+    )
+    .validate_strict()
+    .expect_err("strict validation must reject a skipped expression");
+    assert_eq!(expression_error.layer(), AvatarStyleLayer::Expression);
+    assert_eq!(expression_error.selection(), "happy");
+
+    AvatarBuilder::for_id("strict@example.com")
+        .kind(AvatarKind::Planet)
+        .accessory(AvatarAccessory::Eyepatch)
+        .render()
+        .expect("legacy builder must retain skip behavior");
+}
+
+#[test]
+fn strict_builder_preserves_supported_render_output() {
+    let legacy = AvatarBuilder::for_id("strict-supported@example.com")
+        .kind(AvatarKind::Robot)
+        .accessory(AvatarAccessory::Glasses)
+        .expression(AvatarExpression::Happy)
+        .render()
+        .expect("legacy render should succeed");
+    let strict = AvatarBuilder::for_id("strict-supported@example.com")
+        .kind(AvatarKind::Robot)
+        .accessory(AvatarAccessory::Glasses)
+        .expression(AvatarExpression::Happy)
+        .strict_style_validation()
+        .render()
+        .expect("supported strict render should succeed");
+    assert_eq!(strict.as_raw(), legacy.as_raw());
+}
+
+#[test]
+fn complete_asset_keys_are_stable_and_domain_separated() {
+    let builder = AvatarBuilder::for_id("keys@example.com")
+        .namespace("tenant-a", "v2")
+        .size(128, 96)
+        .style_variant(42)
+        .kind(AvatarKind::Robot)
+        .background(AvatarBackground::Ocean)
+        .accessory(AvatarAccessory::Glasses)
+        .color(AvatarColor::Gold)
+        .expression(AvatarExpression::Happy)
+        .shape(AvatarShape::Circle);
+    let identity = builder
+        .identity_cache_key()
+        .expect("identity key should derive");
+    let avatar = builder
+        .avatar_asset_key()
+        .expect("avatar key should derive");
+    let encoded = builder
+        .encoded_asset_key(AvatarOutputFormat::WebP)
+        .expect("encoded key should derive");
+
+    assert_eq!(identity.to_string().len(), 64);
+    assert_eq!(avatar.to_string().len(), 64);
+    assert_eq!(encoded.to_string().len(), 64);
+    assert_ne!(identity.to_string(), avatar.to_string());
+    assert_ne!(avatar.to_string(), encoded.to_string());
+    assert_eq!(avatar.encoded(AvatarOutputFormat::WebP), encoded);
+    assert_eq!(
+        encoded,
+        builder
+            .encoded_asset_key(AvatarOutputFormat::WebP)
+            .expect("encoded key should be deterministic")
+    );
+}
+
+#[test]
+fn complete_asset_key_known_answer_matches_active_hash_mode() {
+    let builder = AvatarBuilder::for_id("user@example.com")
+        .namespace("tenant-a", "v2")
+        .size(256, 256)
+        .kind(AvatarKind::Robot)
+        .background(AvatarBackground::Transparent);
+
+    #[cfg(not(any(feature = "blake3", feature = "xxh3")))]
+    let expected = (
+        "ef2edd17ed99559f9d080139142bb3b63e3f7e892b8a4980f851d90f6421a2b0",
+        "06fcfa046651f19914e495db8ecb41f6de925707af3be0fca7bf62659b9cde84",
+        "47c180ec594a704db122cb8b29f1130f64509454ca02ef9c0682e90e1d00d513",
+    );
+    #[cfg(feature = "blake3")]
+    let expected = (
+        "79c5875b00c0dcf52f7e6f9f15ac748a8deadc3c563ce2c2dbdd0d5f77f5604d",
+        "f408ecdf843fae553d5a306247765e3a53caf4f3a558fb46ad031fb0307a8bfa",
+        "c4a8da145952c577e973138693a64596cf818a28d9db13aa42b1001ce0b1404c",
+    );
+    #[cfg(feature = "xxh3")]
+    let expected = (
+        "08a25882e18d19ce93406f7020ffc443dfbd5f4a5c978ff649fcc5fab4506566",
+        "df1134c273b5c1d25de8490a515fb8d2a555c2c9feff2bb036261619f5cb69a8",
+        "56f59dd0d38639e025f680b80e15b74f562cc7f10860f9f3fe82953faa3346dd",
+    );
+
+    assert_eq!(
+        builder
+            .identity_cache_key()
+            .expect("identity key should derive")
+            .to_string(),
+        expected.0
+    );
+    assert_eq!(
+        builder
+            .avatar_asset_key()
+            .expect("avatar key should derive")
+            .to_string(),
+        expected.1
+    );
+    assert_eq!(
+        builder
+            .encoded_asset_key(AvatarOutputFormat::WebP)
+            .expect("encoded key should derive")
+            .to_string(),
+        expected.2
+    );
+}
+
+#[test]
+fn avatar_asset_key_covers_every_render_input() {
+    let spec = valid_spec(128, 128, 7);
+    let identity = valid_identity_with_namespace(
+        valid_namespace("asset-key-tenant", "v2"),
+        "asset-key@example.com",
+    );
+    let style = AvatarStyleOptions::new(
+        AvatarKind::Robot,
+        AvatarBackground::Ocean,
+        AvatarAccessory::Glasses,
+        AvatarColor::Gold,
+        AvatarExpression::Happy,
+        AvatarShape::Circle,
+    );
+    let base = identity.avatar_asset_key(spec, style);
+
+    let changed = [
+        valid_identity("different@example.com").avatar_asset_key(spec, style),
+        valid_identity_with_namespace(
+            valid_namespace("different-tenant", "v2"),
+            "asset-key@example.com",
+        )
+        .avatar_asset_key(spec, style),
+        valid_identity_with_namespace(
+            valid_namespace("asset-key-tenant", "v3"),
+            "asset-key@example.com",
+        )
+        .avatar_asset_key(spec, style),
+        identity.avatar_asset_key(valid_spec(129, 128, 7), style),
+        identity.avatar_asset_key(valid_spec(128, 129, 7), style),
+        identity.avatar_asset_key(valid_spec(128, 128, 8), style),
+        identity.avatar_asset_key(
+            spec,
+            AvatarStyleOptions {
+                kind: AvatarKind::Cat,
+                ..style
+            },
+        ),
+        identity.avatar_asset_key(
+            spec,
+            AvatarStyleOptions {
+                background: AvatarBackground::Starry,
+                ..style
+            },
+        ),
+        identity.avatar_asset_key(
+            spec,
+            AvatarStyleOptions {
+                accessory: AvatarAccessory::Hat,
+                ..style
+            },
+        ),
+        identity.avatar_asset_key(
+            spec,
+            AvatarStyleOptions {
+                color: AvatarColor::Crimson,
+                ..style
+            },
+        ),
+        identity.avatar_asset_key(
+            spec,
+            AvatarStyleOptions {
+                expression: AvatarExpression::Winking,
+                ..style
+            },
+        ),
+        identity.avatar_asset_key(
+            spec,
+            AvatarStyleOptions {
+                shape: AvatarShape::Hexagon,
+                ..style
+            },
+        ),
+    ];
+    for key in changed {
+        assert_ne!(key, base);
+    }
+}
+
+#[test]
+fn encoded_asset_keys_cover_every_enabled_encoder_contract() {
+    let avatar = AvatarBuilder::for_id("formats@example.com")
+        .avatar_asset_key()
+        .expect("avatar key should derive");
+    let mut keys = std::collections::HashSet::new();
+    for &format in AvatarOutputFormat::ALL {
+        assert!(keys.insert(avatar.encoded(format)), "{format}");
+        assert!(format.encoder_contract_id().starts_with("hashavatar-"));
+    }
+}
+
+#[test]
+fn encoded_build_keys_bind_the_caller_supplied_build_id() {
+    let avatar = AvatarBuilder::for_id("build-key@example.com")
+        .avatar_asset_key()
+        .expect("avatar key should derive");
+    let first = EncoderBuildId::from_bytes([1; 32]);
+    let second = EncoderBuildId::from_bytes([2; 32]);
+
+    assert_ne!(
+        avatar.encoded(AvatarOutputFormat::WebP),
+        avatar.encoded_for_build(AvatarOutputFormat::WebP, first)
+    );
+    assert_ne!(
+        avatar.encoded_for_build(AvatarOutputFormat::WebP, first),
+        avatar.encoded_for_build(AvatarOutputFormat::WebP, second)
+    );
+}
+
+#[test]
+fn asset_keys_canonicalize_unsupported_face_layers() {
+    let identity = valid_identity("canonical-key@example.com");
+    let spec = valid_spec(128, 128, 3);
+    let base = AvatarStyleOptions::new(
+        AvatarKind::Paws,
+        AvatarBackground::Ocean,
+        AvatarAccessory::None,
+        AvatarColor::Gold,
+        AvatarExpression::Default,
+        AvatarShape::Circle,
+    );
+    let expected = identity.avatar_asset_key(spec, base);
+
+    for &accessory in AvatarAccessory::ALL {
+        for &expression in AvatarExpression::ALL {
+            let style = AvatarStyleOptions {
+                accessory,
+                expression,
+                ..base
+            };
+            assert_eq!(style.canonicalized_for_family(), base);
+            assert_eq!(identity.avatar_asset_key(spec, style), expected);
+        }
+    }
+}
+
+#[test]
+fn encoder_contract_ids_match_frozen_output_vectors() {
+    let image = ImageBuffer::from_fn(31, 23, |x, y| {
+        Rgba([
+            ((x * 17 + y * 3) % 256) as u8,
+            ((x * 5 + y * 29) % 256) as u8,
+            ((x * 11 + y * 7) % 256) as u8,
+            ((x * 13 + y * 19 + 64) % 256) as u8,
+        ])
+    });
+
+    let encoded: Vec<_> = AvatarOutputFormat::ALL
+        .iter()
+        .copied()
+        .map(|format| {
+            let bytes =
+                encode_rgba_image(&image, format).expect("encoder contract fixture should encode");
+            (format, bytes)
+        })
+        .collect();
+
+    for (format, bytes) in encoded {
+        let expected = match format {
+            AvatarOutputFormat::WebP => (
+                "hashavatar-webp-lossless-v1",
+                "b353dd63088b774b777b683b",
+                204,
+            ),
+            #[cfg(feature = "png")]
+            AvatarOutputFormat::Png => (
+                "hashavatar-png-best-adaptive-v1",
+                "a3be42fd12603cd5c8f4c743",
+                247,
+            ),
+            #[cfg(feature = "jpeg")]
+            AvatarOutputFormat::Jpeg => (
+                "hashavatar-jpeg-q92-white-v1",
+                "8ce6620c6e99569be454120f",
+                1685,
+            ),
+            #[cfg(feature = "gif")]
+            AvatarOutputFormat::Gif => (
+                "hashavatar-gif-default-v1",
+                "3ed24dca1a911b31843f2082",
+                1459,
+            ),
+        };
+        assert_eq!(format.encoder_contract_id(), expected.0);
+        assert_eq!(image_fingerprint_bytes(&bytes), expected.1, "{format}");
+        assert_eq!(bytes.len(), expected.2, "{format}");
+    }
+}
+
+#[test]
 fn automatic_style_derivation_uses_distinct_digest_offsets() {
     let base = AvatarStyleOptions::from_identity(&identity_with_digest_byte(63, 99));
 
@@ -2568,7 +3096,11 @@ fn regression_fingerprint_for(label: &str) -> Option<&'static str> {
 }
 
 fn image_fingerprint(image: &RgbaImage) -> String {
-    let digest = <TestSha512 as sha2::Digest>::digest(image.as_raw());
+    image_fingerprint_bytes(image.as_raw())
+}
+
+fn image_fingerprint_bytes(bytes: &[u8]) -> String {
+    let digest = <TestSha512 as sha2::Digest>::digest(bytes);
     digest[..12]
         .iter()
         .map(|byte| format!("{byte:02x}"))

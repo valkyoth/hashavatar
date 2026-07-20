@@ -15,7 +15,7 @@ fn parse_ascii_label<T: Copy>(
 /// Trait for renderers that can draw reusable avatar styles onto an image buffer.
 ///
 /// Implementations must return an RGBA image whose dimensions exactly match
-/// `spec`. [`encode_avatar`](crate::encode_avatar) rejects mismatched output
+/// `spec`. [`encode_avatar`] rejects mismatched output
 /// before invoking an encoder, but direct callers of this trait should enforce
 /// the same invariant when accepting third-party renderer implementations.
 pub trait AvatarRenderer {
@@ -850,14 +850,7 @@ impl AvatarStyleOptions {
     }
 
     pub fn from_identity(identity: &AvatarIdentity) -> Self {
-        Self {
-            kind: AvatarKind::from_byte(identity.byte(AVATAR_STYLE_KIND_BYTE)),
-            background: AvatarBackground::from_byte(identity.byte(AVATAR_STYLE_BACKGROUND_BYTE)),
-            accessory: AvatarAccessory::from_byte(identity.byte(AVATAR_STYLE_ACCESSORY_BYTE)),
-            color: AvatarColor::from_byte(identity.byte(AVATAR_STYLE_COLOR_BYTE)),
-            expression: AvatarExpression::from_byte(identity.byte(AVATAR_STYLE_EXPRESSION_BYTE)),
-            shape: AvatarShape::from_byte(identity.byte(AVATAR_STYLE_SHAPE_BYTE)),
-        }
+        CatalogVersion::CURRENT.derive_style(identity)
     }
 
     pub const fn legacy_options(self) -> AvatarOptions {

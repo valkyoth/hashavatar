@@ -27,6 +27,9 @@ cargo clippy --all-targets -- -D warnings
 
 echo "checks: tests"
 cargo test
+cargo test --no-default-features --features "all-formats serde"
+cargo test --no-default-features --features "blake3 all-formats serde"
+cargo test --no-default-features --features "xxh3 all-formats serde"
 
 echo "checks: MSRV compatibility"
 if command -v rustup >/dev/null 2>&1; then

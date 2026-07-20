@@ -1,5 +1,44 @@
 # Changelog
 
+## 1.2.0
+
+- Added explicit `CatalogVersion::LEGACY_V1` and
+  `RenderContractId::LEGACY_V1` identifiers for the frozen Hashavatar 1.x
+  automatic-selection and rendering contracts.
+- Added stable built-in catalog IDs and weights through public catalog
+  manifests for kinds, backgrounds, accessories, colors, expressions, and
+  shapes. Automatic style derivation now routes through the legacy catalog
+  without changing its byte mapping.
+- Added `AvatarFamilyCapabilities`, `LEGACY_FAMILY_CAPABILITIES`, and strict
+  style validation through `AvatarStyleOptions::validate_strict()` and
+  `AvatarBuilder::strict_style_validation()`.
+- Added typed, domain-separated `IdentityCacheKey`, `AvatarAssetKey`, and
+  `EncodedAssetKey` APIs. Avatar keys cover the active hash mode, catalog,
+  render contract, dimensions, seed, and effective style. Semantic encoded
+  keys additionally cover output format and fixed encoder settings.
+- Added `EncoderBuildId` and deployment-bound encoded keys for shared byte
+  caches, while documenting that content-addressable integrity requires hashing
+  the actual encoded bytes.
+- Canonicalized unsupported legacy accessory/expression layers during asset-key
+  derivation, preventing redundant cache keys for identical output.
+- Changed owned raster cleanup to sanitize full backing-vector capacity,
+  including custom-renderer spare capacity.
+- Preserved the existing string `cache_key()` output for downstream caches.
+- Added frozen catalog vectors, complete family/style compatibility coverage,
+  complete-key mutation tests, SHA-512/BLAKE3/XXH3 known-answer key tests, and
+  hash-independent fixed-pixel fingerprints for every encoder contract. The
+  standard gate now runs all tests in every valid hash/all-format matrix.
+- Added `examples/asset_keys.rs` and documented strict validation, typed cache
+  keys, catalog contracts, and the application-owned keyed-pseudonym boundary.
+- Updated `sanitization` and `sanitization-crypto-interop` from `1.2.5` to
+  `2.0.1`, adopting the 2.x `sanitization::wipe` API while retaining the
+  existing bounded secret-container and cleaned crypto-hasher boundaries.
+- Kept keyed identity derivation outside Hashavatar 1.x. Applications that need
+  dictionary resistance should derive a tenant/domain pseudonym with a managed
+  key before constructing an avatar identity.
+- Bumped crate and fuzz path dependency metadata to `1.2.0`.
+- Existing raster golden fingerprints remain unchanged.
+
 ## 1.1.3
 
 - Bumped the crate and fuzz path dependency metadata to `1.1.3`.

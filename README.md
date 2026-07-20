@@ -29,7 +29,7 @@ The crate starts conservative: validated avatar dimensions, bounded identity inp
 
 ## Current Status
 
-The current crate version is `1.1.3`.
+The current crate version is `1.2.0`.
 
 Implemented now:
 
@@ -39,6 +39,8 @@ Implemented now:
   features.
 - Public enum variant lists use single-source `ALL` slices and byte-to-variant
   helpers for deterministic option derivation.
+- Frozen `CatalogVersion` and `RenderContractId` values, explicit legacy
+  catalog IDs and weights, and a public family-capability manifest.
 - Visual layer options for accessories, accent palettes, expressions, and
   frame shapes through `AvatarStyleOptions`.
 - Automatic style derivation uses distinct identity digest bytes for kind,
@@ -57,6 +59,12 @@ Implemented now:
 - Compact SVG string rendering.
 - Fluent `AvatarBuilder` API for common render, encode, SVG, and cache-key
   workflows.
+- Opt-in strict style validation that rejects unsupported accessory and
+  expression layers before rendering.
+- Typed `IdentityCacheKey`, `AvatarAssetKey`, and `EncodedAssetKey` values that
+  cover identity mode, catalog, render contract, effective style/spec tuples,
+  output format, and fixed encoder settings. `EncoderBuildId` can additionally
+  bind encoded keys to a deployment's resolved encoder build.
 - Typed low-level errors plus unified `AvatarError` for high-level builder
   calls.
 - Optional `serde` feature for public style enums only. `AvatarIdentity` is
@@ -108,8 +116,8 @@ Security-control details live in [docs/SECURITY_CONTROLS.md](docs/SECURITY_CONTR
 The accepted preparation and 2.0 roadmap lives in
 [plan-towards-2.0.0.md](plan-towards-2.0.0.md). The historical path to the
 current crate remains in [docs/VERSION_PLAN.md](docs/VERSION_PLAN.md).
-`hashavatar` remains one crate through `1.1.3`, `1.2.0`, and `1.3.0`; the
-workspace split begins with `2.0.0-alpha.1`.
+`hashavatar` remains one crate through `1.2.0` and `1.3.0`; the workspace split
+begins with `2.0.0-alpha.1`.
 
 ## Rust Version Support
 
@@ -119,7 +127,7 @@ The minimum supported Rust version is Rust `1.90.0`, as declared by
 to Rust `1.90.0` so the MSRV stays honest. New deployments should prefer the
 latest stable Rust; as of July 20, 2026, that is Rust `1.97.1`.
 
-Compatibility evidence for `1.1.3`:
+Compatibility evidence for `1.2.0`:
 
 | Rust | Local Evidence |
 | --- | --- |
@@ -131,7 +139,7 @@ Compatibility evidence for `1.1.3`:
 | `1.95.0` | ✓ `cargo check --features all-formats` |
 | `1.96.0` | ✓ `cargo check --features all-formats` |
 | `1.96.1` | ✓ `cargo check --features all-formats` |
-| `1.97.0` | ✓ full release gate; ✓ `cargo check --features all-formats` |
+| `1.97.0` | ✓ `cargo check --features all-formats` |
 | `1.97.1` | ✓ full release gate; ✓ `cargo check --features all-formats` |
 
 Optional hash modes are mutually exclusive, so `hashavatar` cannot use a single
@@ -141,7 +149,7 @@ Optional hash modes are mutually exclusive, so `hashavatar` cannot use a single
 
 ```toml
 [dependencies]
-hashavatar = "1.1.3"
+hashavatar = "1.2.0"
 ```
 
 Optional identity hash modes and extra raster encoders are disabled by default.
@@ -149,28 +157,28 @@ Hash modes are mutually exclusive, so enable at most one of `blake3` or `xxh3`:
 
 ```toml
 [dependencies]
-hashavatar = { version = "1.1.3", features = ["blake3"] }
+hashavatar = { version = "1.2.0", features = ["blake3"] }
 ```
 
 Enable additional raster formats explicitly:
 
 ```toml
 [dependencies]
-hashavatar = { version = "1.1.3", features = ["png", "jpeg", "gif"] }
+hashavatar = { version = "1.2.0", features = ["png", "jpeg", "gif"] }
 ```
 
 Or enable every optional raster encoder at once:
 
 ```toml
 [dependencies]
-hashavatar = { version = "1.1.3", features = ["all-formats"] }
+hashavatar = { version = "1.2.0", features = ["all-formats"] }
 ```
 
 Enable string serialization/deserialization for public style enums:
 
 ```toml
 [dependencies]
-hashavatar = { version = "1.1.3", features = ["serde"] }
+hashavatar = { version = "1.2.0", features = ["serde"] }
 ```
 
 Combine these as needed, for example `features = ["blake3", "png", "serde"]`.
@@ -237,26 +245,89 @@ fn main() -> Result<(), AvatarError> {
 }
 ```
 
-For cache storage, prefer the opaque cache-key API over deriving keys from
-internal digest bytes.
+For new cache storage, use the typed keys rather than assembling cache keys
+from labels or internal digest bytes. The identity key identifies only the
+derived identity, the avatar key adds the effective render tuple, and the
+semantic encoded key also adds the format's fixed encoder contract. Ignored
+accessory and expression values are canonicalized for families without face
+anchors, so identical legacy output cannot create redundant cache entries.
 
 ```rust
 use hashavatar::prelude::*;
 
 fn main() -> Result<(), AvatarError> {
-    let cache_key = AvatarBuilder::for_id("user@example.com")
+    let avatar = AvatarBuilder::for_id("user@example.com")
         .namespace("tenant-a", "v2")
-        .cache_key()?;
+        .kind(AvatarKind::Robot)
+        .background(AvatarBackground::Transparent);
 
-    println!("{cache_key}");
+    println!("identity={}", avatar.identity_cache_key()?);
+    println!("avatar={}", avatar.avatar_asset_key()?);
+    println!(
+        "webp={}",
+        avatar.encoded_asset_key(AvatarOutputFormat::WebP)?
+    );
     Ok(())
 }
 ```
 
-Cache keys are stable and display-safe, but they still allow correlation: the
-same identity maps to the same key. An opaque cache key is not a password hash;
+`encoded_asset_key()` is a semantic request key. Encoder dependency versions,
+the compilation target, build flags, and the application revision can still
+change encoded bytes. Applications that share byte caches across deployments
+should compute a 32-byte digest over those deployment inputs and bind it with
+`EncoderBuildId`:
+
+```rust
+use hashavatar::prelude::*;
+
+fn deployment_webp_key(
+    encoder_build_digest: [u8; 32],
+) -> Result<EncodedAssetKey, AvatarError> {
+    AvatarBuilder::for_id("user@example.com")
+        .namespace("tenant-a", "v2")
+        .encoded_asset_key_for_build(
+            AvatarOutputFormat::WebP,
+            EncoderBuildId::from_bytes(encoder_build_digest),
+        )
+}
+```
+
+For content-addressable integrity, encode first and hash the actual returned
+bytes. Predictive asset keys, including build-bound keys, are cache-routing
+identifiers rather than proofs of byte equality.
+
+`AvatarIdentity::cache_key()` and `AvatarBuilder::cache_key()` remain available
+with their exact 1.1 output for existing caches. New integrations should prefer
+the typed keys because their domains explicitly include the active identity
+hash mode and all inputs that affect rendered or encoded assets.
+
+All cache keys are stable and display-safe, but they still allow correlation:
+the same tuple maps to the same key. An opaque cache key is not a password hash;
 an attacker who obtains one can still test a dictionary of likely email
 addresses, usernames, or personnel identifiers offline.
+
+When explicit styles originate from users, opt into strict validation so a
+family cannot silently skip an unsupported face layer:
+
+```rust
+use hashavatar::prelude::*;
+
+fn main() -> Result<(), StrictAvatarError> {
+    let image = AvatarBuilder::for_id("user@example.com")
+        .kind(AvatarKind::Robot)
+        .accessory(AvatarAccessory::Glasses)
+        .expression(AvatarExpression::Happy)
+        .strict_style_validation()
+        .render()?;
+
+    assert_eq!(image.dimensions(), (256, 256));
+    Ok(())
+}
+```
+
+Legacy render methods continue to skip accessories and expressions on families
+without face anchors. `AvatarStyleOptions::validate_strict()` and
+`StrictAvatarBuilder` provide the additive fail-closed path.
 
 For sensitive, guessable identifiers, derive a keyed pseudonym at the service
 boundary and pass only that pseudonym to `hashavatar`. Keep the key in a KMS or
@@ -265,25 +336,25 @@ For example, using keyed BLAKE3 from the sanitization sister crate:
 
 ```toml
 [dependencies]
-hashavatar = "1.1.3"
-sanitization = "1.2.5"
-sanitization-crypto-interop = { version = "1.2.5", features = ["blake3"] }
+hashavatar = "1.2.0"
+sanitization = "2.0.1"
+sanitization-crypto-interop = { version = "2.0.1", features = ["blake3"] }
 ```
 
 ```rust
-use hashavatar::{AvatarBuilder, AvatarError};
+use hashavatar::{AvatarBuilder, AvatarError, IdentityCacheKey};
 use sanitization::Secret;
 use sanitization_crypto_interop::blake3::blake3_keyed_digest;
 
 fn sensitive_identity_cache_key(
     tenant_key: &Secret<[u8; 32]>,
     raw_identity: &[u8],
-) -> Result<String, AvatarError> {
+) -> Result<IdentityCacheKey, AvatarError> {
     let pseudonym = Secret::new(
         tenant_key.with_secret(|key| blake3_keyed_digest(key, raw_identity)),
     );
 
-    pseudonym.with_secret(|id| AvatarBuilder::for_id(id).cache_key())
+    pseudonym.with_secret(|id| AvatarBuilder::for_id(id).identity_cache_key())
 }
 ```
 
@@ -300,9 +371,10 @@ Patch releases should not intentionally change output for the same explicit
 rendering tuple except for correctness or security fixes. Minor releases may
 add source-compatible APIs and opt-in capabilities, but the current public
 option enums are exhaustive and their variants remain frozen for 1.x. The 2.0
-line introduces explicitly versioned catalog evolution. Services that need
-precise visual rollout control should continue using namespace `style_version`
-values deliberately.
+line introduces explicitly versioned catalog evolution. `CatalogVersion::LEGACY_V1`
+and `RenderContractId::LEGACY_V1` now name the frozen 1.x mappings and renderer
+behavior directly. Services that need precise visual rollout control should
+continue using namespace `style_version` values deliberately.
 
 See [docs/STABILITY.md](docs/STABILITY.md) for the full semver and rendering
 policy.
@@ -335,9 +407,11 @@ identity hashing or namespace style-version rollouts.
 All public option enums expose an `ALL` slice, `from_byte`, `as_str`,
 `Display`, and `FromStr` support. With the optional `serde` feature enabled,
 these enums serialize and deserialize as the same lowercase string labels.
-Byte-to-variant mapping always indexes through `ALL`, so adding variants does
-not require duplicated modulo constants. Because these enums are exhaustive,
-their current variants and `ALL` lists remain frozen for the rest of 1.x.
+Byte-to-variant mapping remains compatible with the frozen legacy catalog.
+`LEGACY_AVATAR_KINDS` and the corresponding background/accessory/color/
+expression/shape catalogs expose explicit stable IDs and weights. Because the
+public enums are exhaustive, their variants, `ALL` lists, IDs, weights, and
+automatic mapping remain frozen for the rest of 1.x.
 
 | Enum | Controls | Values |
 | --- | --- | --- |
@@ -368,11 +442,12 @@ Non-face families such as `paws`, `planet`, `rocket`, `diamond`,
 instead of placing them at arbitrary canvas coordinates. Accent colors and
 frame shapes are canvas-level layers and still apply.
 
-Use `AvatarKind::supports_face_layers()` when mapping public endpoint query
-parameters. If it returns `false`, requested accessories and expressions are
-accepted but become deterministic no-ops for that family. This keeps automatic
-style derivation total while avoiding awkward combinations such as an eyepatch
-on a paw print or planet.
+Use `AvatarKind::capabilities()` or the `LEGACY_FAMILY_CAPABILITIES` manifest
+when mapping public endpoint query parameters. Legacy rendering accepts
+unsupported accessories and expressions as deterministic no-ops so automatic
+style derivation remains total. For explicit user choices, call
+`AvatarStyleOptions::validate_strict()` or finish the builder with
+`.strict_style_validation()` to reject those combinations before rendering.
 
 Suggested public endpoint query mapping:
 
@@ -380,9 +455,9 @@ Suggested public endpoint query mapping:
 | --- | --- | --- |
 | `kind` | `AvatarKind` | Parse with `FromStr`; reject unsupported labels. |
 | `background` | `AvatarBackground` | Parse with `FromStr`; reject unsupported labels. |
-| `accessory` | `AvatarAccessory` | Parse with `FromStr`; allow no-op fallback when `kind.supports_face_layers()` is `false`. |
+| `accessory` | `AvatarAccessory` | Parse with `FromStr`; use strict style validation to reject unsupported family combinations. |
 | `color` | `AvatarColor` | Parse with `FromStr`; `default` keeps the family palette. |
-| `expression` | `AvatarExpression` | Parse with `FromStr`; allow no-op fallback when `kind.supports_face_layers()` is `false`. |
+| `expression` | `AvatarExpression` | Parse with `FromStr`; use strict style validation to reject unsupported family combinations. |
 | `shape` | `AvatarShape` | Parse with `FromStr`; applied as a raster mask and SVG clip path. |
 | `format` | `AvatarOutputFormat` | Parse with `FromStr`; SVG uses the `render_avatar_svg_*` APIs. |
 | `size` | `AvatarSpec` | Construct with `AvatarSpec::new`; reject invalid dimensions. |
@@ -580,7 +655,7 @@ your namespace style version when intentionally migrating output.
 
 ```toml
 [dependencies]
-hashavatar = { version = "1.1.3", features = ["blake3"] }
+hashavatar = { version = "1.2.0", features = ["blake3"] }
 ```
 
 ```rust
@@ -608,7 +683,7 @@ assert!(svg.contains("alien avatar"));
 
 ```toml
 [dependencies]
-hashavatar = { version = "1.1.3", features = ["xxh3"] }
+hashavatar = { version = "1.2.0", features = ["xxh3"] }
 ```
 
 ```rust
@@ -695,7 +770,7 @@ use hashavatar::{
     AvatarBackground, AvatarKind, AvatarOptions, AvatarOutputFormat, AvatarSpec,
     encode_avatar_for_id, render_avatar_for_id,
 };
-use sanitization::{sanitize_bytes, unsafe_wipe::volatile_sanitize_vec};
+use sanitization::wipe;
 
 let spec = AvatarSpec::new(256, 256, 0)?;
 let options = AvatarOptions::new(AvatarKind::Cat, AvatarBackground::Transparent);
@@ -707,11 +782,11 @@ let mut bytes = encode_avatar_for_id(
     options,
 )?;
 // Send, store, or otherwise consume `bytes`.
-volatile_sanitize_vec(&mut bytes);
+wipe::vec(&mut bytes);
 
 let mut image = render_avatar_for_id(spec, "sensitive-user-id", options)?;
 // Composite, inspect, or encode `image`.
-sanitize_bytes(image.as_mut());
+wipe::bytes(image.as_mut());
 
 # Ok::<(), Box<dyn std::error::Error>>(())
 ```
@@ -921,6 +996,8 @@ The repository includes:
 - style-aware raster and SVG layer tests
 - transparent background checks
 - golden visual fingerprint tests
+- fixed-pixel encoder fingerprints in every valid SHA-512, BLAKE3, and XXH3
+  feature matrix
 - fuzz harness compilation
 - bounded Kani proof run; ordinary check mode reports unavailable tooling as an
   explicit skip, while stable release mode requires the verifier

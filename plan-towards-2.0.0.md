@@ -1,6 +1,6 @@
 # hashavatar Plan Towards 2.0.0
 
-Status: accepted direction, implementation not started
+Status: accepted direction, 1.x preparation in progress
 
 Current stable line: `1.1.x`
 
@@ -628,9 +628,7 @@ branch, not in published 1.x packages.
 
 ### v1.1.3 - Policy Corrections
 
-**Status:** Release-ready. The runtime and release-control state at `7d0cb53`
-passed the final pentest retest; the final readiness commit is documentation
-only and awaits GitHub validation before tagging.
+**Status:** Released as `v1.1.3`.
 
 **Goal:** Make current documentation and checks accurately describe 1.1.x.
 
@@ -649,7 +647,9 @@ security claims are internally consistent.
 
 ### v1.2.0 - Contracts And Strict Preparation
 
-**Status:** Planned.
+**Status:** Implementation stop reached. Local release gate passed; independent
+pentest, GitHub validation, and downstream integration testing remain before
+tagging.
 
 **Goal:** Give 1.x consumers the identifiers and validation path needed for a
 safe 2.0 migration.

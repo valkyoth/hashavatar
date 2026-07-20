@@ -1,6 +1,6 @@
 # Third-Party Notices
 
-Portions of the raster drawing primitives in `src/lib.rs` are adapted from
+Portions of the raster drawing primitives in `src/primitives.rs` are adapted from
 `imageproc` drawing modules.
 
 ## imageproc

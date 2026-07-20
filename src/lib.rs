@@ -44,8 +44,7 @@ use image::{
 };
 use palette::{FromColor, Hsl, Srgb};
 use rand::{RngExt, SeedableRng, rngs::StdRng};
-use sanitization::unsafe_wipe::volatile_sanitize_vec;
-use sanitization::{Secret, SecretVec, SecureSanitize, sanitize_bytes};
+use sanitization::{Secret, SecretVec, SecureSanitize, wipe};
 #[cfg(feature = "blake3")]
 use sanitization_crypto_interop::blake3::blake3_xof_fill;
 use sanitization_crypto_interop::sha2::sha512_digest as sanitized_sha512_digest;
@@ -112,9 +111,11 @@ pub const AVATAR_STYLE_SHAPE_BYTE: usize = 5;
 /// Common imports for application code using the high-level avatar APIs.
 pub mod prelude {
     pub use crate::{
-        AvatarAccessory, AvatarBackground, AvatarBuilder, AvatarColor, AvatarError,
-        AvatarExpression, AvatarIdentity, AvatarIdentityOptions, AvatarKind, AvatarNamespace,
-        AvatarOptions, AvatarOutputFormat, AvatarShape, AvatarSpec, AvatarStyleOptions,
+        AvatarAccessory, AvatarAssetKey, AvatarBackground, AvatarBuilder, AvatarColor, AvatarError,
+        AvatarExpression, AvatarFamilyCapabilities, AvatarIdentity, AvatarIdentityOptions,
+        AvatarKind, AvatarNamespace, AvatarOptions, AvatarOutputFormat, AvatarShape, AvatarSpec,
+        AvatarStyleOptions, AvatarStyleValidationError, CatalogVersion, EncodedAssetKey,
+        EncoderBuildId, IdentityCacheKey, RenderContractId, StrictAvatarBuilder, StrictAvatarError,
     };
 }
 
@@ -134,6 +135,7 @@ mod api;
 mod avatars;
 mod backgrounds;
 mod cat_support;
+mod contracts;
 mod core;
 mod encoding;
 mod layers;
@@ -157,6 +159,7 @@ pub(crate) use self::svg::*;
 
 pub use self::api::*;
 pub use self::avatars::*;
+pub use self::contracts::*;
 pub use self::core::*;
 pub use self::model::*;
 pub use self::primitives::Color;
