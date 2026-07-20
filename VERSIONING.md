@@ -55,7 +55,8 @@ Hashavatar 1.2 names the frozen 1.x automatic-selection mapping as
 weights; those values must not be reordered or changed during 1.x.
 
 New caches should use `IdentityCacheKey`, `AvatarAssetKey`, and
-`EncodedAssetKey` according to the level of artifact being stored. The latter
+`SemanticEncodedAssetKey` or `BuildEncodedAssetKey` according to the level of
+artifact being stored. The latter
 two prevent dimensions, seed, style, format, or encoder-setting changes from
 reusing an incomplete cache key. Existing `cache_key()` strings remain stable
 for compatibility.

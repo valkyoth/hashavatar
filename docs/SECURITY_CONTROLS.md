@@ -77,16 +77,18 @@
   a separately managed per-domain or per-tenant key and pass only that
   pseudonym to `hashavatar`. Key rotation changes avatar/cache identity and
   must be coordinated with cache invalidation and visual-stability policy.
-- `IdentityCacheKey`, `AvatarAssetKey`, and `EncodedAssetKey` are separate,
-  domain-separated public identifiers. The avatar key binds the active hash
-  mode, frozen catalog and render contracts, dimensions, seed, and complete
-  effective style. Unsupported legacy face layers are canonicalized before key
-  derivation so identical output has one avatar key. The semantic encoded key
-  additionally binds fixed encoder settings, but not transitive codec versions,
-  target, or build revision. Applications sharing byte caches across builds
-  should use `EncoderBuildId` with `encoded_for_build()`; content-addressed
-  stores must hash actual output bytes. These keys are correlators, not secrets,
-  content digests, or authorization tokens.
+- `IdentityCacheKey`, `AvatarAssetKey`, `SemanticEncodedAssetKey`, and
+  `BuildEncodedAssetKey` are separate, domain-separated public identifiers.
+  Distinct semantic and build-bound encoded types prevent cache-policy mixing
+  through ordinary type checking. The avatar key binds the active hash mode,
+  frozen catalog and render contracts, dimensions, seed, and complete effective
+  style. Unsupported legacy face layers are canonicalized before key derivation
+  so identical output has one avatar key. The semantic encoded key additionally
+  binds fixed encoder settings, but not transitive codec versions, target, or
+  build revision. Applications sharing byte caches across builds should use
+  `EncoderBuildId` with `encoded_for_build()`; content-addressed stores must hash
+  actual output bytes. These keys are correlators, not secrets, content digests,
+  or authorization tokens.
 - Unsupported accessories and expressions remain deterministic no-ops in the
   legacy rendering APIs. Applications that accept explicit user style choices
   can fail closed before rendering with

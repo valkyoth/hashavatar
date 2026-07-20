@@ -24,7 +24,8 @@
   - ResolvedStyle.
   - LayoutReport.
   - ResourceBudget.
-  - IdentityCacheKey, AvatarAssetKey, and EncodedAssetKey.
+  - IdentityCacheKey, AvatarAssetKey, SemanticEncodedAssetKey, and
+    BuildEncodedAssetKey.
   - RasterSurfaceMut.
   - render_into.
   - write_svg.

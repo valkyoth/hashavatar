@@ -114,8 +114,9 @@ pub mod prelude {
         AvatarAccessory, AvatarAssetKey, AvatarBackground, AvatarBuilder, AvatarColor, AvatarError,
         AvatarExpression, AvatarFamilyCapabilities, AvatarIdentity, AvatarIdentityOptions,
         AvatarKind, AvatarNamespace, AvatarOptions, AvatarOutputFormat, AvatarShape, AvatarSpec,
-        AvatarStyleOptions, AvatarStyleValidationError, CatalogVersion, EncodedAssetKey,
-        EncoderBuildId, IdentityCacheKey, RenderContractId, StrictAvatarBuilder, StrictAvatarError,
+        AvatarStyleOptions, AvatarStyleValidationError, BuildEncodedAssetKey, CatalogVersion,
+        EncoderBuildId, IdentityCacheKey, RenderContractId, SemanticEncodedAssetKey,
+        StrictAvatarBuilder, StrictAvatarError,
     };
 }
 

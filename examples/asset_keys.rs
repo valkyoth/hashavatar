@@ -17,6 +17,8 @@ fn main() -> Result<(), AvatarError> {
         "deployment-webp={}",
         avatar.encoded_asset_key_for_build(
             AvatarOutputFormat::WebP,
+            // Demonstration only. Production must hash the resolved encoder
+            // build inputs described by EncoderBuildId::from_bytes.
             EncoderBuildId::from_bytes([0x42; 32]),
         )?
     );

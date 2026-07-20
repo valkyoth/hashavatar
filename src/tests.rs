@@ -1936,6 +1936,11 @@ fn encoded_asset_keys_cover_every_enabled_encoder_contract() {
 
 #[test]
 fn encoded_build_keys_bind_the_caller_supplied_build_id() {
+    assert_ne!(
+        std::any::TypeId::of::<SemanticEncodedAssetKey>(),
+        std::any::TypeId::of::<BuildEncodedAssetKey>()
+    );
+
     let avatar = AvatarBuilder::for_id("build-key@example.com")
         .avatar_asset_key()
         .expect("avatar key should derive");
@@ -1943,8 +1948,10 @@ fn encoded_build_keys_bind_the_caller_supplied_build_id() {
     let second = EncoderBuildId::from_bytes([2; 32]);
 
     assert_ne!(
-        avatar.encoded(AvatarOutputFormat::WebP),
-        avatar.encoded_for_build(AvatarOutputFormat::WebP, first)
+        avatar.encoded(AvatarOutputFormat::WebP).as_bytes(),
+        avatar
+            .encoded_for_build(AvatarOutputFormat::WebP, first)
+            .as_bytes()
     );
     assert_ne!(
         avatar.encoded_for_build(AvatarOutputFormat::WebP, first),

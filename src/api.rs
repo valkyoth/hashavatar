@@ -209,7 +209,7 @@ impl AvatarRenderPlan {
         self.identity.avatar_asset_key(self.spec, self.style)
     }
 
-    pub(crate) fn encoded_asset_key(&self, format: AvatarOutputFormat) -> EncodedAssetKey {
+    pub(crate) fn encoded_asset_key(&self, format: AvatarOutputFormat) -> SemanticEncodedAssetKey {
         self.avatar_asset_key().encoded(format)
     }
 
@@ -217,7 +217,7 @@ impl AvatarRenderPlan {
         &self,
         format: AvatarOutputFormat,
         build_id: EncoderBuildId,
-    ) -> EncodedAssetKey {
+    ) -> BuildEncodedAssetKey {
         self.avatar_asset_key().encoded_for_build(format, build_id)
     }
 
@@ -732,7 +732,7 @@ impl<'a, T: AsRef<[u8]>> AvatarBuilder<'a, T> {
     pub fn encoded_asset_key(
         &self,
         format: AvatarOutputFormat,
-    ) -> Result<EncodedAssetKey, AvatarError> {
+    ) -> Result<SemanticEncodedAssetKey, AvatarError> {
         Ok(self.render_plan()?.encoded_asset_key(format))
     }
 
@@ -741,7 +741,7 @@ impl<'a, T: AsRef<[u8]>> AvatarBuilder<'a, T> {
         &self,
         format: AvatarOutputFormat,
         build_id: EncoderBuildId,
-    ) -> Result<EncodedAssetKey, AvatarError> {
+    ) -> Result<BuildEncodedAssetKey, AvatarError> {
         Ok(self
             .render_plan()?
             .encoded_asset_key_for_build(format, build_id))
@@ -866,7 +866,7 @@ impl<'a, T: AsRef<[u8]>> StrictAvatarBuilder<'a, T> {
     pub fn encoded_asset_key(
         &self,
         format: AvatarOutputFormat,
-    ) -> Result<EncodedAssetKey, StrictAvatarError> {
+    ) -> Result<SemanticEncodedAssetKey, StrictAvatarError> {
         Ok(self.validated_plan()?.encoded_asset_key(format))
     }
 
@@ -875,7 +875,7 @@ impl<'a, T: AsRef<[u8]>> StrictAvatarBuilder<'a, T> {
         &self,
         format: AvatarOutputFormat,
         build_id: EncoderBuildId,
-    ) -> Result<EncodedAssetKey, StrictAvatarError> {
+    ) -> Result<BuildEncodedAssetKey, StrictAvatarError> {
         Ok(self
             .validated_plan()?
             .encoded_asset_key_for_build(format, build_id))

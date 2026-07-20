@@ -46,8 +46,12 @@ define_asset_key!(
     "Domain-separated key for one complete unencoded avatar render tuple."
 );
 define_asset_key!(
-    EncodedAssetKey,
-    "Domain-separated key for one encoded avatar asset tuple."
+    SemanticEncodedAssetKey,
+    "Domain-separated semantic request key for one encoded avatar asset tuple."
+);
+define_asset_key!(
+    BuildEncodedAssetKey,
+    "Domain-separated deployment-specific key for one encoded avatar asset tuple."
 );
 define_asset_key!(
     EncoderBuildId,
@@ -161,8 +165,8 @@ impl AvatarAssetKey {
     /// dependency versions, compilation target, or deployment build. Use
     /// [`AvatarAssetKey::encoded_for_build`] when encoded bytes from different
     /// deployments must never share a cache entry.
-    pub fn encoded(self, format: AvatarOutputFormat) -> EncodedAssetKey {
-        EncodedAssetKey(derive_key(
+    pub fn encoded(self, format: AvatarOutputFormat) -> SemanticEncodedAssetKey {
+        SemanticEncodedAssetKey(derive_key(
             ENCODED_ASSET_KEY_DOMAIN,
             &[self.as_bytes(), format.encoder_contract_id().as_bytes()],
         ))
@@ -178,8 +182,8 @@ impl AvatarAssetKey {
         self,
         format: AvatarOutputFormat,
         build_id: EncoderBuildId,
-    ) -> EncodedAssetKey {
-        EncodedAssetKey(derive_key(
+    ) -> BuildEncodedAssetKey {
+        BuildEncodedAssetKey(derive_key(
             ENCODED_BUILD_ASSET_KEY_DOMAIN,
             &[
                 self.as_bytes(),

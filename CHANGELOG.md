@@ -12,10 +12,12 @@
 - Added `AvatarFamilyCapabilities`, `LEGACY_FAMILY_CAPABILITIES`, and strict
   style validation through `AvatarStyleOptions::validate_strict()` and
   `AvatarBuilder::strict_style_validation()`.
-- Added typed, domain-separated `IdentityCacheKey`, `AvatarAssetKey`, and
-  `EncodedAssetKey` APIs. Avatar keys cover the active hash mode, catalog,
-  render contract, dimensions, seed, and effective style. Semantic encoded
-  keys additionally cover output format and fixed encoder settings.
+- Added typed, domain-separated `IdentityCacheKey`, `AvatarAssetKey`,
+  `SemanticEncodedAssetKey`, and `BuildEncodedAssetKey` APIs. Distinct encoded
+  key types prevent semantic request keys from being passed accidentally to
+  deployment-specific byte caches. Avatar keys cover the active hash mode,
+  catalog, render contract, dimensions, seed, and effective style. Semantic
+  encoded keys additionally cover output format and fixed encoder settings.
 - Added `EncoderBuildId` and deployment-bound encoded keys for shared byte
   caches, while documenting that content-addressable integrity requires hashing
   the actual encoded bytes.

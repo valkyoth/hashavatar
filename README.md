@@ -61,10 +61,11 @@ Implemented now:
   workflows.
 - Opt-in strict style validation that rejects unsupported accessory and
   expression layers before rendering.
-- Typed `IdentityCacheKey`, `AvatarAssetKey`, and `EncodedAssetKey` values that
-  cover identity mode, catalog, render contract, effective style/spec tuples,
-  output format, and fixed encoder settings. `EncoderBuildId` can additionally
-  bind encoded keys to a deployment's resolved encoder build.
+- Typed `IdentityCacheKey`, `AvatarAssetKey`, `SemanticEncodedAssetKey`, and
+  `BuildEncodedAssetKey` values that prevent cache-layer confusion while
+  covering identity mode, catalog, render contract, effective style/spec
+  tuples, output format, fixed encoder settings, and optionally a deployment's
+  resolved encoder build.
 - Typed low-level errors plus unified `AvatarError` for high-level builder
   calls.
 - Optional `serde` feature for public style enums only. `AvatarIdentity` is
@@ -282,7 +283,7 @@ use hashavatar::prelude::*;
 
 fn deployment_webp_key(
     encoder_build_digest: [u8; 32],
-) -> Result<EncodedAssetKey, AvatarError> {
+) -> Result<BuildEncodedAssetKey, AvatarError> {
     AvatarBuilder::for_id("user@example.com")
         .namespace("tenant-a", "v2")
         .encoded_asset_key_for_build(

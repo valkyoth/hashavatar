@@ -51,10 +51,13 @@ The typed cache-key hierarchy introduced in 1.2 is also contract-versioned:
 - `IdentityCacheKey` covers the active identity hash mode and derived identity;
 - `AvatarAssetKey` additionally covers catalog, renderer, dimensions, seed, and
   every effective style layer, canonicalizing legacy layers a family ignores;
-- `EncodedAssetKey` from `encoded()` additionally covers the output format and
-  fixed encoder settings as a semantic request key;
-- `EncodedAssetKey` from `encoded_for_build()` additionally binds a
+- `SemanticEncodedAssetKey` from `encoded()` additionally covers the output
+  format and fixed encoder settings as a semantic request key;
+- `BuildEncodedAssetKey` from `encoded_for_build()` additionally binds a
   caller-supplied `EncoderBuildId` for deployment-specific byte caches.
+
+The distinct encoded-key types prevent a semantic request key from being used
+accidentally where a deployment-specific byte key is required.
 
 Neither encoded-key method is a digest of actual output bytes. Content-addressed
 storage must hash the bytes after encoding. Applications own the build-ID

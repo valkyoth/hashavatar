@@ -75,7 +75,8 @@ renderer internals. The intended public vocabulary is:
 - `ResolvedStyle` and `LayoutReport`;
 - `ResourceBudget`;
 - `CatalogVersion` and `RenderContractId`;
-- `IdentityCacheKey`, `AvatarAssetKey`, and `EncodedAssetKey`;
+- `IdentityCacheKey`, `AvatarAssetKey`, `SemanticEncodedAssetKey`, and
+  `BuildEncodedAssetKey`;
 - `RasterSurfaceMut` and an explicit external pixel format;
 - `render_into` and convenience owned-image rendering;
 - `write_svg` with document/fragment options;
@@ -143,7 +144,8 @@ completion metadata for writer APIs. It should expose:
 - media type and conventional extension;
 - output format and encoder contract/version;
 - alpha support and relevant capability metadata;
-- an `EncodedAssetKey` derived from the prepared asset key and exact encoder
+- a typed semantic or build-bound encoded asset key derived from the prepared
+  asset key and exact encoder
   settings;
 - conservative scratch-memory information where the codec permits it;
 - documented cleanup limits for codec-owned buffers.
@@ -381,7 +383,7 @@ The SVG contract must define:
 - collision-free deterministic IDs for clips and gradients;
 - validated caller-supplied or scene-derived ID prefixes;
 - XML escaping for all caller-provided accessibility text;
-- title/description policy and whether metadata affects `EncodedAssetKey`;
+- title/description policy and whether metadata affects encoded asset keys;
 - locale-independent fixed-point numeric formatting;
 - stable element/attribute ordering only where explicitly promised;
 - unsupported scene-capability errors;

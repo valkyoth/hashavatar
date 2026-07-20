@@ -31,11 +31,13 @@ APIs and pixels remain compatible.
 - Added `AvatarAssetKey` covering identity, catalog, render contract,
   dimensions, seed, and all effective style layers. Ignored legacy face layers
   are canonicalized so identical output receives one key.
-- Added semantic `EncodedAssetKey` derivation covering the avatar key, output
+- Added `SemanticEncodedAssetKey` derivation covering the avatar key, output
   format, and fixed encoder settings.
-- Added `EncoderBuildId` and build-bound encoded-key derivation for applications
-  that share byte caches across deployment builds. Actual encoded-byte hashing
-  remains required for content-addressable integrity.
+- Added `EncoderBuildId` and distinct `BuildEncodedAssetKey` derivation for
+  applications that share byte caches across deployment builds. The nominal
+  types prevent semantic and deployment-specific cache keys from being mixed.
+  Actual encoded-byte hashing remains required for content-addressable
+  integrity.
 - Preserved `AvatarIdentity::cache_key()` and `AvatarBuilder::cache_key()` with
   their exact previous output for existing caches.
 - Added `examples/asset_keys.rs` for the recommended typed-key workflow.
@@ -72,8 +74,9 @@ crate from implying a key-management guarantee it cannot enforce.
 - Frozen fixed-pixel encoded-byte fingerprints bind each encoder contract ID to
   its current WebP, PNG, JPEG, or GIF output settings independently of the
   selected identity-hash feature.
-- SHA-512, BLAKE3, and XXH3 builds have frozen known-answer vectors for all
-  three key levels.
+- SHA-512, BLAKE3, and XXH3 builds have frozen known-answer vectors for the
+  identity, avatar, and semantic encoded key levels. Separate tests enforce the
+  build-bound key's nominal type and build-ID separation.
 - The standard gate runs the complete test suite in SHA-512, BLAKE3, and XXH3
   modes with every optional encoder and serde enabled in valid combinations.
 - Owned raster cleanup now sanitizes the entire backing-vector capacity,
