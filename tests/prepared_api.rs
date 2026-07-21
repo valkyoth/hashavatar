@@ -219,13 +219,14 @@ fn raster_surfaces_fail_closed_on_invalid_layouts() {
     ));
 
     let prepared = prepared();
-    let mut wrong_size = vec![0_u8; 95 * 80 * 4];
+    let mut wrong_size = vec![0xa5_u8; 95 * 80 * 4];
     let mut surface = RasterSurfaceMut::new_rgba8(&mut wrong_size, 95, 80, 95 * 4)
         .expect("valid but mismatched surface");
     assert!(matches!(
         prepared.render_into(&mut surface),
         Err(RasterSurfaceError::DimensionMismatch { .. })
     ));
+    assert!(surface.pixels().iter().all(|byte| *byte == 0xa5));
 }
 
 #[derive(Default)]

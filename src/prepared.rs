@@ -408,6 +408,15 @@ impl PreparedAvatar {
         surface: &mut RasterSurfaceMut<'_>,
     ) -> Result<(), RasterSurfaceError> {
         let spec = self.spec();
+        if (surface.width(), surface.height()) != (spec.width(), spec.height()) {
+            return Err(RasterSurfaceError::DimensionMismatch {
+                expected_width: spec.width(),
+                expected_height: spec.height(),
+                actual_width: surface.width(),
+                actual_height: surface.height(),
+            });
+        }
+
         let image = SanitizingRgbaImage::new(self.plan.render_rgba()?);
         copy_rgba_image_into_surface(spec, image.as_image(), surface)
     }

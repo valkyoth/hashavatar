@@ -17,7 +17,8 @@
 - Added validated, strided `RasterSurfaceMut` output and fail-closed errors for
   zero dimensions, short strides, short buffers, overflow, and request/surface
   dimension mismatches. Internal renderer dimensions/storage and exact row
-  counts are validated before success.
+  counts are validated before success, while mismatched caller dimensions are
+  rejected before rendering or temporary image allocation.
 - Preserved width, height, and seed independently in both builders so invalid
   intermediate dimensions cannot silently reset the selected style seed.
 - Added `PreparedAvatar::write_svg()` and `encode_to_writer()` for

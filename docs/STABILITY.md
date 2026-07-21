@@ -104,7 +104,8 @@ currently promised.
   caller policy.
 - `RasterSurfaceMut` validates dimensions, stride, and capacity before copy.
   The 1.3 adapter also validates internal renderer dimensions and byte length
-  before copying an exact row count, and still allocates one internal image.
+  before copying an exact row count. Caller dimension mismatches return before
+  rendering; valid requests still allocate one internal image.
 - Writer methods propagate failures and leave partial caller-owned output in
   the caller's sink.
 

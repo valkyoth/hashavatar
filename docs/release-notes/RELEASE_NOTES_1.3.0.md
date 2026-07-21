@@ -34,8 +34,9 @@ planned for 2.0 while continuing to use the frozen Hashavatar 1.x renderer.
 - Added `PreparedAvatar::render_into()` for tight or padded caller-owned RGBA8
   surfaces. The 1.x adapter still renders through one sanitized temporary
   `RgbaImage`; it validates renderer dimensions/storage and copies an exact
-  checked row count before reporting success. It is not a zero-allocation
-  renderer.
+  checked row count before reporting success. Caller-surface dimension
+  mismatches fail before rendering or temporary image allocation. It is not a
+  zero-allocation renderer.
 - Added `write_svg()` and `encode_to_writer()` for caller-owned sinks. Partial
   output remains owned by the caller after a writer/codec error. SVG and codec
   internals can still allocate documented temporary buffers.

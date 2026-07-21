@@ -186,8 +186,10 @@
 - `PreparedAvatar::resource_budget()` makes known 1.x RGBA memory explicit.
   `render_into()` validates caller-surface dimensions, checked stride, and
   required capacity, validates the internal renderer dimensions and byte
-  length, copies an exact checked row count, and preserves row padding. It
-  still uses one sanitized internal `RgbaImage`.
+  length, copies an exact checked row count, and preserves row padding.
+  Caller-surface dimension mismatches return before renderer work or temporary
+  image allocation. Valid requests still use one sanitized internal
+  `RgbaImage`.
 - Resource accounting distinguishes a minimum tight surface from the actual
   declared `stride * height` surface storage. Call
   `render_into_known_rgba_bytes_for()` for padded surfaces. Vector-return
