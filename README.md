@@ -28,16 +28,14 @@
 # hashavatar
 
 `hashavatar` is the recommended facade for deterministic avatar generation.
-The `2.0.0-alpha.2` source tree provides one complete Cat workflow: bounded
-identity input becomes independently derived traits, a private validated
-Q16.16 scene, canonical straight-alpha RGBA8 pixels, and deterministic SVG.
-Owned images, caller-provided surfaces, complete SVG documents, and SVG
-fragments all execute the same scene.
+The `2.0.0-alpha.3` source tree ports all 31 existing families, 13 backgrounds,
+and five frame shapes onto one private validated Q16.16 scene. Canonical
+straight-alpha RGBA8, caller-provided surfaces, complete SVG documents, and SVG
+fragments all execute that same scene.
 
-Alpha.2 is deliberately small. It has no codecs, image-library types, mutable
-rendering RNG, filesystem API, CLI, server, or user-supplied SVG. Later 2.0
-alphas will extend this proven architecture to the existing catalog and
-separate optional packages.
+Alpha.3 has no codecs, image-library types, mutable rendering RNG, filesystem
+API, CLI, server, or user-supplied SVG. Optional formats and service-oriented
+packages remain later milestones.
 
 ## Release Status
 
@@ -47,25 +45,33 @@ The latest crates.io release is `1.3.0`, maintained on
 are tested through GitHub and `hashavatar-website`; prereleases are neither
 tagged nor uploaded to crates.io.
 
-To test alpha.2 from a local checkout:
+To test alpha.3 from a local checkout:
 
 ```toml
 [dependencies]
 hashavatar = { path = "../hashavatar" }
 ```
 
-## Cat Vertical Slice
+## Catalog Request
 
 ```rust
-use hashavatar::CatRequest;
+use hashavatar::{
+    AvatarBackground, AvatarKind, AvatarRequest, AvatarShape, AvatarStyle,
+};
 
-let prepared = CatRequest::with_namespace(
+let style = AvatarStyle::new(
+    AvatarKind::Robot,
+    AvatarBackground::Ocean,
+    AvatarShape::Circle,
+);
+let prepared = AvatarRequest::with_namespace(
     256,
     256,
     0,
     b"tenant-a",
-    b"website-v2-alpha2",
+    b"website-v2-alpha3",
     b"user-123",
+    style,
 )?
 .prepare()?;
 
@@ -83,9 +89,17 @@ assert!(svg.starts_with("<svg"));
 Render into a padded caller-owned surface without modifying padding:
 
 ```rust
-use hashavatar::{CatRequest, RgbaSurfaceMut};
+use hashavatar::{
+    AvatarBackground, AvatarKind, AvatarRequest, AvatarShape, AvatarStyle,
+    RgbaSurfaceMut,
+};
 
-let prepared = CatRequest::new(128, 128, 0, b"user-123")?.prepare()?;
+let style = AvatarStyle::new(
+    AvatarKind::Ghost,
+    AvatarBackground::Transparent,
+    AvatarShape::Squircle,
+);
+let prepared = AvatarRequest::new(128, 128, 0, b"user-123", style)?.prepare()?;
 let stride = 128 * 4 + 16;
 let mut storage = vec![0_u8; stride * 128];
 let mut surface = RgbaSurfaceMut::new(&mut storage, 128, 128, stride)?;
@@ -100,17 +114,28 @@ assert_eq!(digest, prepared.render_rgba()?.pixel_digest()?);
 Embed multiple deterministic fragments safely by choosing distinct prefixes:
 
 ```rust
-use hashavatar::{CatRequest, SvgOptions};
+use hashavatar::{
+    AvatarBackground, AvatarKind, AvatarRequest, AvatarShape, AvatarStyle,
+    SvgOptions,
+};
 
-let prepared = CatRequest::new(128, 128, 0, b"user-123")?.prepare()?;
+let style = AvatarStyle::new(
+    AvatarKind::Planet,
+    AvatarBackground::Starry,
+    AvatarShape::Hexagon,
+);
+let prepared = AvatarRequest::new(128, 128, 0, b"user-123", style)?.prepare()?;
 let fragment = prepared.render_svg_with(SvgOptions::fragment("profile-avatar")?)?;
 assert!(fragment.starts_with("<g id=\"profile-avatar-scene\">"));
 # Ok::<(), hashavatar::CatError>(())
 ```
 
-`CatRequest` borrows input only until `prepare()`. `PreparedCat` retains the
-private scene, public named trait samples, and validated resource report, but
-not the raw identifier, tenant, style-version, or identity digest.
+`AvatarRequest` borrows input only until `prepare()`. `PreparedAvatar` retains
+the private scene, explicit style, public named trait samples, and validated
+resource report, but not the raw identifier, tenant, style-version, or identity
+digest. `AvatarKind::ALL`, `AvatarBackground::ALL`, and `AvatarShape::ALL`
+provide the frozen catalog order; family capability declarations are available
+through `AvatarKind::capabilities()` and `AVATAR_FAMILY_CAPABILITIES`.
 
 ## Contracts
 
@@ -118,12 +143,16 @@ not the raw identifier, tenant, style-version, or identity digest.
 - Identity input is restricted to 1024 bytes.
 - Tenant and style-version components are restricted to 128 bytes each.
 - Components are length-prefixed and SHA-512 domain separated.
+- Catalog IDs and capability behavior follow the documented
+  [catalog contract](docs/CATALOG_CONTRACT.md).
 - Traits are sampled independently by stable labels; adding a trait does not
   consume mutable RNG state or shift existing traits.
 - Geometry is private signed Q16.16 fixed point with checked construction.
 - Scenes contain at most 64 commands, eight paths, 48 points per path, and
   eight levels each of clips and opacity groups.
 - Scene validation runs before raster or SVG execution.
+- All backgrounds and non-square frame clips are scene commands shared by both
+  executors. Transparent output clears prior caller-surface pixels.
 - External raster output is straight-alpha sRGB RGBA8. Owned output is tightly
   packed; caller surfaces may use validated padded strides.
 - Source-over compositing, gradient interpolation, clipping, integer curve
@@ -139,10 +168,10 @@ still enforce process-wide concurrency and rate limits.
 
 ## Crates
 
-| Package | Alpha.2 role |
+| Package | Alpha.3 role |
 | --- | --- |
 | `hashavatar` | Recommended thin facade and stable import path |
-| `hashavatar-core` | `no_std + alloc` identity, trait, scene, CPU RGBA8, and SVG core |
+| `hashavatar-core` | `no_std + alloc` catalog, identity, scene, CPU RGBA8, and SVG core |
 
 The private scene representation is not a general graphics API. Future format,
 schema, heapless, and GPU packages will consume narrow reviewed boundaries
@@ -168,6 +197,8 @@ for the exact guarantees and accepted limitations.
 scripts/checks.sh
 scripts/check_kani.sh
 cargo test --workspace --release
+cargo run --example catalog_sheet
+cargo run --example catalog_raster_sheet
 ```
 
 The standard gate checks formatting, strict Clippy, debug and release KATs,

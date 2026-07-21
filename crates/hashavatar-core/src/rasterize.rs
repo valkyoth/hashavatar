@@ -4,11 +4,11 @@ use crate::{
     geometry::{FillRule, Path, Point, Rect},
     paint::Paint,
     raster::SurfaceWriter,
-    scene::{Stroke, triangle_area},
+    scene::{Clip, Scene, Stroke, triangle_area},
 };
 
 pub(crate) fn draw_rect(
-    writer: &mut SurfaceWriter<'_, '_>,
+    writer: &mut SurfaceWriter<'_, '_, '_>,
     rect: Rect,
     paint: Paint,
 ) -> Result<(), CatError> {
@@ -27,7 +27,7 @@ pub(crate) fn draw_rect(
 }
 
 pub(crate) fn draw_ellipse(
-    writer: &mut SurfaceWriter<'_, '_>,
+    writer: &mut SurfaceWriter<'_, '_, '_>,
     center: Point,
     radius_x: Fixed,
     radius_y: Fixed,
@@ -67,7 +67,7 @@ pub(crate) fn draw_ellipse(
 }
 
 pub(crate) fn draw_triangle(
-    writer: &mut SurfaceWriter<'_, '_>,
+    writer: &mut SurfaceWriter<'_, '_, '_>,
     points: [Point; 3],
     paint: Paint,
 ) -> Result<(), CatError> {
@@ -92,7 +92,7 @@ pub(crate) fn draw_triangle(
 }
 
 pub(crate) fn draw_line(
-    writer: &mut SurfaceWriter<'_, '_>,
+    writer: &mut SurfaceWriter<'_, '_, '_>,
     start: Point,
     end: Point,
     stroke: Stroke,
@@ -114,7 +114,7 @@ pub(crate) fn draw_line(
 }
 
 pub(crate) fn draw_path(
-    writer: &mut SurfaceWriter<'_, '_>,
+    writer: &mut SurfaceWriter<'_, '_, '_>,
     path: &Path,
     fill_rule: FillRule,
     fill: Option<Paint>,
@@ -146,7 +146,7 @@ pub(crate) fn draw_path(
 }
 
 fn visit_bounds(
-    writer: &mut SurfaceWriter<'_, '_>,
+    writer: &mut SurfaceWriter<'_, '_, '_>,
     bounds: Bounds,
     mut contains: impl FnMut(Point) -> Result<bool, CatError>,
     paint: Paint,
@@ -210,6 +210,52 @@ fn point_distance_squared(first: Point, second: Point) -> Result<i128, CatError>
         .ok_or(CatError::NumericRange)
 }
 
+pub(crate) fn clip_contains(scene: &Scene, clip: Clip, sample: Point) -> Result<bool, CatError> {
+    match clip {
+        Clip::Rect(rect) => Ok(sample.x >= rect.left
+            && sample.x < rect.right
+            && sample.y >= rect.top
+            && sample.y < rect.bottom),
+        Clip::Ellipse {
+            center,
+            radius_x,
+            radius_y,
+        } => ellipse_contains(center, radius_x, radius_y, sample),
+        Clip::Path {
+            path_index,
+            fill_rule,
+        } => Ok(path_contains(
+            scene.path(path_index)?.points()?,
+            sample,
+            fill_rule,
+        )),
+    }
+}
+
+fn ellipse_contains(
+    center: Point,
+    radius_x: Fixed,
+    radius_y: Fixed,
+    sample: Point,
+) -> Result<bool, CatError> {
+    let rx = i128::from(radius_x.raw());
+    let ry = i128::from(radius_y.raw());
+    let rx2 = rx.checked_mul(rx).ok_or(CatError::NumericRange)?;
+    let ry2 = ry.checked_mul(ry).ok_or(CatError::NumericRange)?;
+    let dx = i128::from(sample.x.raw()) - i128::from(center.x.raw());
+    let dy = i128::from(sample.y.raw()) - i128::from(center.y.raw());
+    let value = dx
+        .checked_mul(dx)
+        .and_then(|number| number.checked_mul(ry2))
+        .and_then(|number| {
+            dy.checked_mul(dy)
+                .and_then(|term| term.checked_mul(rx2))
+                .and_then(|term| number.checked_add(term))
+        })
+        .ok_or(CatError::NumericRange)?;
+    Ok(value <= rx2.checked_mul(ry2).ok_or(CatError::NumericRange)?)
+}
+
 fn path_contains(points: &[Point], sample: Point, fill_rule: FillRule) -> bool {
     let mut winding = 0_i32;
     for edge_points in path_edges(points) {
@@ -251,7 +297,7 @@ struct Bounds {
 }
 
 impl Bounds {
-    fn for_points(points: &[Point], writer: &SurfaceWriter<'_, '_>) -> Result<Self, CatError> {
+    fn for_points(points: &[Point], writer: &SurfaceWriter<'_, '_, '_>) -> Result<Self, CatError> {
         let first = points.first().ok_or(CatError::InvalidScene)?;
         let mut min_x = first.x;
         let mut max_x = first.x;
@@ -271,7 +317,7 @@ impl Bounds {
         min_y: Fixed,
         max_x: Fixed,
         max_y: Fixed,
-        writer: &SurfaceWriter<'_, '_>,
+        writer: &SurfaceWriter<'_, '_, '_>,
     ) -> Result<Self, CatError> {
         let width = i32::try_from(writer.width()).map_err(|_| CatError::NumericRange)?;
         let height = i32::try_from(writer.height()).map_err(|_| CatError::NumericRange)?;

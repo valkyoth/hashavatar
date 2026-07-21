@@ -1,6 +1,8 @@
 #![no_main]
 
-use hashavatar::{CatRequest, RgbaSurfaceMut};
+use hashavatar::{
+    AvatarBackground, AvatarKind, AvatarRequest, AvatarShape, AvatarStyle, RgbaSurfaceMut,
+};
 use libfuzzer_sys::fuzz_target;
 
 fuzz_target!(|data: &[u8]| {
@@ -15,8 +17,13 @@ fuzz_target!(|data: &[u8]| {
         return;
     };
     let mut storage = vec![0xa5_u8; stride.saturating_mul(rows)];
-    let identity = data.get(3..).unwrap_or_default();
-    let Ok(request) = CatRequest::new(width, height, 0, identity) else {
+    let style = AvatarStyle::new(
+        AvatarKind::from_byte(data.get(3).copied().unwrap_or_default()),
+        AvatarBackground::from_byte(data.get(4).copied().unwrap_or_default()),
+        AvatarShape::from_byte(data.get(5).copied().unwrap_or_default()),
+    );
+    let identity = data.get(6..).unwrap_or_default();
+    let Ok(request) = AvatarRequest::new(width, height, 0, identity, style) else {
         return;
     };
     let Ok(prepared) = request.prepare() else {

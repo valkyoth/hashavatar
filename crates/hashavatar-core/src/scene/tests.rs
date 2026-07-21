@@ -29,9 +29,9 @@ fn stack_underflow_is_rejected() -> Result<(), CatError> {
 }
 
 #[test]
-fn transparent_background_is_rejected() -> Result<(), CatError> {
+fn transparent_background_is_valid_canonical_clear() -> Result<(), CatError> {
     let mut scene = Scene::new(64, 64)?;
-    scene.push(Command::Fill(Paint::solid(Color::rgba(1, 2, 3, 0))))?;
-    assert_eq!(scene.validate(), Err(CatError::InvalidScene));
+    scene.push(Command::Fill(Paint::solid(Color::TRANSPARENT)))?;
+    assert!(scene.validate().is_ok());
     Ok(())
 }

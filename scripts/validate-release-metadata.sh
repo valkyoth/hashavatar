@@ -16,12 +16,12 @@ facade_version="$(package_version hashavatar)"
 core_version="$(package_version hashavatar-core)"
 toolchain_version="$(sed -n 's/^channel = "\([^"]*\)"/\1/p' rust-toolchain.toml | sed -n '1p')"
 
-if [ "$facade_version" != "2.0.0-alpha.2" ]; then
-    echo "release metadata: facade must be 2.0.0-alpha.2, got $facade_version" >&2
+if [ "$facade_version" != "2.0.0-alpha.3" ]; then
+    echo "release metadata: facade must be 2.0.0-alpha.3, got $facade_version" >&2
     exit 1
 fi
-if [ "$core_version" != "0.1.0-alpha.2" ]; then
-    echo "release metadata: core must be 0.1.0-alpha.2, got $core_version" >&2
+if [ "$core_version" != "0.1.0-alpha.3" ]; then
+    echo "release metadata: core must be 0.1.0-alpha.3, got $core_version" >&2
     exit 1
 fi
 if [ "$toolchain_version" != "1.97.1" ]; then
@@ -64,6 +64,7 @@ for required_file in \
     docs/FAILURE_CONTRACT.md \
     docs/SVG_CONTRACT.md \
     docs/CANONICAL_EXECUTION.md \
+    docs/CATALOG_CONTRACT.md \
     docs/PLAN_TOWARDS_2.0.md \
     docs/PROVENANCE.md \
     docs/README_POLICY.md \
@@ -73,7 +74,7 @@ for required_file in \
     docs/THIRD_PARTY_NOTICES.md \
     docs/VERSIONING.md \
     release-crates.toml \
-    release-notes/RELEASE_NOTES_2.0.0-alpha.2.md \
+    release-notes/RELEASE_NOTES_2.0.0-alpha.3.md \
     rust-toolchain.toml \
     security/pentest/README.md
 do
@@ -84,12 +85,12 @@ if [ -e PENTEST.md ]; then
     echo "release metadata: root PENTEST.md is temporary and must be removed" >&2
     exit 1
 fi
-if ! grep -q '^## 2.0.0-alpha.2$' CHANGELOG.md; then
-    echo "release metadata: changelog is missing alpha.2" >&2
+if ! grep -q '^## 2.0.0-alpha.3$' CHANGELOG.md; then
+    echo "release metadata: changelog is missing alpha.3" >&2
     exit 1
 fi
-if ! grep -q 'version = "2.0.0-alpha.2"' release-crates.toml; then
-    echo "release metadata: release plan is not alpha.2" >&2
+if ! grep -q 'version = "2.0.0-alpha.3"' release-crates.toml; then
+    echo "release metadata: release plan is not alpha.3" >&2
     exit 1
 fi
 if grep -q '^publish = true$' release-crates.toml; then

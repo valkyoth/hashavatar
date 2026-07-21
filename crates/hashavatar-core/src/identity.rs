@@ -45,20 +45,36 @@ impl TraitDeriver {
     }
 
     pub(crate) fn sample(&self, label: &[u8]) -> Result<u16, CatError> {
+        self.sample_components(None, label)
+    }
+
+    pub(crate) fn sample_scoped(&self, scope: &[u8], label: &[u8]) -> Result<u16, CatError> {
+        self.sample_components(Some(scope), label)
+    }
+
+    fn sample_components(&self, scope: Option<&[u8]>, label: &[u8]) -> Result<u16, CatError> {
         let seed = self.style_seed.to_le_bytes();
         let counter = 0_u32.to_le_bytes();
-        let capacity = component_size(TRAIT_DOMAIN)?
+        let mut capacity = component_size(TRAIT_DOMAIN)?
             .checked_add(component_size(&[0_u8; 64])?)
             .and_then(|value| value.checked_add(component_size(&seed).ok()?))
             .and_then(|value| value.checked_add(component_size(label).ok()?))
             .and_then(|value| value.checked_add(component_size(&counter).ok()?))
             .ok_or(CatError::NumericRange)?;
+        if let Some(scope) = scope {
+            capacity = capacity
+                .checked_add(component_size(scope)?)
+                .ok_or(CatError::NumericRange)?;
+        }
         let mut preimage =
             SecretVec::try_with_capacity(capacity).map_err(|_| CatError::Allocation)?;
         append_component(&mut preimage, TRAIT_DOMAIN)?;
         self.digest
             .with_secret(|digest| append_component(&mut preimage, digest))?;
         append_component(&mut preimage, &seed)?;
+        if let Some(scope) = scope {
+            append_component(&mut preimage, scope)?;
+        }
         append_component(&mut preimage, label)?;
         append_component(&mut preimage, &counter)?;
         let digest = Secret::new(preimage.with_secret(sha512_digest));

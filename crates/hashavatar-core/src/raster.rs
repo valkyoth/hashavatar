@@ -4,10 +4,9 @@ use sanitization_crypto_interop::sha2::SanitizedSha512;
 
 use crate::{
     CatError, PIXEL_CONTRACT_ID, RGBA8_BYTES_PER_PIXEL,
-    geometry::Rect,
     paint::{Color, div_255_round, source_over},
-    rasterize::{draw_ellipse, draw_line, draw_path, draw_rect, draw_triangle},
-    scene::{Command, MAX_STACK_DEPTH, Scene, validate_dimensions},
+    rasterize::{clip_contains, draw_ellipse, draw_line, draw_path, draw_rect, draw_triangle},
+    scene::{Clip, Command, MAX_STACK_DEPTH, Scene, validate_dimensions},
 };
 
 /// Tightly packed canonical straight-alpha RGBA8 output.
@@ -61,7 +60,7 @@ impl CanonicalRgbaImage {
 ///
 /// Rows may contain padding. Canonical execution modifies visible bytes only;
 /// row padding and any trailing bytes remain unchanged.
-#[must_use = "pass the validated surface to PreparedCat::render_into"]
+#[must_use = "pass the validated surface to a prepared avatar"]
 pub struct RgbaSurfaceMut<'a> {
     pixels: &'a mut [u8],
     width: u32,
@@ -204,7 +203,7 @@ pub(crate) fn render_scene_into(
     if surface.dimensions() != (scene.width(), scene.height()) {
         return Err(CatError::InvalidSurface);
     }
-    let mut writer = SurfaceWriter::new(surface);
+    let mut writer = SurfaceWriter::new(surface, scene);
     for command in scene.commands()? {
         match *command {
             Command::Empty => return Err(CatError::InvalidScene),
@@ -239,18 +238,20 @@ pub(crate) fn render_scene_into(
     Ok(())
 }
 
-pub(crate) struct SurfaceWriter<'surface, 'pixels> {
+pub(crate) struct SurfaceWriter<'scene, 'surface, 'pixels> {
+    scene: &'scene Scene,
     surface: &'surface mut RgbaSurfaceMut<'pixels>,
-    clips: [Option<Rect>; MAX_STACK_DEPTH],
+    clips: [Option<Clip>; MAX_STACK_DEPTH],
     clip_depth: usize,
     opacities: [u8; MAX_STACK_DEPTH],
     opacity_depth: usize,
     opacity: u8,
 }
 
-impl<'surface, 'pixels> SurfaceWriter<'surface, 'pixels> {
-    fn new(surface: &'surface mut RgbaSurfaceMut<'pixels>) -> Self {
+impl<'scene, 'surface, 'pixels> SurfaceWriter<'scene, 'surface, 'pixels> {
+    fn new(surface: &'surface mut RgbaSurfaceMut<'pixels>, scene: &'scene Scene) -> Self {
         Self {
+            scene,
             surface,
             clips: [None; MAX_STACK_DEPTH],
             clip_depth: 0,
@@ -269,9 +270,6 @@ impl<'surface, 'pixels> SurfaceWriter<'surface, 'pixels> {
     }
 
     fn fill_background(&mut self, paint: crate::paint::Paint) -> Result<(), CatError> {
-        if !paint.is_opaque() {
-            return Err(CatError::InvalidScene);
-        }
         for y in 0..self.height() {
             for x in 0..self.width() {
                 let sample = crate::geometry::Point::new(
@@ -297,12 +295,7 @@ impl<'surface, 'pixels> SurfaceWriter<'surface, 'pixels> {
             .get(..self.clip_depth)
             .ok_or(CatError::InvalidScene)?
         {
-            let rect = clip.ok_or(CatError::InvalidScene)?;
-            if sample.x < rect.left
-                || sample.x >= rect.right
-                || sample.y < rect.top
-                || sample.y >= rect.bottom
-            {
+            if !clip_contains(self.scene, clip.ok_or(CatError::InvalidScene)?, sample)? {
                 return Ok(());
             }
         }
@@ -313,12 +306,12 @@ impl<'surface, 'pixels> SurfaceWriter<'surface, 'pixels> {
         Ok(())
     }
 
-    fn push_clip(&mut self, rect: Rect) -> Result<(), CatError> {
+    fn push_clip(&mut self, clip: Clip) -> Result<(), CatError> {
         let slot = self
             .clips
             .get_mut(self.clip_depth)
             .ok_or(CatError::InvalidScene)?;
-        *slot = Some(rect);
+        *slot = Some(clip);
         self.clip_depth = self
             .clip_depth
             .checked_add(1)

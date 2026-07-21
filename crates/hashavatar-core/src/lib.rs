@@ -1,15 +1,19 @@
 //! Canonical rendering core for the Hashavatar 2.0 development line.
 //!
-//! Alpha.2 completes the bounded canonical renderer used by the Cat vertical
-//! slice. Identity-derived traits are stateless, geometry and scene layouts stay
-//! private, and CPU RGBA8 and SVG output execute the same validated scene.
+//! Alpha.3 ports the complete existing family, background, and frame catalog
+//! onto the bounded canonical renderer. Identity-derived traits are stateless,
+//! geometry and scene layouts stay private, and CPU RGBA8 and SVG output execute
+//! the same validated scene.
 
 #![no_std]
 #![forbid(unsafe_code)]
 
 extern crate alloc;
 
+mod art;
+mod avatar;
 mod cat;
+mod catalog;
 mod error;
 mod fixed;
 mod geometry;
@@ -24,10 +28,17 @@ mod svg;
 mod kani_proofs;
 
 pub use self::cat::{CatRequest, CatTraitVector, PreparedCat};
+pub use self::catalog::{
+    AVATAR_FAMILY_CAPABILITIES, AvatarBackground, AvatarFamilyCapabilities,
+    AvatarFamilyCapabilityEntry, AvatarKind, AvatarShape, AvatarStyle,
+};
 pub use self::error::{CatError, IdentityComponent};
 pub use self::raster::{CanonicalRgbaImage, PixelDigest, RgbaSurfaceMut};
 pub use self::scene::SceneReport;
 pub use self::svg::{SvgMode, SvgOptions};
+
+/// Error returned by canonical avatar preparation and execution.
+pub type AvatarError = CatError;
 
 /// Smallest supported canonical output dimension.
 pub const MIN_DIMENSION: u32 = 64;
@@ -46,3 +57,7 @@ pub const RGBA8_BYTES_PER_PIXEL: usize = 4;
 
 /// Versioned contract identifier included in canonical pixel digests.
 pub const PIXEL_CONTRACT_ID: &str = "hashavatar/rgba8-straight-srgb/v1";
+
+/// Source-only alpha.3 catalog contract identifier.
+pub const CATALOG_CONTRACT_ID: &str = "hashavatar/catalog/v2-alpha3";
+pub use self::avatar::{AvatarRequest, AvatarTraitVector, PreparedAvatar};

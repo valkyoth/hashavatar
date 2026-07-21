@@ -1,9 +1,19 @@
 use crate::{
-    MAX_DIMENSION, MIN_DIMENSION, RGBA8_BYTES_PER_PIXEL,
+    AvatarBackground, AvatarKind, AvatarShape, MAX_DIMENSION, MIN_DIMENSION, RGBA8_BYTES_PER_PIXEL,
     fixed::Fixed,
     paint::{Color, source_over},
     scene::{rgba_len, validate_dimensions},
 };
+
+#[kani::proof]
+fn catalog_byte_selection_stays_in_frozen_bounds() {
+    let value = kani::any::<u8>();
+    assert!(usize::from(AvatarKind::from_byte(value).catalog_id()) < AvatarKind::ALL.len());
+    assert!(
+        usize::from(AvatarBackground::from_byte(value).catalog_id()) < AvatarBackground::ALL.len()
+    );
+    assert!(usize::from(AvatarShape::from_byte(value).catalog_id()) < AvatarShape::ALL.len());
+}
 
 #[kani::proof]
 fn request_dimension_admission_is_exact() {

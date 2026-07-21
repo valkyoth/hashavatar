@@ -734,8 +734,8 @@ no independent family geometry path. The abstractions remain changeable.
 
 ### v2.0.0-alpha.2 - Complete Canonical Renderer
 
-**Status:** Implementation complete; pending exact-commit pentest, downstream
-website validation, and green GitHub checks before beginning alpha.3.
+**Status:** Complete. Exact-commit pentest passed and permanent evidence is
+recorded under `security/pentest/`.
 
 **Goal:** Generalize only the scene operations demonstrated by real avatar
 needs and finish the canonical CPU/SVG contracts.
@@ -759,7 +759,8 @@ renderer receives focused adversarial review.
 
 ### v2.0.0-alpha.3 - Existing Catalog Port
 
-**Status:** Planned.
+**Status:** Implementation complete; pending exact-commit pentest, downstream
+website validation, and green GitHub checks before beginning alpha.4.
 
 **Goal:** Port all existing 1.x families, backgrounds, and frames without
 expanding the art catalog.

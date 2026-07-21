@@ -34,6 +34,14 @@ Alpha.1 records deterministic evidence for one Cat scene:
 This evidence detects drift but does not promise compatibility with alpha.2 or
 stable 2.0. Scene structures and fixed-point representation remain private.
 
+## Alpha.3 Contract
+
+Alpha.3 records deterministic evidence for the complete existing family,
+background, and frame catalog. Catalog IDs retain their 1.x ordering, while
+pixels intentionally use the new 2.0 renderer. The complete aggregate pixel
+fingerprint detects cross-family drift; it remains a prerelease KAT rather than
+a stable compatibility promise.
+
 ## Exact 1.x Output
 
 Applications requiring exact 1.x output should pin `=1.3.0` or a later

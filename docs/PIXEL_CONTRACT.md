@@ -25,8 +25,9 @@ channels, including alpha, use a clamped integer projection and nearest integer
 interpolation between their two endpoint colors.
 
 An output alpha of zero has canonical bytes `[0, 0, 0, 0]`. The first scene
-command is an opaque full-surface fill, so canonical output does not depend on
-the prior visible contents of a caller surface.
+command directly overwrites the complete surface with a validated paint,
+including transparent black when required. Canonical output therefore does not
+depend on the prior visible contents of a caller surface.
 
 `RgbaSurfaceMut::new` accepts only dimensions in `64..=2048`, a stride at least
 `width * 4`, and enough bytes for the last visible row. Execution changes only

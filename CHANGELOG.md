@@ -1,5 +1,23 @@
 # Changelog
 
+## 2.0.0-alpha.3
+
+- Added `AvatarRequest`, `PreparedAvatar`, and explicit `AvatarStyle` catalog
+  preparation while retaining the transitional alpha.2 Cat API.
+- Ported all 31 existing families to bounded semantic compilers that emit only
+  the private canonical scene.
+- Ported all 13 existing backgrounds, including transparent, patterned,
+  gradient, and deterministic starry modes.
+- Ported square, circle, squircle, hexagon, and octagon frames with validated
+  rectangle, ellipse, or path clips shared by raster and SVG.
+- Added frozen catalog IDs, byte selection, and an immutable family capability
+  manifest without introducing alpha.4 accessory or expression layers early.
+- Added an exhaustive 2,015 family/background/frame execution matrix, aggregate
+  catalog pixel KAT, caller-surface clearing checks, XML clip checks, full-
+  catalog fuzzing, an eighth Kani proof, and raster/SVG contact-sheet examples.
+- Updated migration, stability, security, pixel, README, and release metadata
+  for the source-only alpha.3 implementation stop.
+
 ## 2.0.0-alpha.2
 
 - Completed the bounded private canonical renderer with rectangles, ellipses,

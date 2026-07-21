@@ -1,0 +1,67 @@
+use super::{Clip, Scene, full_work, rect_work, validate_point, validate_rect};
+use crate::{CatError, fixed::Fixed, geometry::Rect};
+
+pub(super) fn validate_clip(
+    clip: Clip,
+    scene: &Scene,
+    minimum: Fixed,
+    maximum: Fixed,
+) -> Result<(), CatError> {
+    match clip {
+        Clip::Rect(rect) => validate_rect(rect, minimum, maximum),
+        Clip::Ellipse {
+            center,
+            radius_x,
+            radius_y,
+        } => {
+            if radius_x <= Fixed::ZERO || radius_y <= Fixed::ZERO {
+                return Err(CatError::InvalidScene);
+            }
+            validate_rect(
+                Rect::new(
+                    center.x.checked_sub(radius_x)?,
+                    center.y.checked_sub(radius_y)?,
+                    center.x.checked_add(radius_x)?,
+                    center.y.checked_add(radius_y)?,
+                ),
+                minimum,
+                maximum,
+            )
+        }
+        Clip::Path { path_index, .. } => {
+            let path = scene.path(path_index)?;
+            if !path.is_closed() {
+                return Err(CatError::InvalidScene);
+            }
+            for point in path.points()? {
+                validate_point(*point, minimum, maximum)?;
+            }
+            Ok(())
+        }
+    }
+}
+
+pub(super) fn clip_work(clip: Clip, scene: &Scene) -> Result<u64, CatError> {
+    match clip {
+        Clip::Rect(rect) => rect_work(rect, scene),
+        Clip::Ellipse {
+            center,
+            radius_x,
+            radius_y,
+        } => rect_work(
+            Rect::new(
+                center.x.checked_sub(radius_x)?,
+                center.y.checked_sub(radius_y)?,
+                center.x.checked_add(radius_x)?,
+                center.y.checked_add(radius_y)?,
+            ),
+            scene,
+        ),
+        Clip::Path { path_index, .. } => {
+            let points = scene.path(path_index)?.point_count();
+            full_work(scene)?
+                .checked_mul(u64::try_from(points).map_err(|_| CatError::NumericRange)?)
+                .ok_or(CatError::NumericRange)
+        }
+    }
+}

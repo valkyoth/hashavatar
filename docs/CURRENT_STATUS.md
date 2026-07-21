@@ -9,8 +9,8 @@ changes belong to 2.0.
 
 ## Development Line
 
-`main` implements `2.0.0-alpha.2`. This source-only prerelease completes the
-bounded canonical renderer beneath the Cat vertical slice:
+`main` implements `2.0.0-alpha.3`. This source-only prerelease ports the
+complete existing visual catalog onto the bounded canonical renderer:
 
 - stateless, label-separated SHA-512 trait derivation;
 - private checked Q16.16 geometry;
@@ -20,12 +20,17 @@ bounded canonical renderer beneath the Cat vertical slice:
 - owned and caller-provided padded surfaces through the same executor;
 - versioned pixel digests over visible rows;
 - deterministic SVG documents and fragments from the same scene;
+- 31 family compilers, 13 backgrounds, and five frame shapes;
+- immutable family capability declarations and frozen catalog IDs;
+- transparent surface clearing and rectangle, ellipse, and path clips shared
+  by raster and SVG;
+- an exhaustive 2,015 family/background/frame execution matrix;
 - debug/release pixel KATs and parser-backed SVG checks;
-- focused fuzz targets and seven Kani harnesses;
+- focused full-catalog fuzz targets and eight Kani harnesses;
 - source-size enforcement at 500 lines per Rust file;
 - portable core CI for WASM, AArch64 Linux, and 32-bit x86 Linux.
 
-The alpha.2 implementation-stop candidate is ready for exact-commit external pentesting.
+The alpha.3 implementation-stop candidate is ready for exact-commit external pentesting.
 The milestone is not complete until findings are resolved, the permanent
 pentest digest is added, GitHub is green, and `hashavatar-website` passes
 against the final reviewed commit.
@@ -48,8 +53,9 @@ digest under
 | Workspace resolver | Cargo resolver `3` |
 | CodeQL | GitHub default setup |
 | Unsafe Rust | Forbidden in first-party library code |
-| Alpha.2 identity mode | Domain-separated SHA-512 |
-| Alpha.2 outputs | Canonical RGBA8, pixel digest, and semantic SVG |
+| Alpha.3 identity mode | Domain-separated SHA-512 |
+| Alpha.3 outputs | Canonical RGBA8, pixel digest, and semantic SVG |
+| Alpha.3 catalog | 31 families, 13 backgrounds, 5 frame shapes |
 
 Version details live in [release notes](../release-notes/) and the
 [changelog](../CHANGELOG.md).

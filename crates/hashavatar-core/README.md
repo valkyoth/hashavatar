@@ -24,10 +24,9 @@
 # hashavatar-core
 
 `hashavatar-core` contains the canonical safe-Rust renderer used by the
-Hashavatar 2.0 work. Alpha.2 completes the bounded canonical renderer used by
-the Cat vertical slice: validated fixed-point primitives and paths, exact
-compositing, gradients, clips, opacity groups, caller surfaces, and SVG
-documents/fragments.
+Hashavatar 2.0 work. Alpha.3 ports all 31 existing families, 13 backgrounds,
+and five frame shapes onto validated fixed-point primitives and paths, exact
+compositing, bounded clips, caller surfaces, and SVG documents/fragments.
 
 Most applications should use the `hashavatar` facade. This companion crate is
 not published during the 2.0 alpha, beta, or release-candidate cycle.
@@ -35,17 +34,23 @@ not published during the 2.0 alpha, beta, or release-candidate cycle.
 ## Example
 
 ```rust
-use hashavatar_core::CatRequest;
+use hashavatar_core::{
+    AvatarBackground, AvatarKind, AvatarRequest, AvatarShape, AvatarStyle,
+};
 
-let prepared = CatRequest::new(256, 256, 0, b"user-123")?.prepare()?;
-let traits = prepared.trait_vector();
+let style = AvatarStyle::new(
+    AvatarKind::Dragon,
+    AvatarBackground::Starry,
+    AvatarShape::Octagon,
+);
+let prepared = AvatarRequest::new(256, 256, 0, b"user-123", style)?.prepare()?;
 let image = prepared.render_rgba()?;
 let svg = prepared.render_svg()?;
 
 assert_eq!(image.dimensions(), (256, 256));
 assert_eq!(image.pixels().len(), 256 * 256 * 4);
 assert!(svg.starts_with("<svg "));
-assert_ne!(traits.head_width(), 0);
+assert_eq!(prepared.style(), style);
 # Ok::<(), hashavatar_core::CatError>(())
 ```
 
@@ -59,9 +64,10 @@ assert_ne!(traits.head_width(), 0);
 - Scene commands and fixed-point layouts are private and validated before
   execution.
 - CPU RGBA8 and SVG consume the same immutable scene.
+- Every built-in family, background, and frame compiles into that scene.
 - Caller-provided strided surfaces preserve padding and share the owned-image
   executor.
 - Pixel digests exclude padding and bind the dimensions and pixel contract ID.
 - Returned pixels and SVG belong to the caller and are not secret containers.
 
-Alpha.2 APIs and pixels remain explicitly unstable until the 2.0 beta freeze.
+Alpha.3 APIs and pixels remain explicitly unstable until the 2.0 beta freeze.

@@ -61,17 +61,6 @@ impl Paint {
         }
     }
 
-    pub(crate) const fn is_opaque(self) -> bool {
-        match self {
-            Self::Solid(color) => color.alpha == u8::MAX,
-            Self::LinearGradient {
-                start_color,
-                end_color,
-                ..
-            } => start_color.alpha == u8::MAX && end_color.alpha == u8::MAX,
-        }
-    }
-
     pub(crate) fn sample(self, point: Point) -> Result<Color, CatError> {
         match self {
             Self::Solid(color) => Ok(color),

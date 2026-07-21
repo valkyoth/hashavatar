@@ -1,3 +1,6 @@
+mod clip;
+
+use self::clip::{clip_work, validate_clip};
 use crate::{
     CatError, MAX_DIMENSION, MIN_DIMENSION, RGBA8_BYTES_PER_PIXEL,
     fixed::Fixed,
@@ -12,6 +15,20 @@ pub(crate) const MAX_STACK_DEPTH: usize = 8;
 pub(crate) struct Stroke {
     pub(crate) width: Fixed,
     pub(crate) paint: Paint,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(crate) enum Clip {
+    Rect(Rect),
+    Ellipse {
+        center: Point,
+        radius_x: Fixed,
+        radius_y: Fixed,
+    },
+    Path {
+        path_index: u8,
+        fill_rule: FillRule,
+    },
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -43,7 +60,7 @@ pub(crate) enum Command {
         fill: Option<Paint>,
         stroke: Option<Stroke>,
     },
-    PushClip(Rect),
+    PushClip(Clip),
     PopClip,
     PushOpacity(u8),
     PopOpacity,
@@ -102,7 +119,7 @@ impl Scene {
             return Err(CatError::InvalidScene);
         }
         let commands = self.commands()?;
-        if !matches!(commands.first(), Some(Command::Fill(paint)) if paint.is_opaque())
+        if !matches!(commands.first(), Some(Command::Fill(_)))
             || commands
                 .iter()
                 .skip(1)
@@ -325,7 +342,7 @@ fn validate_command(
             }
             Ok(())
         }
-        Command::PushClip(rect) => validate_rect(rect, minimum, maximum),
+        Command::PushClip(clip) => validate_clip(clip, scene, minimum, maximum),
         Command::PushOpacity(_) => Ok(()),
     }
 }
@@ -390,7 +407,7 @@ fn command_work(command: Command, scene: &Scene) -> Result<u64, CatError> {
     match command {
         Command::Empty => Err(CatError::InvalidScene),
         Command::Fill(_) => full_work(scene),
-        Command::Rect { rect, .. } | Command::PushClip(rect) => rect_work(rect, scene),
+        Command::Rect { rect, .. } => rect_work(rect, scene),
         Command::Ellipse {
             center,
             radius_x,
@@ -417,6 +434,7 @@ fn command_work(command: Command, scene: &Scene) -> Result<u64, CatError> {
                 )
                 .ok_or(CatError::NumericRange)
         }
+        Command::PushClip(clip) => clip_work(clip, scene),
         Command::PopClip | Command::PushOpacity(_) | Command::PopOpacity => Ok(0),
     }
 }
@@ -465,12 +483,8 @@ fn rect_work(rect: Rect, scene: &Scene) -> Result<u64, CatError> {
 }
 
 fn coordinate_limit() -> Result<Fixed, CatError> {
-    Fixed::from_integer(
-        i32::try_from(MAX_DIMENSION)
-            .map_err(|_| CatError::NumericRange)?
-            .checked_mul(2)
-            .ok_or(CatError::NumericRange)?,
-    )
+    let dimension = i32::try_from(MAX_DIMENSION).map_err(|_| CatError::NumericRange)?;
+    Fixed::from_integer(dimension.checked_mul(2).ok_or(CatError::NumericRange)?)
 }
 
 pub(crate) fn rgba_len(width: u32, height: u32) -> Result<usize, CatError> {

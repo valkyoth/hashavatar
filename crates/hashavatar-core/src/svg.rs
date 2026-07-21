@@ -1,7 +1,9 @@
 use alloc::string::String;
 use core::fmt::Write;
 
+mod clip;
 mod options;
+use self::clip::write_clip;
 pub use self::options::{SvgMode, SvgOptions};
 
 use crate::{
@@ -197,19 +199,7 @@ fn write_command(
                 ..stroke
             }),
         ),
-        Command::PushClip(rect) => {
-            write!(
-                output,
-                "<defs><clipPath id=\"{prefix}-clip-{index}\"><rect x=\""
-            )
-            .map_err(|_| CatError::SvgWrite)?;
-            write_rect_values(output, rect)?;
-            write!(
-                output,
-                "\"/></clipPath></defs><g clip-path=\"url(#{prefix}-clip-{index})\">"
-            )
-            .map_err(|_| CatError::SvgWrite)
-        }
+        Command::PushClip(clip) => write_clip(output, scene, prefix, index, clip),
         Command::PopClip => write_text(output, "</g>"),
         Command::PushOpacity(_) | Command::PopOpacity => Err(CatError::InvalidScene),
     }
@@ -231,6 +221,21 @@ fn write_path(
         write_paint_definition(output, prefix, index, "stroke", stroke.paint)?;
     }
     write_text(output, "<path d=\"")?;
+    write_path_data(output, path)?;
+    write_text(output, "\"")?;
+    match fill {
+        Some(paint) => write_paint_attribute(output, prefix, index, "fill", "fill", paint)?,
+        None => write_text(output, " fill=\"none\"")?,
+    }
+    write!(output, " fill-rule=\"{}\"", fill_rule_name(fill_rule))
+        .map_err(|_| CatError::SvgWrite)?;
+    if let Some(stroke) = stroke {
+        write_stroke(output, prefix, index, stroke)?;
+    }
+    write_text(output, "/>")
+}
+
+pub(super) fn write_path_data(output: &mut impl Write, path: &Path) -> Result<(), CatError> {
     let mut points = path.points()?.iter();
     let first = points.next().ok_or(CatError::InvalidScene)?;
     write_text(output, "M")?;
@@ -242,24 +247,14 @@ fn write_path(
     if path.is_closed() {
         write_text(output, " Z")?;
     }
-    write_text(output, "\"")?;
-    match fill {
-        Some(paint) => write_paint_attribute(output, prefix, index, "fill", "fill", paint)?,
-        None => write_text(output, " fill=\"none\"")?,
+    Ok(())
+}
+
+pub(super) const fn fill_rule_name(fill_rule: FillRule) -> &'static str {
+    match fill_rule {
+        FillRule::EvenOdd => "evenodd",
+        FillRule::NonZero => "nonzero",
     }
-    write!(
-        output,
-        " fill-rule=\"{}\"",
-        match fill_rule {
-            FillRule::EvenOdd => "evenodd",
-            FillRule::NonZero => "nonzero",
-        }
-    )
-    .map_err(|_| CatError::SvgWrite)?;
-    if let Some(stroke) = stroke {
-        write_stroke(output, prefix, index, stroke)?;
-    }
-    write_text(output, "/>")
 }
 
 fn write_stroke(
@@ -371,7 +366,7 @@ fn write_opacity(output: &mut impl Write, opacity: u8) -> Result<(), CatError> {
     write!(output, "0.{fraction:0digits$}").map_err(|_| CatError::SvgWrite)
 }
 
-fn write_rect_values(output: &mut impl Write, rect: Rect) -> Result<(), CatError> {
+pub(super) fn write_rect_values(output: &mut impl Write, rect: Rect) -> Result<(), CatError> {
     write_number(output, rect.left)?;
     write_text(output, "\" y=\"")?;
     write_number(output, rect.top)?;
@@ -401,11 +396,11 @@ fn write_point_axis(output: &mut impl Write, point: Point, x_axis: bool) -> Resu
     write_number(output, if x_axis { point.x } else { point.y })
 }
 
-fn write_number(output: &mut impl Write, value: Fixed) -> Result<(), CatError> {
+pub(super) fn write_number(output: &mut impl Write, value: Fixed) -> Result<(), CatError> {
     write_decimal(output, value).map_err(|_| CatError::SvgWrite)
 }
 
-fn write_text(output: &mut impl Write, value: &str) -> Result<(), CatError> {
+pub(super) fn write_text(output: &mut impl Write, value: &str) -> Result<(), CatError> {
     output.write_str(value).map_err(|_| CatError::SvgWrite)
 }
 

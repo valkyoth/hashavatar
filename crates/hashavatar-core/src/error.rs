@@ -21,7 +21,7 @@ impl IdentityComponent {
     }
 }
 
-/// Error returned by the alpha.2 canonical Cat workflow.
+/// Error returned by canonical avatar preparation or execution.
 #[non_exhaustive]
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum CatError {

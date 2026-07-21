@@ -38,7 +38,7 @@ panic = "abort"
 
 [package]
 name = "hashavatar"
-version = "2.0.0-alpha.2"
+version = "2.0.0-alpha.3"
 edition.workspace = true
 rust-version.workspace = true
 description = "Security-oriented deterministic procedural avatar rendering facade"
@@ -58,7 +58,11 @@ exclude = [
 ]
 
 [dependencies]
-hashavatar-core = { path = "crates/hashavatar-core", version = "0.1.0-alpha.2" }
+hashavatar-core = { path = "crates/hashavatar-core", version = "0.1.0-alpha.3" }
+
+[dev-dependencies]
+roxmltree.workspace = true
+sanitization-crypto-interop.workspace = true
 
 [lints]
 workspace = true

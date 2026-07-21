@@ -14,19 +14,21 @@ created and crates are not uploaded to crates.io. Every milestone must update
 its release note, current status, crate matrix, tests, and pentest digest before
 work begins on the next milestone.
 
-Alpha.2 freezes evidence for one complete canonical renderer, not the final 2.0 public
-surface. The following are intentional current contracts:
+Alpha.2 freezes evidence for one complete canonical renderer. Alpha.3 adds
+evidence for the existing 31-family, 13-background, five-frame catalog, not the
+final 2.0 public surface. The following are intentional current contracts:
 
 - checked request bounds and typed failures;
 - stateless label-separated trait derivation;
 - private fixed-point scene representation;
 - one scene used by canonical CPU RGBA8 and SVG output;
+- frozen catalog IDs and explicit family capability declarations;
 - deterministic output within the same source revision and contract labels;
 - no exposure of raw identity digests or scene internals.
 
-Changing alpha.2 domain labels, rounding, command order, containment tests,
-colors, or SVG serialization changes output and requires explicit KAT updates
-and release-note disclosure.
+Changing current domain labels, catalog order, family compilers, rounding,
+command order, containment tests, colors, or SVG serialization changes output
+and requires explicit KAT updates and release-note disclosure.
 
 ## Stable 2.0
 

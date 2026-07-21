@@ -20,7 +20,7 @@ supply-chain scope.
 - SHA-512 runs through `sanitization-crypto-interop`, including its reviewed
   upstream hasher cleanup path.
 - Geometry uses checked signed Q16.16 values. No floating point is used.
-- The alpha.2 scene is private and capped at 64 commands, eight paths, 48
+- The canonical scene is private and capped at 64 commands, eight paths, 48
   lowered points per path, and eight levels each of clip and opacity stacks.
   Validation rejects malformed commands, stack imbalance, invalid paint or
   geometry, degenerate shapes, bad path references, and arithmetic failure.
@@ -39,8 +39,8 @@ supply-chain scope.
   Accessibility strings are XML escaped before entering markup.
 - Owned SVG writes are capped at a 64 KiB pre-reserved document bound; writer
   failures return a typed error with documented partial-prefix behavior.
-- SVG is tested with an XML parser, including command-count parity with the
-  validated scene.
+- SVG is tested with an XML parser across the complete catalog, including
+  non-square clip-path semantics.
 - Production code is checked for panic-like sites; debug and release pixel
   fingerprints must match.
 - Rust source files are capped at 500 lines to keep review boundaries small.
@@ -89,7 +89,7 @@ exploit path exists.
 ## Assurance
 
 The gate includes strict Clippy, debug/release KATs, parser-backed SVG tests,
-MSRV checks, cross-target core compilation, fuzz-harness compilation, seven
+MSRV checks, cross-target core compilation, fuzz-harness compilation, eight
 bounded Kani proofs, RustSec, cargo-deny, package inspection, unsafe/panic
 policy checks, and reproducible archive comparison. Independent pentest
 digests are retained under [`security/pentest`](../security/pentest/README.md).

@@ -1,6 +1,6 @@
 #![no_main]
 
-use hashavatar::CatRequest;
+use hashavatar::{AvatarBackground, AvatarKind, AvatarRequest, AvatarShape, AvatarStyle};
 use libfuzzer_sys::fuzz_target;
 
 fuzz_target!(|data: &[u8]| {
@@ -26,15 +26,27 @@ fuzz_target!(|data: &[u8]| {
     let width = u32::from(u16::from_le_bytes(width_array));
     let height = u32::from(u16::from_le_bytes(height_array));
     let style_seed = u64::from_le_bytes(seed_array);
-    let tenant_end = data.len().min(28);
-    let style_end = data.len().min(44);
-    let identity_end = data.len().min(1_068);
-    let tenant = data.get(12..tenant_end).unwrap_or_default();
+    let avatar_style = AvatarStyle::new(
+        AvatarKind::from_byte(data.get(12).copied().unwrap_or_default()),
+        AvatarBackground::from_byte(data.get(13).copied().unwrap_or_default()),
+        AvatarShape::from_byte(data.get(14).copied().unwrap_or_default()),
+    );
+    let tenant_end = data.len().min(31);
+    let style_end = data.len().min(47);
+    let identity_end = data.len().min(1_071);
+    let tenant = data.get(15..tenant_end).unwrap_or_default();
     let style = data.get(tenant_end..style_end).unwrap_or_default();
     let identity = data.get(style_end..identity_end).unwrap_or_default();
 
-    let Ok(request) =
-        CatRequest::with_namespace(width, height, style_seed, tenant, style, identity)
+    let Ok(request) = AvatarRequest::with_namespace(
+        width,
+        height,
+        style_seed,
+        tenant,
+        style,
+        identity,
+        avatar_style,
+    )
     else {
         return;
     };

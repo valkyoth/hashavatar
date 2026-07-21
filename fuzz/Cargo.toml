@@ -8,7 +8,7 @@ publish = false
 cargo-fuzz = true
 
 [dependencies]
-hashavatar = { path = "..", version = "2.0.0-alpha.2" }
+hashavatar = { path = "..", version = "2.0.0-alpha.3" }
 libfuzzer-sys = "0.4.13"
 roxmltree = "0.21.1"
 

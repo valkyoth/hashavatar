@@ -49,14 +49,16 @@ dependencies = [
 
 [[package]]
 name = "hashavatar"
-version = "2.0.0-alpha.2"
+version = "2.0.0-alpha.3"
 dependencies = [
  "hashavatar-core",
+ "roxmltree",
+ "sanitization-crypto-interop",
 ]
 
 [[package]]
 name = "hashavatar-core"
-version = "0.1.0-alpha.2"
+version = "0.1.0-alpha.3"
 dependencies = [
  "roxmltree",
  "sanitization",

@@ -4,7 +4,7 @@ use crate::{
     fixed::Fixed,
     geometry::{FillRule, Path, Point, Rect},
     paint::{Color, Paint},
-    scene::{Command, Scene, Stroke},
+    scene::{Clip, Command, Scene, Stroke},
 };
 
 pub(super) fn compile_scene(
@@ -51,12 +51,12 @@ pub(super) fn compile_scene(
         rect: Rect::new(Fixed::ZERO, scale(height, 88, 100)?, width, height),
         paint: Paint::solid(Color::rgba(255, 255, 255, 36)),
     })?;
-    scene.push(Command::PushClip(Rect::new(
+    scene.push(Command::PushClip(Clip::Rect(Rect::new(
         Fixed::ZERO,
         Fixed::ZERO,
         scale(width, 95, 100)?,
         height,
-    )))?;
+    ))))?;
     scene.push(Command::PushOpacity(196))?;
     scene.push(Command::Ellipse {
         center: Point::new(scale(width, 82, 100)?, scale(height, 18, 100)?),

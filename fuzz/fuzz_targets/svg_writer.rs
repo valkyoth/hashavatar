@@ -2,7 +2,9 @@
 
 use core::fmt::Write;
 
-use hashavatar::{CatRequest, SvgOptions};
+use hashavatar::{
+    AvatarBackground, AvatarKind, AvatarRequest, AvatarShape, AvatarStyle, SvgOptions,
+};
 use libfuzzer_sys::fuzz_target;
 
 struct BoundedWriter {
@@ -24,8 +26,13 @@ fuzz_target!(|data: &[u8]| {
         .get(..2)
         .and_then(|bytes| <[u8; 2]>::try_from(bytes).ok())
         .map_or(0, |bytes| usize::from(u16::from_le_bytes(bytes)));
-    let text = String::from_utf8_lossy(data.get(2..).unwrap_or_default());
-    let Ok(request) = CatRequest::new(64, 64, 0, b"svg-fuzz") else {
+    let style = AvatarStyle::new(
+        AvatarKind::from_byte(data.get(2).copied().unwrap_or_default()),
+        AvatarBackground::from_byte(data.get(3).copied().unwrap_or_default()),
+        AvatarShape::from_byte(data.get(4).copied().unwrap_or_default()),
+    );
+    let text = String::from_utf8_lossy(data.get(5..).unwrap_or_default());
+    let Ok(request) = AvatarRequest::new(64, 64, 0, b"svg-fuzz", style) else {
         return;
     };
     let Ok(prepared) = request.prepare() else {

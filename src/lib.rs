@@ -1,16 +1,20 @@
 //! Security-oriented facade for canonical Hashavatar rendering.
 //!
-//! `2.0.0-alpha.2` is a source-only development release. It intentionally
-//! exposes one complete Cat vertical slice while the 2.0 contracts are
-//! validated. The maintained crates.io line remains `1.3.x`.
+//! `2.0.0-alpha.3` is a source-only development release. It ports the existing
+//! family, background, and frame catalog onto the canonical scene renderer.
+//! The maintained crates.io line remains `1.3.x`.
 //!
 //! # Example
 //!
 //! ```
-//! use hashavatar::CatRequest;
+//! use hashavatar::{AvatarBackground, AvatarKind, AvatarRequest, AvatarShape, AvatarStyle};
 //!
-//! let prepared = CatRequest::new(256, 256, 0, b"user@example.invalid")?
-//!     .prepare()?;
+//! let style = AvatarStyle::new(
+//!     AvatarKind::Robot,
+//!     AvatarBackground::Ocean,
+//!     AvatarShape::Circle,
+//! );
+//! let prepared = AvatarRequest::new(256, 256, 0, b"user@example.invalid", style)?.prepare()?;
 //! let rgba = prepared.render_rgba()?;
 //! let svg = prepared.render_svg()?;
 //!
@@ -23,16 +27,18 @@
 #![forbid(unsafe_code)]
 
 pub use hashavatar_core::{
-    CanonicalRgbaImage, CatError, CatRequest, CatTraitVector, IdentityComponent, MAX_DIMENSION,
-    MAX_IDENTITY_BYTES, MAX_NAMESPACE_COMPONENT_BYTES, MIN_DIMENSION, PIXEL_CONTRACT_ID,
-    PixelDigest, PreparedCat, RGBA8_BYTES_PER_PIXEL, RgbaSurfaceMut, SceneReport, SvgMode,
-    SvgOptions,
+    AVATAR_FAMILY_CAPABILITIES, AvatarBackground, AvatarError, AvatarFamilyCapabilities,
+    AvatarFamilyCapabilityEntry, AvatarKind, AvatarRequest, AvatarShape, AvatarStyle,
+    AvatarTraitVector, CATALOG_CONTRACT_ID, CanonicalRgbaImage, CatError, CatRequest,
+    CatTraitVector, IdentityComponent, MAX_DIMENSION, MAX_IDENTITY_BYTES,
+    MAX_NAMESPACE_COMPONENT_BYTES, MIN_DIMENSION, PIXEL_CONTRACT_ID, PixelDigest, PreparedAvatar,
+    PreparedCat, RGBA8_BYTES_PER_PIXEL, RgbaSurfaceMut, SceneReport, SvgMode, SvgOptions,
 };
 
-/// Common alpha.2 facade imports.
+/// Common alpha.3 facade imports.
 pub mod prelude {
     pub use crate::{
-        CanonicalRgbaImage, CatError, CatRequest, CatTraitVector, PreparedCat, RgbaSurfaceMut,
-        SvgOptions,
+        AvatarBackground, AvatarError, AvatarKind, AvatarRequest, AvatarShape, AvatarStyle,
+        CanonicalRgbaImage, PreparedAvatar, RgbaSurfaceMut, SvgOptions,
     };
 }
