@@ -78,5 +78,5 @@ byte-identical package archives, SBOM generation, and crates.io publish
 dry-run. `cargo-semver-checks` against `v1.2.0` passed for the default,
 BLAKE3, and XXH3 feature sets, confirming that the public API changes are
 additive. Independent pentesting completed cleanly after the reported
-assurance findings were resolved. GitHub validation and downstream
-`hashavatar-website` integration testing remain before tagging.
+assurance findings were resolved. GitHub validation is green, and downstream
+`hashavatar-website` integration testing completed successfully.
