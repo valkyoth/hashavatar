@@ -1,6 +1,6 @@
 use crate::{AvatarError, AvatarKind, geometry::Point, scene::Scene};
 
-use crate::art::families::common::{FamilyRig, ellipse, eyes, polygon, smile, triangle};
+use crate::art::families::common::{FamilyRig, ellipse, eyes, polygon, triangle};
 
 use super::{base_head, split_smile};
 
@@ -39,8 +39,25 @@ fn fox(scene: &mut Scene, rig: FamilyRig) -> Result<(), AvatarError> {
         )?;
     }
     base_head(scene, rig, rig.primary)?;
-    polygon(scene, rig, &[(30, 54), (50, 78), (48, 62)], rig.light)?;
-    polygon(scene, rig, &[(70, 54), (50, 78), (52, 62)], rig.light)?;
+    polygon(
+        scene,
+        rig,
+        &[(30, 54), (47, 60), (43, 69), (31, 63)],
+        rig.light,
+    )?;
+    polygon(
+        scene,
+        rig,
+        &[(70, 54), (53, 60), (57, 69), (69, 63)],
+        rig.light,
+    )?;
+    ellipse(
+        scene,
+        Point::new(rig.canvas.x(50)?, rig.canvas.y(65)?),
+        rig.canvas.s(13)?,
+        rig.canvas.s(8)?,
+        rig.light,
+    )?;
     if rig.draws_default_eyes() {
         for x in [39, 61] {
             ellipse(
@@ -68,7 +85,7 @@ fn fox(scene: &mut Scene, rig: FamilyRig) -> Result<(), AvatarError> {
         ],
         rig.ink,
     )?;
-    smile(scene, rig, 69)
+    split_smile(scene, rig, 50, 69)
 }
 
 fn panda(scene: &mut Scene, rig: FamilyRig) -> Result<(), AvatarError> {

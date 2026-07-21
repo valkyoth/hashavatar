@@ -1,4 +1,4 @@
-use super::common::{LayerRig, curved_line, ellipse, line, outline_ellipse, rect};
+use super::common::{LayerRig, curved_line, ellipse, line, rect};
 use crate::{
     AvatarAnchorSet, AvatarColorRoles, AvatarError, AvatarExpression, AvatarKind, geometry::Point,
     paint::Color, scene::Scene,
@@ -27,21 +27,19 @@ pub(super) fn compile(
     match expression {
         AvatarExpression::Default => Ok(()),
         AvatarExpression::Happy => mouth_curve(scene, rig, mouth, false, mouth_color),
-        AvatarExpression::Grumpy => mouth_curve(
-            scene,
-            rig,
-            Point::new(mouth.x, mouth.y.checked_add(rig.size(700)?)?),
-            true,
-            mouth_color,
-        ),
-        AvatarExpression::Surprised => outline_ellipse(
-            scene,
-            mouth,
-            rig.size(700)?,
-            rig.size(700)?,
-            rig.size(180)?,
-            mouth_color,
-        ),
+        AvatarExpression::Grumpy => {
+            grumpy_brows(scene, rig, left, right, eye)?;
+            mouth_curve(
+                scene,
+                rig,
+                Point::new(mouth.x, mouth.y.checked_add(rig.size(350)?)?),
+                true,
+                mouth_color,
+            )
+        }
+        AvatarExpression::Surprised => {
+            ellipse(scene, mouth, rig.size(600)?, rig.size(850)?, mouth_color)
+        }
         AvatarExpression::Sleepy => {
             for center in [left, right] {
                 line(
@@ -105,6 +103,32 @@ pub(super) fn compile(
             )
         }
     }
+}
+
+fn grumpy_brows(
+    scene: &mut Scene,
+    rig: LayerRig,
+    left: Point,
+    right: Point,
+    eye: crate::fixed::Fixed,
+) -> Result<(), AvatarError> {
+    let high = rig.size(500)?;
+    let low = rig.size(100)?;
+    let width = rig.size(160)?;
+    line(
+        scene,
+        Point::new(left.x.checked_sub(eye)?, left.y.checked_sub(high)?),
+        Point::new(left.x.checked_add(eye)?, left.y.checked_sub(low)?),
+        width,
+        rig.ink,
+    )?;
+    line(
+        scene,
+        Point::new(right.x.checked_sub(eye)?, right.y.checked_sub(low)?),
+        Point::new(right.x.checked_add(eye)?, right.y.checked_sub(high)?),
+        width,
+        rig.ink,
+    )
 }
 
 fn mouth_curve(

@@ -48,6 +48,9 @@ prerelease.
 - Makes expressions replace the affected default eyes or mouth instead of
   painting duplicate features, and adds a 340-render layered-corpus KAT plus
   fixed-path accessory and expression review sheets.
+- Restores Fox's compact central muzzle and split smile, gives Wizard a visible
+  foreground mouth, and makes Grumpy and Surprised read clearly through angled
+  brows, a frown, and a filled open mouth.
 - Adds exact WebP/PNG decode-to-canonical comparisons, bounded JPEG/GIF lossy
   evidence, writer-failure tests, key tests, scratch-reuse tests, and a bounded
   format/writer fuzz target.

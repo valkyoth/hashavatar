@@ -1,7 +1,7 @@
 mod animals;
 mod characters;
 
-use super::common::{FamilyRig, ellipse, eyes, line, polygon, rect, triangle};
+use super::common::{FamilyRig, ellipse, eyes, line, polygon, rect, smile, triangle};
 use crate::{
     AvatarError, AvatarKind,
     geometry::{Point, Rect},
@@ -271,7 +271,8 @@ fn wizard(scene: &mut Scene, rig: FamilyRig) -> Result<(), AvatarError> {
         rig,
         &[(36, 64), (50, 91), (64, 64), (58, 79), (50, 73), (42, 79)],
         rig.light,
-    )
+    )?;
+    smile(scene, rig, 63)
 }
 
 fn skull(scene: &mut Scene, rig: FamilyRig) -> Result<(), AvatarError> {
