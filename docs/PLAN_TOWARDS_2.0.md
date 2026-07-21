@@ -761,6 +761,9 @@ renderer receives focused adversarial review.
 
 **Status:** Complete. Exact-commit external pentest passed after remediation;
 permanent evidence is recorded in `security/pentest/v2.0.0-alpha.3.md`.
+The first downstream 1.3 comparison was deferred until alpha.5 and exposed
+over-simplified geometry and generic palettes; alpha.5 remediates that visual
+acceptance gap and rebases the prerelease catalog KAT.
 
 **Goal:** Port all existing 1.x families, backgrounds, and frames without
 expanding the art catalog.
@@ -771,7 +774,8 @@ backgrounds; all current frame shapes; capability manifests; canonical corpus.
 
 **Verification:** Every family at minimum/default/maximum dimensions, all
 background/frame combinations, raster/SVG scene parity, cross-platform pixel
-digests, unsupported-capability tests, resource ceilings, and visual review.
+digests, unsupported-capability tests, resource ceilings, and side-by-side
+contact-sheet review against the deployed 1.3 catalog.
 
 **Exit criteria:** Every existing family/background/frame uses only the canonical
 scene; old family raster and SVG implementations can be removed or isolated by

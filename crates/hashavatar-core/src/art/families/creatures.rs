@@ -17,22 +17,27 @@ pub(super) fn compile(
 }
 
 fn ghost(scene: &mut Scene, rig: FamilyRig) -> Result<(), AvatarError> {
+    ellipse(
+        scene,
+        Point::new(rig.canvas.x(50)?, rig.canvas.y(49)?),
+        rig.canvas.s(23)?,
+        rig.canvas.s(27)?,
+        rig.light,
+    )?;
     polygon(
         scene,
         rig,
         &[
+            (27, 48),
+            (73, 48),
+            (73, 76),
+            (66, 72),
+            (61, 81),
+            (53, 74),
+            (46, 82),
+            (39, 74),
+            (33, 81),
             (27, 76),
-            (27, 49),
-            (32, 31),
-            (50, 21),
-            (68, 31),
-            (73, 49),
-            (73, 80),
-            (65, 73),
-            (58, 82),
-            (50, 74),
-            (42, 82),
-            (35, 73),
         ],
         rig.light,
     )?;
@@ -74,40 +79,29 @@ fn bird(scene: &mut Scene, rig: FamilyRig) -> Result<(), AvatarError> {
     ellipse(
         scene,
         Point::new(rig.canvas.x(50)?, rig.canvas.y(57)?),
-        rig.canvas.s(25)?,
-        rig.canvas.s(29)?,
+        rig.canvas.s(23)?,
+        rig.canvas.s(23)?,
         rig.primary,
     )?;
-    ellipse(
-        scene,
-        Point::new(rig.canvas.x(39)?, rig.canvas.y(60)?),
-        rig.canvas.s(11)?,
-        rig.canvas.s(18)?,
-        rig.secondary,
-    )?;
+    for x in [34, 66] {
+        ellipse(
+            scene,
+            Point::new(rig.canvas.x(x)?, rig.canvas.y(62)?),
+            rig.canvas.s(8)?,
+            rig.canvas.s(13)?,
+            rig.secondary,
+        )?;
+    }
     triangle(
         scene,
         [
-            Point::new(rig.canvas.x(67)?, rig.canvas.y(53)?),
-            Point::new(rig.canvas.x(84)?, rig.canvas.y(60)?),
-            Point::new(rig.canvas.x(67)?, rig.canvas.y(65)?),
+            Point::new(rig.canvas.x(46)?, rig.canvas.y(58)?),
+            Point::new(rig.canvas.x(54)?, rig.canvas.y(58)?),
+            Point::new(rig.canvas.x(50)?, rig.canvas.y(65)?),
         ],
         rig.accent,
     )?;
-    ellipse(
-        scene,
-        Point::new(rig.canvas.x(59)?, rig.canvas.y(48)?),
-        rig.canvas.s(5)?,
-        rig.canvas.s(5)?,
-        rig.light,
-    )?;
-    ellipse(
-        scene,
-        Point::new(rig.canvas.x(60)?, rig.canvas.y(48)?),
-        rig.canvas.s(2)?,
-        rig.canvas.s(2)?,
-        rig.ink,
-    )
+    eyes(scene, rig, 49, 8, 3)
 }
 
 fn octopus(scene: &mut Scene, rig: FamilyRig) -> Result<(), AvatarError> {
@@ -146,6 +140,15 @@ fn penguin(scene: &mut Scene, rig: FamilyRig) -> Result<(), AvatarError> {
         rig.canvas.s(24)?,
         rig.light,
     )?;
+    for x in [25, 75] {
+        ellipse(
+            scene,
+            Point::new(rig.canvas.x(x)?, rig.canvas.y(61)?),
+            rig.canvas.s(7)?,
+            rig.canvas.s(18)?,
+            rig.ink,
+        )?;
+    }
     for x in [27, 73] {
         triangle(
             scene,
@@ -169,5 +172,15 @@ fn penguin(scene: &mut Scene, rig: FamilyRig) -> Result<(), AvatarError> {
             Point::new(rig.canvas.x(50)?, rig.canvas.y(61)?),
         ],
         rig.accent,
-    )
+    )?;
+    for x in [41, 59] {
+        ellipse(
+            scene,
+            Point::new(rig.canvas.x(x)?, rig.canvas.y(87)?),
+            rig.canvas.s(6)?,
+            rig.canvas.s(3)?,
+            rig.accent,
+        )?;
+    }
+    Ok(())
 }

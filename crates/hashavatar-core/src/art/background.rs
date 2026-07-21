@@ -1,4 +1,4 @@
-use super::util::{Canvas, themed_color};
+use super::util::{Canvas, role_color, themed_color};
 use crate::{
     AvatarBackground, AvatarError, AvatarPalette, AvatarTraitVector, ResolvedStyle,
     geometry::Point,
@@ -15,12 +15,7 @@ pub(super) fn compile(
     match style.background() {
         AvatarBackground::Transparent => Ok(()),
         AvatarBackground::Themed if matches!(style.palette(), AvatarPalette::Default) => {
-            push_gradient(
-                scene,
-                canvas,
-                themed_color(traits.primary_hue(), 52, 224, 7),
-                themed_color(traits.secondary_hue(), 28, 172, 11),
-            )
+            push_family_theme(scene, canvas, style, traits)
         }
         AvatarBackground::Themed => push_gradient(
             scene,
@@ -50,6 +45,60 @@ pub(super) fn compile(
         AvatarBackground::Grid => push_grid(scene, canvas),
         AvatarBackground::Starry => push_stars(scene, canvas, traits.pattern_seed()),
     }
+}
+
+fn push_family_theme(
+    scene: &mut Scene,
+    canvas: Canvas,
+    style: ResolvedStyle,
+    traits: AvatarTraitVector,
+) -> Result<(), AvatarError> {
+    let primary = role_color(style.color_roles().primary());
+    let accent = family_theme_accent(style);
+    push_solid(scene, canvas, mix_with_white(primary, 18))?;
+    let band_y = 17 + i32::from(traits.proportion_b() % 8);
+    let band_height = 8 + i32::from(traits.detail_a() % 8);
+    scene.push(Command::Rect {
+        rect: crate::geometry::Rect::new(
+            crate::fixed::Fixed::ZERO,
+            canvas.y(band_y)?,
+            canvas.width,
+            canvas.y(band_y + band_height)?,
+        ),
+        paint: Paint::solid(mix_with_white(accent, 34)),
+    })?;
+    scene.push(Command::Ellipse {
+        center: Point::new(canvas.x(63)?, canvas.y(39)?),
+        radius_x: canvas.s(9)?,
+        radius_y: canvas.s(9)?,
+        paint: Paint::solid(accent.with_opacity(150)),
+    })
+}
+
+fn family_theme_accent(style: ResolvedStyle) -> Color {
+    let roles = style.color_roles();
+    let color = match style.kind() {
+        crate::AvatarKind::Alien
+        | crate::AvatarKind::Monster
+        | crate::AvatarKind::Cactus
+        | crate::AvatarKind::Frog
+        | crate::AvatarKind::Planet
+        | crate::AvatarKind::Rocket
+        | crate::AvatarKind::Mushroom
+        | crate::AvatarKind::Icecream
+        | crate::AvatarKind::Octopus => roles.secondary(),
+        _ => roles.accent(),
+    };
+    role_color(color)
+}
+
+fn mix_with_white(color: Color, color_percent: u16) -> Color {
+    let mix = |channel: u8| {
+        let value = u32::from(channel) * u32::from(color_percent)
+            + 255 * u32::from(100_u16.saturating_sub(color_percent));
+        u8::try_from(value / 100).unwrap_or(u8::MAX)
+    };
+    Color::rgb(mix(color.red), mix(color.green), mix(color.blue))
 }
 
 fn push_solid(scene: &mut Scene, canvas: Canvas, color: Color) -> Result<(), AvatarError> {

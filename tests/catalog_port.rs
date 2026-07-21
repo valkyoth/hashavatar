@@ -187,19 +187,68 @@ fn capability_manifest_is_complete_and_ordered() {
 fn complete_catalog_has_a_stable_aggregate_pixel_fingerprint() -> Result<(), hashavatar::AvatarError>
 {
     let mut aggregate = SanitizedSha512::new();
+    let mut family_fingerprints = Vec::with_capacity(AvatarKind::ALL.len());
     for kind in AvatarKind::ALL {
         let prepared = prepare(64, 64, kind, AvatarBackground::Themed, AvatarShape::Square)?;
-        let digest = prepared.render_rgba()?.pixel_digest()?;
+        let image = prepared.render_rgba()?;
+        family_fingerprints.push(fnv1a64(image.pixels()));
+        let digest = image.pixel_digest()?;
         aggregate.update(digest.as_bytes());
+    }
+    let expected_family_fingerprints = [
+        14_959_214_206_026_651_746,
+        9_202_591_113_189_904_873,
+        7_779_670_557_938_237_177,
+        8_552_577_103_144_023_970,
+        15_689_753_943_708_702_665,
+        14_625_612_522_906_726_477,
+        1_712_830_299_425_462_904,
+        18_156_709_895_062_844_882,
+        11_055_067_729_218_570_545,
+        15_791_166_020_840_224_950,
+        3_167_892_409_447_852_483,
+        4_568_691_605_609_754_493,
+        5_970_636_059_914_220_005,
+        11_874_149_948_522_176_569,
+        7_918_069_477_284_194_231,
+        9_275_310_335_073_050_193,
+        17_892_788_220_383_271_177,
+        7_400_073_407_904_865_353,
+        8_853_086_671_596_485_388,
+        1_682_025_975_739_740_998,
+        5_399_080_176_009_215_906,
+        340_207_536_650_252_233,
+        17_639_134_060_814_003_555,
+        6_113_982_546_575_385_341,
+        9_586_995_340_015_360_875,
+        3_655_959_163_641_752_247,
+        4_672_810_096_955_459_917,
+        40_325_208_071_989_337,
+        16_056_988_084_459_822_721,
+        15_077_432_928_493_723_768,
+        16_278_937_666_865_071_925,
+    ];
+    for ((kind, actual), expected) in AvatarKind::ALL
+        .iter()
+        .zip(family_fingerprints)
+        .zip(expected_family_fingerprints)
+    {
+        assert_eq!(actual, expected, "visual fingerprint: {}", kind.as_str());
     }
     assert_eq!(
         aggregate.finalize(),
         [
-            238, 123, 213, 179, 34, 38, 186, 2, 201, 167, 182, 249, 125, 247, 61, 89, 151, 249,
-            185, 117, 214, 111, 120, 193, 77, 172, 16, 34, 80, 162, 248, 76, 84, 248, 202, 154,
-            238, 72, 120, 214, 201, 190, 40, 105, 120, 49, 11, 167, 181, 9, 83, 126, 248, 117, 108,
-            213, 161, 220, 193, 218, 99, 194, 93, 128,
+            132, 132, 130, 154, 148, 230, 0, 63, 47, 40, 28, 205, 50, 136, 18, 251, 192, 53, 115,
+            102, 15, 253, 108, 163, 220, 16, 40, 112, 158, 64, 43, 233, 145, 215, 101, 125, 149,
+            61, 204, 110, 103, 139, 59, 195, 123, 93, 245, 40, 165, 53, 146, 84, 5, 96, 219, 181,
+            218, 251, 232, 66, 215, 238, 241, 48,
         ]
     );
     Ok(())
+}
+
+fn fnv1a64(bytes: &[u8]) -> u64 {
+    bytes.iter().fold(0xcbf2_9ce4_8422_2325, |hash, byte| {
+        (hash ^ u64::from(*byte)).wrapping_mul(0x0000_0100_0000_01b3)
+    })
 }

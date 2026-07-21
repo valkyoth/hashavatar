@@ -1,4 +1,4 @@
-//! Generates a dependency-free PPM contact sheet for alpha.3 visual review.
+//! Generates a dependency-free PPM contact sheet for complete catalog review.
 
 use std::fs;
 

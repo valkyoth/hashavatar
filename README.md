@@ -53,6 +53,18 @@ To test alpha.5 from a local checkout:
 hashavatar = { path = "../hashavatar" }
 ```
 
+## Visual Compatibility
+
+Hashavatar 2.0 uses a new fixed-point canonical renderer, so it does not promise
+pixel equality with 1.3. It does preserve the existing 31 subjects, family-
+appropriate default palettes, and their recognizable visual signatures. The
+full raster and SVG catalogs are reviewed against the deployed 1.3 catalog;
+ordered per-family fingerprints then prevent unreviewed drift within 2.0.
+
+Applications that require exact 1.3 pixels should pin `hashavatar = "=1.3.0"`.
+Applications trialing 2.0 must use a new style-version and cache namespace. See
+the [migration guide](docs/MIGRATION_2.0.md) for the rollout contract.
+
 ## Prepared Request
 
 ```rust

@@ -1,4 +1,4 @@
-//! Generates an SVG contact sheet for alpha.3 catalog review.
+//! Generates an SVG contact sheet for complete catalog review.
 
 use std::{fmt::Write, fs};
 

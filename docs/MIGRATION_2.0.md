@@ -6,7 +6,9 @@ output should pin `hashavatar = "=1.3.0"` until they deliberately migrate.
 
 Alpha.5 ports the complete 1.3 style catalog to typed canonical composition and
 adds the intended prepared-request, key, reusable raster, and established-
-format boundaries. Pixels intentionally differ from 1.x.
+format boundaries. Pixels intentionally differ from 1.x, while family-aware
+colors and defining silhouettes preserve the recognizable subject and visual
+intent of each 1.3 family.
 
 ## Alpha.5 Trial
 
@@ -59,7 +61,9 @@ compatible. `image::RgbaImage` is no longer part of Hashavatar's public API.
 4. Enforce service concurrency from `SceneReport` and application memory
    policy.
 5. Test each reviewed alpha implementation-stop commit in `hashavatar-website`.
-6. Move production only after the required 2.0 package and compatibility
+6. Review complete 1.3-versus-2.0 raster and SVG contact sheets; pixel KATs
+   prevent unreviewed drift after that visual acceptance point.
+7. Move production only after the required 2.0 package and compatibility
    contracts reach stable.
 
 Do not reuse a 1.x cache key for 2.0 bytes. Alpha.5 typed keys use new domains

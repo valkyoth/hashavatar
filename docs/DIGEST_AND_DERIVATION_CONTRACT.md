@@ -41,7 +41,9 @@ Alpha.5 automatic palette, expression, and accessory selection reuses separate
 named family samples. Compatibility fallback consumes no additional hash state
 and does not introduce mutable RNG state.
 
-The default namespace is tenant `public` and style version `v2-alpha3` so
-layer-free alpha.3 KATs remain stable through alpha.5.
+The default namespace is tenant `public` and style version `v2-alpha3`.
+Alpha.5 intentionally rebases the prerelease pixel KAT after correcting the
+catalog's first production-versus-candidate visual review. Trait derivation and
+catalog IDs remain stable; canonical pixels do not.
 Applications needing stable application-specific output should always pass an
 explicit tenant and style version.

@@ -16,9 +16,11 @@ order beginning at zero.
 The complete ordered arrays are exposed as `ALL`. `from_byte` selects through
 that order without hard-coded modulo counts.
 
-The IDs identify semantic choices, not 1.x pixels. Alpha.3 compiles every
-choice through the new canonical fixed-point renderer and therefore requires a
-new style-version and cache namespace.
+The IDs identify semantic choices, not 1.x pixels. The canonical fixed-point
+renderer therefore requires a new style-version and cache namespace. Alpha.5
+corrected the prerelease port's palettes and recognizable family geometry after
+its first comparison with the deployed 1.3 website; this intentionally changed
+2.0 prerelease pixels without changing semantic IDs.
 
 Existing IDs must never be reordered or reused. Adding a future entry appends
 an ID under a new catalog contract and requires mapping, aggregate-KAT,
@@ -46,4 +48,7 @@ geometry and color samples remain separately scoped by family label.
 The integration corpus retains the 2,015 family/background/frame matrix and
 adds every family/palette, family/expression, and family/accessory combination,
 strict and automatic resolution cases, permutation invariance, maximum stacks,
-pixel-distinct representative choices, and a full layered visual corpus.
+pixel-distinct representative choices, ordered per-family fingerprints, and a
+full layered visual corpus. Every catalog-port milestone must also compare full
+raster and SVG contact sheets with the deployed 1.3 catalog; checksums prove
+stability after review, not visual quality by themselves.

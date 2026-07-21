@@ -21,6 +21,7 @@ portable core, established-format provider, and recommended facade workflow:
 - versioned pixel digests over visible rows;
 - deterministic SVG documents and fragments from the same scene;
 - 31 family compilers, 13 backgrounds, and five frame shapes;
+- family-aware default palettes and recognizable 1.3-derived subject geometry;
 - immutable family capability declarations and frozen catalog IDs;
 - fixed-capacity typed accessory stacks with six admitted semantic slots;
 - nine accessory variants, eight expressions, and six integer palettes;
@@ -39,11 +40,18 @@ portable core, established-format provider, and recommended facade workflow:
 - typed format metadata, alpha capabilities, semantic encoded keys, and
   caller-bound build keys;
 - an exhaustive 2,015 family/background/frame execution matrix;
-- debug/release pixel KATs and parser-backed SVG checks;
+- ordered per-family and aggregate debug/release pixel KATs plus parser-backed
+  SVG checks;
 - focused catalog, layout, surface, SVG-writer, and format/writer fuzz targets
   plus nine Kani harnesses;
 - source-size enforcement at 500 lines per Rust file;
 - portable core CI for WASM, AArch64 Linux, and 32-bit x86 Linux.
+
+The first alpha.5 downstream trial exposed a broad visual regression in the
+initial catalog port. Family palettes, themed composition, and defining
+geometry have been corrected and the prerelease pixel baseline intentionally
+rebased. The remediated alpha.5 candidate requires a fresh exact-commit
+website comparison and pentest.
 
 The alpha.5 implementation-stop candidate is ready for exact-commit external pentesting.
 The milestone is not complete until findings are resolved, the permanent

@@ -90,7 +90,7 @@ pub(crate) fn resolve_style(
         background: style.background(),
         shape: style.shape(),
         palette,
-        colors: resolve_color_roles(palette, traits),
+        colors: resolve_color_roles(palette, traits, style.kind()),
         expression: expression.effective,
         accessories: effective_accessories,
         automatically_derived,

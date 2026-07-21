@@ -34,6 +34,13 @@ fn paws(scene: &mut Scene, rig: FamilyRig) -> Result<(), AvatarError> {
         rig.canvas.s(14)?,
         rig.primary,
     )?;
+    ellipse(
+        scene,
+        Point::new(rig.canvas.x(50)?, rig.canvas.y(64)?),
+        rig.canvas.s(12)?,
+        rig.canvas.s(9)?,
+        rig.secondary,
+    )?;
     for (x, y) in [(31, 43), (43, 34), (57, 34), (69, 43)] {
         ellipse(
             scene,
@@ -41,6 +48,13 @@ fn paws(scene: &mut Scene, rig: FamilyRig) -> Result<(), AvatarError> {
             rig.canvas.s(7)?,
             rig.canvas.s(9)?,
             rig.primary,
+        )?;
+        ellipse(
+            scene,
+            Point::new(rig.canvas.x(x)?, rig.canvas.y(y + 1)?),
+            rig.canvas.s(4)?,
+            rig.canvas.s(5)?,
+            rig.secondary,
         )?;
     }
     Ok(())
@@ -162,6 +176,13 @@ fn cactus(scene: &mut Scene, rig: FamilyRig) -> Result<(), AvatarError> {
         ),
         rig.primary,
     )?;
+    ellipse(
+        scene,
+        Point::new(rig.canvas.x(50)?, rig.canvas.y(27)?),
+        rig.canvas.s(7)?,
+        rig.canvas.s(7)?,
+        rig.primary,
+    )?;
     rect(
         scene,
         Rect::new(
@@ -170,6 +191,13 @@ fn cactus(scene: &mut Scene, rig: FamilyRig) -> Result<(), AvatarError> {
             rig.canvas.x(45)?,
             rig.canvas.y(58)?,
         ),
+        rig.primary,
+    )?;
+    ellipse(
+        scene,
+        Point::new(rig.canvas.x(27)?, rig.canvas.y(52)?),
+        rig.canvas.s(6)?,
+        rig.canvas.s(6)?,
         rig.primary,
     )?;
     rect(
@@ -184,9 +212,25 @@ fn cactus(scene: &mut Scene, rig: FamilyRig) -> Result<(), AvatarError> {
     )?;
     ellipse(
         scene,
-        Point::new(rig.canvas.x(50)?, rig.canvas.y(25)?),
-        rig.canvas.s(7)?,
-        rig.canvas.s(7)?,
+        Point::new(rig.canvas.x(73)?, rig.canvas.y(45)?),
+        rig.canvas.s(6)?,
+        rig.canvas.s(6)?,
+        rig.primary,
+    )?;
+    for (x, y, direction) in [(47, 40, -1), (53, 54, 1), (47, 67, -1)] {
+        line(
+            scene,
+            Point::new(rig.canvas.x(x)?, rig.canvas.y(y)?),
+            Point::new(rig.canvas.x(x + direction * 5)?, rig.canvas.y(y - 3)?),
+            rig.canvas.s(1)?,
+            rig.light,
+        )?;
+    }
+    ellipse(
+        scene,
+        Point::new(rig.canvas.x(50)?, rig.canvas.y(17)?),
+        rig.canvas.s(5)?,
+        rig.canvas.s(5)?,
         rig.accent,
     )
 }
@@ -198,6 +242,18 @@ fn cupcake(scene: &mut Scene, rig: FamilyRig) -> Result<(), AvatarError> {
         &[(31, 55), (69, 55), (62, 83), (38, 83)],
         rig.primary,
     )?;
+    for x in [40, 50, 60] {
+        line(
+            scene,
+            Point::new(rig.canvas.x(x)?, rig.canvas.y(58)?),
+            Point::new(
+                rig.canvas.x(x + if x < 50 { 2 } else { -2 })?,
+                rig.canvas.y(80)?,
+            ),
+            rig.canvas.s(1)?,
+            rig.light,
+        )?;
+    }
     for (x, y, radius) in [(38, 52, 11), (50, 44, 14), (63, 52, 11)] {
         ellipse(
             scene,
@@ -312,6 +368,13 @@ fn coffee(scene: &mut Scene, rig: FamilyRig) -> Result<(), AvatarError> {
         ),
         rig.primary,
     )?;
+    ellipse(
+        scene,
+        Point::new(rig.canvas.x(46)?, rig.canvas.y(42)?),
+        rig.canvas.s(19)?,
+        rig.canvas.s(5)?,
+        rig.secondary,
+    )?;
     line(
         scene,
         Point::new(rig.canvas.x(65)?, rig.canvas.y(49)?),
@@ -326,13 +389,20 @@ fn coffee(scene: &mut Scene, rig: FamilyRig) -> Result<(), AvatarError> {
         rig.canvas.s(7)?,
         rig.primary,
     )?;
-    for x in [39, 52] {
+    line(
+        scene,
+        Point::new(rig.canvas.x(22)?, rig.canvas.y(78)?),
+        Point::new(rig.canvas.x(72)?, rig.canvas.y(78)?),
+        rig.canvas.s(4)?,
+        rig.secondary,
+    )?;
+    for x in [38, 50, 62] {
         line(
             scene,
             Point::new(rig.canvas.x(x)?, rig.canvas.y(35)?),
-            Point::new(rig.canvas.x(x + 3)?, rig.canvas.y(19)?),
+            Point::new(rig.canvas.x(x + 3)?, rig.canvas.y(20)?),
             rig.canvas.s(2)?,
-            rig.light,
+            rig.secondary.with_opacity(135),
         )?;
     }
     Ok(())
@@ -350,13 +420,13 @@ fn shield(scene: &mut Scene, rig: FamilyRig) -> Result<(), AvatarError> {
         Point::new(rig.canvas.x(50)?, rig.canvas.y(28)?),
         Point::new(rig.canvas.x(50)?, rig.canvas.y(75)?),
         rig.canvas.s(3)?,
-        rig.light,
+        rig.accent,
     )?;
     line(
         scene,
         Point::new(rig.canvas.x(34)?, rig.canvas.y(48)?),
         Point::new(rig.canvas.x(66)?, rig.canvas.y(48)?),
         rig.canvas.s(3)?,
-        rig.light,
+        rig.accent,
     )
 }
