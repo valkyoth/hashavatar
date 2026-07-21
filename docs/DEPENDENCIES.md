@@ -1,97 +1,31 @@
 # Dependency Policy
 
-`hashavatar` keeps the published crate dependency graph focused on rendering:
+Alpha.1 keeps the runtime graph limited to identity derivation and cleanup:
 
-- `image` for raster buffers and WebP encoding
-- `palette` for color conversion
-- `rand` for deterministic seeded variation
-- optional `serde` for string serialization/deserialization of public style
-  enums when the `serde` feature is enabled
-- transitive `sha2` for default SHA-512 identity hashing through
-  `sanitization-crypto-interop`
-- `subtle` for constant-time identity digest comparison
-- `sanitization` 2.x for clearing derived identity digests, temporary hash
-  preimage buffers, renderer seed copies, and temporary image/encoder buffers
-- `sanitization-crypto-interop` for SHA-512 hashing and hasher-state cleanup
-  through the upstream `sha2` zeroization hooks, and for BLAKE3 hasher/XOF
-  cleanup when the `blake3` feature is enabled
-- optional `blake3` for BLAKE3 identity hashing when the `blake3` feature is
-  enabled
-- optional `xxhash-rust` for XXH3-128 identity distribution when the `xxh3` feature is enabled
-- optional `image/png` encoder support when the `png` feature is enabled
-- optional `image/jpeg` encoder support when the `jpeg` feature is enabled
-- optional `image/gif` encoder support when the `gif` feature is enabled
-Dev-only test dependencies:
+- `sanitization` `2.0.1` supplies bounded secret containers and drop cleanup.
+- `sanitization-crypto-interop` `2.0.1` supplies SHA-512 with reviewed hasher
+  cleanup through upstream `sha2` hooks.
+- `roxmltree` `0.21.1` is dev-only in `hashavatar-core` for parser-backed SVG
+  tests and is also used by the separate fuzz package.
 
-- `roxmltree` for parser-backed SVG well-formedness tests and fuzz harness
-  validation
-- `serde_json` for feature-gated serde round-trip tests
-- `kani` is a reserved Cargo feature for verifier harnesses. It does not add a
-  runtime dependency; Kani itself is an external release-evidence tool.
+There is no runtime dependency on `image`, codecs, `rand`, Serde, JSON, web
+frameworks, async runtimes, network clients, GPU libraries, or filesystem
+helpers. Raster storage and geometry execution are first-party safe Rust.
 
-SHA-512 remains the default identity mode, and WebP remains the default raster
-encoder. `sanitization-crypto-interop` is a direct dependency so SHA-512 uses
-the cleanup boundary provided by the `sanitization` sister crate instead of
-direct `zeroize` imports in `hashavatar`; `sha2` is otherwise direct only for
-test fingerprint helpers. `blake3`, `xxhash-rust`, `serde`, `image/png`,
-`image/jpeg`, and `image/gif` are explicit opt-in features so default users
-keep the smaller conservative dependency graph and only compile extra support
-they use. The `blake3` and `xxh3` features are mutually exclusive because
-identity hashing is a crate-wide mode, not a runtime selection.
+## Admission Rules
 
-The crate must not depend on web frameworks, async runtimes, network clients,
-or service infrastructure. Those concerns belong in integrating applications;
-`hashavatar-website` is the hosted reference implementation.
+- Prefer the latest compatible stable dependency release.
+- Verify maintenance state, docs, advisories, default features, transitive
+  growth, MSRV, and license compatibility before admission.
+- Keep optional capabilities in the package that owns their policy boundary.
+- Do not add web or service infrastructure to reusable crates.
+- Run `cargo update`, `cargo audit`, `cargo deny check`, and `cargo outdated`
+  when available before stable releases.
+- Add tests for every newly enabled dependency path.
 
-Dependency changes should be reviewed for:
+The `hashavatar-core` default feature set is empty. The `kani` feature reserves
+verifier configuration and adds no runtime dependency. Future codecs belong in
+`hashavatar-formats`; schema, heapless storage, and GPU support follow their
+separate roadmap admission gates.
 
-- whether the latest stable crate version is being used
-- security advisory history
-- default features
-- transitive dependency growth
-- license compatibility with `MIT OR Apache-2.0`
-- whether the dependency is needed by the reusable crate or only by an application
-
-## Freshness Policy
-
-- Prefer the latest compatible stable release of each direct dependency.
-- Before adding or changing a dependency, check current upstream information
-  from crates.io, docs.rs, the crate repository, and RustSec advisories. Use
-  web search when needed to confirm the crate is still maintained and that the
-  chosen API reflects current guidance.
-- Do not pin an older crate version unless there is a documented reason, such
-  as a security concern, MSRV constraint, regression, license issue, or
-  unacceptable transitive dependency growth.
-- Re-check dependency freshness before stable releases with `cargo update`,
-  `cargo audit`, `cargo deny check`, and `cargo outdated` when available.
-- New optional dependencies must be justified in README/docs and covered by
-  tests for their enabled feature path.
-
-## Optional Hash Dependencies
-
-- `blake3` is admitted for callers that want BLAKE3 identity derivation and
-  dependency-provided SIMD support where the crate and platform provide it.
-- `xxhash-rust` is admitted only for non-cryptographic XXH3-128 identity
-  distribution. Do not present XXH3-128 as an adversarial collision-resistant
-  identity hash, and do not recommend it for user-controlled identifiers unless
-  the application first maps those identifiers through its own cryptographic
-  boundary.
-- Optional dependency features must be tested in valid feature combinations
-  before release. Do not use `cargo test --all-features` because the `blake3`
-  and `xxh3` identity-hash modes are intentionally mutually exclusive.
-- The standard gate executes the full test suite with `all-formats serde` in
-  SHA-512, BLAKE3, and XXH3 modes. Encoder fixtures use fixed pixels so codec
-  contracts are tested independently from identity-hash selection.
-
-`scripts/validate-dependencies.sh` enforces the current dependency allowlist.
-
-## Crate Boundary
-
-`hashavatar` is intentionally a single image-generation crate. Raster buffers,
-SVG rendering, encoders, deterministic identity hashing, and public avatar
-options are kept together so the published API stays focused on producing
-avatars.
-
-Lower-level planning helpers should remain internal unless a future
-image-generation use case justifies exposing them. A separate non-rendering
-core crate is not part of the current roadmap.
+`scripts/validate-dependencies.sh` enforces the current narrow graph.

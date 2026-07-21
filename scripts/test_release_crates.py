@@ -132,6 +132,38 @@ def test_current_release_plan_matches_workspace() -> None:
     release_crates.verify_workspace(packages, plan)
 
 
+def test_source_only_facade_defers_archive_until_core_exists() -> None:
+    packages = {
+        "hashavatar-core": package("hashavatar-core", "0.1.0-alpha.1"),
+        "hashavatar": package(
+            "hashavatar", "2.0.0-alpha.1", ("hashavatar-core",)
+        ),
+    }
+    plan = {
+        "crates": {
+            "hashavatar-core": entry(
+                previous="0.0.0",
+                version="0.1.0-alpha.1",
+                change="code",
+                publish=False,
+            ),
+            "hashavatar": entry(
+                previous="1.3.0",
+                version="2.0.0-alpha.1",
+                change="code",
+                publish=False,
+            ),
+        }
+    }
+    order = ("hashavatar-core", "hashavatar")
+    assert not release_crates.needs_unpublished_workspace_dependency(
+        "hashavatar-core", order, packages, plan
+    )
+    assert release_crates.needs_unpublished_workspace_dependency(
+        "hashavatar", order, packages, plan
+    )
+
+
 def main() -> int:
     tests = sorted(
         (

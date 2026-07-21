@@ -710,7 +710,8 @@ published to crates.io; crates.io publication begins with the approved stable
 
 ### v2.0.0-alpha.1 - Cat Vertical Slice And Workspace
 
-**Status:** Planned.
+**Status:** Implementation complete; pending exact-commit pentest, downstream
+website validation, and green GitHub checks before tagging.
 
 **Goal:** Prove the complete architecture with real artwork before generalizing
 the rendering abstraction.

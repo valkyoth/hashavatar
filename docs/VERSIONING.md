@@ -1,93 +1,40 @@
 # Versioning Policy
 
-`hashavatar` is intended to be safe for deterministic avatar URLs.
+## Supported Lines
 
-## Stable Rendering Contract
+- `1.3.x` is the maintained published line on `release/1.3`.
+- `2.0.0-alpha.x`, beta, and RC tags are source-only development releases.
+- Stable `2.0.0` will resume crates.io publication after its package and
+  compatibility contracts are frozen.
 
-Within a major release line, the project aims to keep avatar output stable for the same:
+## Deterministic Output
 
-- `tenant`
-- `style_version`
-- identity hash algorithm
-- `id`
-- `kind`
-- `background`
-- `accessory`
-- `color`
-- `expression`
-- `shape`
-- `format`
-- `size`
+Within a stable major release, canonical output is intended to remain stable
+for the complete documented identity, namespace, request, catalog, render, and
+output contract. A patch or minor release must not silently change canonical
+pixels or SVG unless a security/correctness fix requires it and the release
+notes explicitly identify the change.
 
-That means an application can cache and embed avatar URLs without expecting silent visual churn during normal minor and patch upgrades.
+Prerelease APIs and pixels may change. Every intentional change must update
+known-answer tests, release notes, migration guidance, and cache-domain
+documentation. Callers must use a separate style-version and cache namespace
+for each 2.0 prerelease trial.
 
-Callers that use the legacy `AvatarOptions` API implicitly use `accessory =
-none`, `color = default`, `expression = default`, and `shape = square`.
+## Alpha.1 Contract
 
-## When Output May Change
+Alpha.1 records deterministic evidence for one Cat scene:
 
-Visual output may change when:
+- SHA-512 identity and label-separated trait vectors;
+- checked Q16.16 geometry and command order;
+- canonical safe-Rust CPU RGBA8 output;
+- deterministic SVG from the same scene;
+- identical debug/release pixel fingerprint for the pinned fixture.
 
-- you intentionally change `style_version`
-- you intentionally change `tenant`
-- you intentionally change the identity hash algorithm
-- you adopt a new major crate release with documented breaking visual changes
-- a narrowly scoped rendering bug fix is required and documented
+This evidence detects drift but does not promise compatibility with alpha.2 or
+stable 2.0. Scene structures and fixed-point representation remain private.
 
-## Recommended Production Strategy
+## Exact 1.x Output
 
-- treat `tenant` as your product or environment namespace
-- treat `style_version` as your avatar rollout version, for example `v2`
-- use the default SHA-512 algorithm unless you have explicitly chosen and
-  documented another algorithm
-- do not send raw user emails if you can avoid it
-- prefer stable internal ids or a one-way hash as the public avatar id
-
-## Regression Protection
-
-The repository includes golden fingerprint regression tests. Hashavatar 1.3
-also freezes one complete request, style, asset key, RGBA digest, and SVG digest
-for every 1.x family in `tests/compatibility_corpus_v1.tsv`. Those checks are
-meant to catch unintended contract or visual changes before release.
-
-## Explicit Contract And Cache IDs
-
-Hashavatar 1.2 names the frozen 1.x automatic-selection mapping as
-`CatalogVersion::LEGACY_V1` and the renderer behavior as
-`RenderContractId::LEGACY_V1`. Built-in catalog entries expose stable IDs and
-weights; those values must not be reordered or changed during 1.x.
-
-New caches should use `IdentityCacheKey`, `AvatarAssetKey`, and
-`SemanticEncodedAssetKey` or `BuildEncodedAssetKey` according to the level of
-artifact being stored. The latter
-two prevent dimensions, seed, style, format, or encoder-setting changes from
-reusing an incomplete cache key. Existing `cache_key()` strings remain stable
-for compatibility.
-
-Hashavatar 1.3 adds `AvatarRequest` and `PreparedAvatar` as an additive
-migration path. Explicit styles are strict by default in that path; opt-in
-`LegacyV1` preparation reports both requested and effective style values.
-Prepared keys and output methods are bound to the same immutable request tuple.
-
-## Exact 1.x Output After 2.0
-
-The 2.0 renderer may intentionally change pixels. Applications that require
-the exact frozen 1.x corpus should pin the latest 1.x release. A separate
-compatibility renderer is not currently planned and will be considered only if
-downstream demand justifies maintaining two engines. See
-`docs/MIGRATION_2.0.md`.
-
-## Exhaustive Public Enums
-
-The public option enums in the 1.x crate are exhaustive and are not marked
-`#[non_exhaustive]`. Their variant sets and `ALL` slices are therefore frozen
-for the remainder of 1.x. New variants require a major release or a separate
-additive API that leaves the existing enum unchanged.
-
-## Cross-Platform Determinism
-
-The current renderer uses floating-point geometry internally. Golden
-fingerprints protect the release platform, but `hashavatar` does not yet claim
-a formal bit-identical raster contract across every CPU architecture, compiler
-backend, and optimization mode. Future core work should move critical geometry
-to fixed-point arithmetic before making that stronger guarantee.
+Applications requiring exact 1.x output should pin `=1.3.0` or a later
+maintenance patch from the 1.3 line. Main does not carry the old renderer. See
+[MIGRATION_2.0.md](MIGRATION_2.0.md).

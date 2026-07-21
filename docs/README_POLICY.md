@@ -6,13 +6,13 @@ The repository-root `README.md` is the canonical README for both GitHub and the
 published `hashavatar` facade crate. The facade manifest must reference that
 same file rather than maintain a copied crate-local document.
 
-For the current single-package layout:
+For the root facade package:
 
 ```toml
 readme = "README.md"
 ```
 
-When the facade moves to `crates/hashavatar`, its manifest should use:
+If the facade later moves to `crates/hashavatar`, its manifest should use:
 
 ```toml
 readme = "../../README.md"

@@ -8,7 +8,7 @@ publish = false
 cargo-fuzz = true
 
 [dependencies]
-hashavatar = { path = "..", version = "1.3.0", features = ["fuzzing"] }
+hashavatar = { path = "..", version = "2.0.0-alpha.1" }
 libfuzzer-sys = "0.4.13"
 roxmltree = "0.21.1"
 
@@ -19,9 +19,5 @@ test = false
 doc = false
 bench = false
 
-[[bin]]
-name = "polygon_rasterizer"
-path = "fuzz_targets/polygon_rasterizer.rs"
-test = false
-doc = false
-bench = false
+[workspace]
+members = []

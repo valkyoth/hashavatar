@@ -1,0 +1,27 @@
+[package]
+name = "hashavatar-core"
+version = "0.1.0-alpha.1"
+edition.workspace = true
+rust-version.workspace = true
+description = "Canonical fixed-point Cat rendering core for Hashavatar 2.0 alpha"
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+documentation = "https://docs.rs/hashavatar-core/latest/hashavatar_core/"
+readme = "README.md"
+keywords = ["avatar", "graphics", "no-std", "svg"]
+categories = ["multimedia::images", "graphics", "no-std"]
+
+[features]
+default = []
+kani = []
+
+[dependencies]
+sanitization.workspace = true
+sanitization-crypto-interop.workspace = true
+
+[dev-dependencies]
+roxmltree.workspace = true
+
+[lints]
+workspace = true

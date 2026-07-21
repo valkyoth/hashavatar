@@ -31,7 +31,7 @@ check_file() {
     ' "$file"
 }
 
-find src -type f -name '*.rs' \
+find src crates -type f -name '*.rs' \
     ! -name 'tests.rs' \
     ! -name 'kani_proofs.rs' \
     -print |

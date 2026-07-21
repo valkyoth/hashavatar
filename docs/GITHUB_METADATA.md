@@ -9,8 +9,8 @@ Repository: `hashavatar`
 
 About:
 
-> Secure deterministic procedural avatars in Rust with bounded inputs, typed
-> cache keys, and WebP/SVG output.
+> Canonical deterministic procedural avatars in Rust with stateless traits,
+> bounded fixed-point scenes, RGBA8, and SVG output.
 
 Suggested topics:
 
@@ -19,9 +19,9 @@ Suggested topics:
 - `identicon`
 - `procedural-generation`
 - `graphics`
-- `webp`
 - `svg`
 - `image-processing`
+- `no-std`
 - `security`
 
 Repository security settings:

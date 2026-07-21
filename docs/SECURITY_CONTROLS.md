@@ -1,259 +1,91 @@
 # Security Controls
 
-`hashavatar` is a deterministic avatar rendering crate. Its primary security concerns are resource exhaustion, panic safety for untrusted parameters, dependency hygiene, and safe SVG/raster output.
+Hashavatar turns bounded identity bytes into public visual artifacts. Its main
+security concerns are panic avoidance, resource exhaustion, deterministic
+output, namespace separation, safe SVG, sensitive temporary lifetime, and
+supply-chain scope.
 
-## Current Controls
+## Enforced Controls
 
-- The library uses `#![forbid(unsafe_code)]`.
-- `AvatarSpec` has private fields and validates dimensions at construction.
-- `AvatarSpec::default()` is fixed at `256x256` with seed `1` and is covered
-  by a regression test. It is a deterministic convenience value, not a random
-  or production policy default.
-- Public raster/SVG dimensions are bounded by `MIN_AVATAR_DIMENSION` and `MAX_AVATAR_DIMENSION`.
-- Raw RGBA raster memory is bounded by `MAX_AVATAR_RGBA_BYTES` per built-in
-  render before encoder overhead. `encode_avatar` also rejects a custom
-  `AvatarRenderer` result unless its dimensions and RGBA length exactly match
-  the validated `AvatarSpec`.
-- Identity inputs are bounded by `MAX_AVATAR_ID_BYTES`.
-- Namespace tenant and style-version components are bounded by `MAX_AVATAR_NAMESPACE_COMPONENT_BYTES`.
-- Image-generation APIs return typed errors for unsupported dimensions before allocating or encoding raster output.
-- The crate exposes in-memory encoding and rendering APIs, but no public filesystem path-writing helpers.
-- Namespace identity hashing length-prefixes every component, so tenant and style-version values cannot collide through embedded separator bytes.
-- SHA-512 remains the default identity hash. Optional hash modes are crate-wide
-  feature choices, not runtime API choices, and are domain-separated from the
-  default path.
-- BLAKE3 support is available only through the explicit `blake3` feature.
-- XXH3-128 support is available only through the explicit `xxh3` feature. It is
-  non-cryptographic; do not use XXH3-128 for adversarial or user-controlled
-  identifiers unless the application first maps those identifiers through its
-  own cryptographic boundary.
-- The `blake3` and `xxh3` features are mutually exclusive. Enabling both is a
-  compile-time error so feature unification cannot silently mix hash modes.
-- PNG and JPEG export are available only through the explicit `png` and `jpeg`
-  features. The default build exposes WebP as the only raster encoder.
-- GIF export is available only through the explicit `gif` feature. The `image`
-  crate's GIF encoder performs internal 256-color quantization, and
-  `hashavatar` cannot sanitize those codec-owned buffers. High-assurance
-  deployments should prefer WebP or PNG.
-- Procedural RNG seeding uses 256 bits from the second half of the identity
-  digest. Most direct visual parameter lookups use lower digest bytes, but some
-  established renderers also use selected upper digest bytes for visible
-  geometry. This is accepted for `1.x` visual stability: avatars are
-  digest-derived public artifacts, and removing those lookups would change
-  golden output. Callers that treat identifiers as sensitive should prefer
-  SHA-512 or BLAKE3 over XXH3 and follow the timing/output-size guidance below.
-- The temporary 256-bit RNG seed copy is stored in `sanitization::Secret`, so
-  the digest-derived seed copy is scrubbed on scope exit. The final value
-  passed to `StdRng::from_seed` is also held in a `Secret` guard before the
-  copy into `StdRng`. `StdRng::from_seed` still takes the seed by value, so a
-  transient unguarded argument copy is part of the crate's documented
-  by-value-copy sanitization caveat.
-- The procedural RNG itself is `rand::rngs::StdRng`. Its expanded internal
-  state is not sanitized on drop because `StdRng` does not currently expose a
-  sanitization hook. In the default SHA-512 mode, recovering the original
-  identity from that expanded state would require reversing SHA-512 output,
-  which is computationally infeasible. High-assurance callers should still
-  treat this as a known residual and prefer SHA-512 or BLAKE3 over XXH3 for
-  sensitive identifiers.
-- `AvatarIdentity` equality uses constant-time digest comparison.
-- `AvatarIdentity` has a redacted `Debug` implementation so accidental
-  `{:?}` logging does not print the raw digest.
-- `AvatarBuilder` has a redacted `Debug` implementation so accidental builder
-  logging does not print the raw identity input, tenant, or style-version
-  namespace values.
-- `AvatarBuilder<T>` owns or borrows the caller-provided `T` until the builder
-  is consumed or dropped, and cloning a builder clones `T`. It cannot sanitize
-  arbitrary caller-defined storage. High-assurance integrations should pass a
-  short-lived borrow to sanitized storage or, preferably, derive a keyed
-  pseudonym first and build only from that pseudonym. `AvatarRequest` and its
-  builder instead own an already-derived `AvatarIdentity`, and their `Debug`
-  implementations redact that identity.
-- `AvatarIdentity::cache_key()` derives an opaque display key by hashing the
-  internal identity digest under a cache-key domain instead of returning raw
-  digest bytes. Cache keys are still stable correlators for the same identity
-  and should be treated as public cache identifiers, not authentication
-  secrets. Rehashing is not key stretching: an attacker who obtains a cache key
-  can test dictionaries of low-entropy identifiers offline. Applications with
-  sensitive, guessable identifiers should first derive a keyed pseudonym with
-  a separately managed per-domain or per-tenant key and pass only that
-  pseudonym to `hashavatar`. Key rotation changes avatar/cache identity and
-  must be coordinated with cache invalidation and visual-stability policy.
-- `IdentityCacheKey`, `AvatarAssetKey`, `SemanticEncodedAssetKey`, and
-  `BuildEncodedAssetKey` are separate, domain-separated public identifiers.
-  Distinct semantic and build-bound encoded types prevent cache-policy mixing
-  through ordinary type checking. The avatar key binds the active hash mode,
-  frozen catalog and render contracts, dimensions, seed, and complete effective
-  style. Unsupported legacy face layers are canonicalized before key derivation
-  so identical output has one avatar key. The semantic encoded key additionally
-  binds fixed encoder settings, but not transitive codec versions, target, or
-  build revision. Applications sharing byte caches across builds should use
-  `EncoderBuildId` with `encoded_for_build()`; content-addressed stores must hash
-  actual output bytes. These keys are correlators, not secrets, content digests,
-  or authorization tokens.
-- Converting typed keys with `to_hex()`, `to_string()`, or formatting erases
-  their nominal Rust type. Cache interfaces should accept the appropriate key
-  type directly and perform serialization inside the storage adapter. A
-  byte-exact deployment cache should not expose a generic `String` key API that
-  can accept a semantic encoded key accidentally.
-- Unsupported accessories and expressions remain deterministic no-ops in the
-  legacy rendering APIs. Applications that accept explicit user style choices
-  can fail closed before rendering with
-  `AvatarStyleOptions::validate_strict()` or `StrictAvatarBuilder`. Automatic
-  derivation remains total under the frozen legacy compatibility behavior.
-- Explicit `AvatarRequest` styles are strict by default. The opt-in
-  `LegacyV1` mode reports requested and effective values so migration code can
-  detect canonicalized no-op layers rather than losing that information.
-- Hashavatar does not own keyed identity secrets in 1.x. Key storage, rotation,
-  tenant separation, and pseudonym lifetime are application policy. Sensitive,
-  guessable identifiers should be mapped through a reviewed keyed construction
-  at that boundary and only the resulting pseudonym passed to Hashavatar.
-- `AvatarIdentity` implements `Clone`; every clone is sanitized independently
-  on drop. High-assurance integrations should keep identity clones
-  short-lived so digest bytes do not remain live in multiple memory locations
-  longer than necessary.
-- Derived identity digests and temporary hash preimage buffers are sanitized
-  when dropped. The intermediate 64-byte digest returned by each hash backend is
-  held in `sanitization::Secret` guards before being copied into
-  `AvatarIdentity`. Identity, cache-key, and optional XXH3 chunk preimages are
-  owned by `sanitization::SecretVec` before sensitive bytes are written, so
-  their full allocation capacity is cleared on normal return and unwinding.
-  If a preimage ever outgrows its expected capacity, `SecretVec` clears the old
-  allocation before replacing it. Process aborts and environments that bypass
-  Rust destructors remain outside this cleanup guarantee.
-- SHA-512 hashing is routed through `sanitization-crypto-interop` 2.x, which enables
-  upstream `sha2` hasher cleanup for SHA-512 state. BLAKE3 hashing is routed
-  through the same interop crate when the `blake3` feature is enabled, so the
-  BLAKE3 hasher and XOF reader are explicitly cleared after output extraction.
-  The interop crate necessarily uses those crypto crates' own cleanup hooks;
-  callers that audit dependency internals should keep
-  `sanitization-crypto-interop`, `sha2`, and `blake3` in scope.
-- Direct cleanup of caller-accessible byte slices and temporary `Vec<u8>`
-  allocations uses the audited `sanitization::wipe::bytes` and
-  `sanitization::wipe::vec` boundaries from Sanitization 2.x.
-- Identity hash preimage allocation is sized from the tenant, style-version,
-  and identity input lengths. Debug builds verify the expected capacity and
-  final length as a correctness check, while `SecretVec` cleanup remains the
-  security boundary even if future size accounting drifts. The crate bounds
-  and sanitizes those temporary buffers, but it does
-  not hide input length from the allocator, OS-level heap profilers, or other
-  same-process memory-observation tools. Very high-assurance callers that treat
-  identifier length as sensitive should normalize or pad identifiers to a fixed
-  length before calling this crate.
-- The optional XXH3-128 mode derives the crate's 64-byte identity digest by
-  hashing four domain-separated chunks. Each chunk temporarily copies the
-  bounded preimage into a sanitized buffer, so peak preimage memory is higher
-  than SHA-512 or BLAKE3. Keep XXH3 for low-stakes, non-adversarial workloads
-  where its non-cryptographic collision profile and extra temporary preimage
-  copy are acceptable.
-- The crate seeds its own rendering RNG deterministically from identity digest
-  bytes and does not use OS entropy for avatar rendering. The `rand` dependency
-  may still bring a transitive `getrandom` dependency into the lockfile; WASM
-  and embedded applications that use OS-backed randomness elsewhere in the same
-  binary must configure and test `getrandom` for their target explicitly.
-- Encode APIs wrap temporary owned raster buffers in RAII sanitization guards,
-  so the complete backing-vector capacity, including spare capacity from custom
-  renderers, is cleared during normal returns, encoder errors, and unwinding
-  panics. Encoded output is accumulated in a local `SanitizingVec` until
-  successful return, so partially encoded bytes are scrubbed on encoder errors.
-  The encoded-output writer owns its allocation and performs growth by copying
-  into a replacement allocation, sanitizing the retired allocation, and only
-  then installing the replacement. JPEG export also wraps the temporary RGB
-  flattening buffer in `SanitizingVec`.
-  `PreparedAvatar::encode_to_writer()` writes directly to a caller-owned sink;
-  codec failures can leave partial output there, and cleanup is the caller's
-  responsibility. `write_svg()` has the same partial-output ownership rule and
-  currently builds a temporary SVG `String` before writing.
-  Returned encoded bytes and images returned by render APIs are caller-owned
-  and must be cleared by the caller if their environment requires that. The
-  README includes `sanitization` examples for returned `Vec<u8>` and
-  `RgbaImage` buffers.
-- Rendering time is intentionally not constant-time. Shape counts, geometry,
-  raster encoding, and SVG length can vary with the identity digest, so callers
-  should not treat rendered avatar timing or output size as secret-preserving
-  side channels.
-- High-assurance API wrappers can reduce render-time observability with stable
-  cache keys, CDN caching, and a fixed-minimum-latency response wrapper. Apply
-  that at the service boundary, and use async timers in async servers rather
-  than blocking runtime worker threads.
-- The crate bounds individual render sizes, but service-level memory exhaustion
-  from many concurrent maximum-size renders must be controlled by callers with
-  API rate limits, request concurrency limits, and caching. Use
-  `MAX_AVATAR_RGBA_BYTES`, `AvatarSpec::rgba_buffer_len()`, and
-  `AvatarRenderResourceBudget` to size service-level render semaphores against
-  the application's memory budget. The crate intentionally does not ship a
-  semaphore wrapper because concurrency primitives belong to the caller's
-  async/runtime boundary.
-- `PreparedAvatar::resource_budget()` makes known 1.x RGBA memory explicit.
-  `render_into()` validates caller-surface dimensions, checked stride, and
-  required capacity, validates the internal renderer dimensions and byte
-  length, copies an exact checked row count, and preserves row padding.
-  Caller-surface dimension mismatches return before renderer work or temporary
-  image allocation. Valid requests still use one sanitized internal
-  `RgbaImage`.
-- Resource accounting distinguishes a minimum tight surface from the actual
-  declared `stride * height` surface storage. Call
-  `render_into_known_rgba_bytes_for()` for padded surfaces. Vector-return
-  encoding reports the image plus its initial output reserve, while writer
-  encoding reports the internal image only. Codec scratch space, later output
-  growth, temporary replacement allocations, caller-writer storage, and
-  trailing surface bytes are excluded and must be included in application
-  policy separately.
-- Internal rectangle helpers use saturating or clamping arithmetic for edge and
-  intersection calculations. Rectangle size construction promotes zero
-  dimensions to a one-pixel rectangle so rounded-down decorative features remain
-  non-panicking; minimum-size rendering is covered by regression tests.
-- Raster frame-shape hit-testing uses integer arithmetic for circle, squircle,
-  hexagon, and octagon masks, reducing platform-specific floating-point
-  rounding in clipping decisions.
-- Decorative raster backgrounds are deterministic. Pattern and gradient modes
-  are explicit by design, while the starry background now incorporates identity
-  digest bytes in its local deterministic star-position generator.
-- Polygon rasterization returns immediately for empty polygons and zero-sized
-  images, widens scanline interpolation math before rounding, and is covered by
-  a dedicated fuzz harness for arbitrary image dimensions, degenerate polygons,
-  negative coordinates, and extreme `i32` points.
-- The SVG renderer emits generated shape markup from structured numeric values
-  rather than from caller-provided SVG fragments. Paint-server and clip-path
-  IDs use a deterministic namespace derived only from dimensions, frame shape,
-  and background. Definitions that differ receive different IDs, while
-  identical definitions can safely share an ID when multiple avatars are
-  embedded inline. Identity digests and cache keys are not included in SVG IDs.
-- SVG output is covered by parser-backed well-formedness tests across every
-  avatar family, background mode, representative identity inputs, and every
-  public visual-layer option. The fuzz harness also parses rendered SVG with
-  `roxmltree` instead of only checking that SVG rendering does not panic.
-- The hidden `fuzzing` feature exposes internal fuzz harness entry points only
-  for test/fuzz builds. A compile-time guard rejects ordinary non-fuzzing
-  release builds if that feature is accidentally enabled.
-- Golden fingerprint tests protect deterministic rendering output.
-- A default-SHA-512 compatibility corpus additionally freezes the complete
-  request/style tuple, typed avatar key, RGBA digest, and SVG digest for every
-  1.x family.
-- The crate package excludes fuzz harnesses and generated build output.
-- `scripts/checks.sh` runs formatting, metadata, dependency, unsafe-boundary, panic-policy, tests, `cargo deny`, and `cargo audit`.
-- Stable release mode requires exactly `cargo-kani 0.67.0`, its pinned Rust
-  `1.90.0` verifier toolchain, and `cargo-sbom 0.10.0`. Missing or mismatched
-  tooling fails closed. The ordinary local check mode may report an explicit
-  skip so contributors can run the rest of the gate without those tools.
-- Reproducibility evidence packages the crate in two isolated target
-  directories under one fresh private temporary root and requires the resulting
-  `.crate` archives to be byte-identical. Environment variables cannot override
-  the two evidence paths.
-- Dependency additions and upgrades are expected to use current upstream
-  documentation and latest compatible crate releases unless an older version is
-  explicitly justified.
-- GitHub CodeQL should use the repository's default setup. Do not add an
-  advanced CodeQL workflow while default setup is active.
+- Both workspace libraries are `no_std` and forbid first-party `unsafe`.
+- Public dimensions are validated as `64..=2048` before preparation.
+- Identity input is capped at 1024 bytes; tenant and style-version components
+  are capped at 128 bytes each.
+- Identity components are length-prefixed and SHA-512 domain separated.
+- Trait samples use separate domain-separated labels, so adding a trait cannot
+  shift mutable RNG state or correlate fields by consuming adjacent bytes.
+- Request preparation does not retain raw identity or namespace input.
+- Temporary hash preimages use `sanitization::SecretVec`; derived digest
+  ownership uses `sanitization::Secret`.
+- SHA-512 runs through `sanitization-crypto-interop`, including its reviewed
+  upstream hasher cleanup path.
+- Geometry uses checked signed Q16.16 values. No floating point is used.
+- The alpha.1 scene is private, flat, and capped at 16 commands. Validation
+  rejects empty commands, transparent paint, invalid bounds, non-positive
+  ellipse radii, degenerate triangles, and arithmetic failure.
+- Both raster and SVG executors revalidate the scene before execution.
+- Raster allocation length uses checked arithmetic and fallible reservation.
+- Pixel writes use checked offsets and bounds-checked slices.
+- Raster loop bounds are clipped to validated output dimensions.
+- `SceneReport` exposes exact RGBA bytes and conservative pixel-test work.
+- SVG contains only static text, validated numeric geometry, and internally
+  generated colors. No caller string enters markup.
+- SVG writes are capped at an 8 KiB pre-reserved document bound and fail closed
+  instead of triggering implicit buffer growth.
+- SVG is tested with an XML parser, including command-count parity with the
+  validated scene.
+- Production code is checked for panic-like sites; debug and release pixel
+  fingerprints must match.
+- Rust source files are capped at 500 lines to keep review boundaries small.
 
-## Testing Standard
+## Application Responsibilities
 
-Every code change that alters behavior should include focused tests for the new
-logic or a clear explanation for why existing tests cover it. Security changes
-must include regression tests whenever the behavior can be tested locally.
+A valid 2048 by 2048 raster returns 16 MiB. Hashavatar bounds one request but
+cannot control process-wide concurrency. Servers must use a semaphore or an
+equivalent admission controller, set request and rate limits, and account for
+the returned buffer plus application/network overhead.
 
-## Service Boundary
+SHA-512 is deterministic hashing, not password hashing. A visible avatar can
+support offline dictionary testing of low-entropy identifiers. Applications
+that treat identifiers as sensitive should first derive a keyed,
+domain-separated pseudonym with a separately managed secret and pass only that
+pseudonym to Hashavatar. Hashavatar does not own application key storage or
+rotation policy.
 
-The crate does not ship an HTTP server. Public web/API concerns such as request
-concurrency, maximum simultaneous large renders, rate limiting, CDN caching,
-security headers, observability, and abuse controls belong in the integrating
-application. `hashavatar-website` is the hosted reference implementation.
+Returned `CanonicalRgbaImage` bytes and SVG strings are caller-owned public
+artifacts. The crate does not wipe them. Callers with an unusual requirement to
+remove rendered output from memory must use a reviewed caller-side cleanup
+container after use.
+
+## Accepted Limitations
+
+- Input length is visible through bounded allocation size. Callers needing
+  length hiding must normalize or pad input before the crate boundary.
+- Rendering time varies with admitted geometry and dimensions. Identity and
+  namespace values must not be treated as timing-protected secrets.
+- Secret cleanup is best effort under Rust drop semantics. It cannot guarantee
+  removal from registers, compiler spills, allocator metadata, swap, crash
+  dumps, hibernation, or hardware state, and it does not run after process
+  abort.
+- Digest output is copied between dependency and secret-container boundaries.
+  Those unavoidable by-value copies are not a claim of perfect physical
+  erasure.
+- Allocation failure is returned where fallible Rust allocation APIs permit.
+  A global allocator may still abort the process under its configured policy.
+- Alpha tags are source-only development evidence, not a stable API or pixel
+  compatibility promise.
+
+Do not report an accepted limitation as a vulnerability unless code contradicts
+this document, a cleanup API fails its stated contract, or a new concrete
+exploit path exists.
+
+## Assurance
+
+The gate includes strict Clippy, debug/release KATs, parser-backed SVG tests,
+MSRV checks, cross-target core compilation, fuzz-harness compilation, five
+bounded Kani proofs, RustSec, cargo-deny, package inspection, unsafe/panic
+policy checks, and reproducible archive comparison. Independent pentest
+digests are retained under [`security/pentest`](../security/pentest/README.md).
+
+These controls improve assurance but are not a claim of formal verification,
+constant-time rendering, or fitness for a specific regulatory classification.

@@ -1,10 +1,17 @@
 [release]
-version = "1.3.0"
-publish_order = ["hashavatar"]
+version = "2.0.0-alpha.1"
+publish_order = ["hashavatar-core", "hashavatar"]
+
+[crates.hashavatar-core]
+previous_version = "0.0.0"
+version = "0.1.0-alpha.1"
+change = "code"
+publish = false
+reason = "New portable canonical rendering core; all prerelease packages remain source-only."
 
 [crates.hashavatar]
 previous_version = "1.3.0"
-version = "1.3.0"
-change = "unchanged"
+version = "2.0.0-alpha.1"
+change = "code"
 publish = false
-reason = "The already-published 1.3.0 release is the baseline before 2.0 workspace development."
+reason = "New 2.0 facade and Cat vertical slice; prerelease publication is prohibited."

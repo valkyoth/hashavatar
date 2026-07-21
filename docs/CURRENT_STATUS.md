@@ -1,31 +1,39 @@
 # Current Status
 
-## Supported Release
+## Published Line
 
-The latest crates.io release is `hashavatar 1.3.0`.
-
-The signed `v1.3.0` tag and `release/1.3` branch preserve the final 1.x
-renderer and migration API. The maintenance branch accepts serious security
-and correctness fixes only. New features and intentional visual changes belong
-to 2.0.
+The latest crates.io release is `hashavatar 1.3.0`. The signed `v1.3.0` tag and
+`release/1.3` branch preserve the final 1.x renderer. That branch accepts
+serious security and correctness fixes; new features and intentional visual
+changes belong to 2.0.
 
 ## Development Line
 
-`main` is preparing `2.0.0-alpha.1`, the first workspace and canonical-scene
-vertical slice described in [PLAN_TOWARDS_2.0.md](PLAN_TOWARDS_2.0.md).
+`main` implements `2.0.0-alpha.1`. This source-only prerelease introduces the
+resolver-3 `hashavatar`/`hashavatar-core` workspace and one canonical Cat
+vertical slice:
 
-The 2.0 prerelease policy is deliberate:
+- stateless, label-separated SHA-512 trait derivation;
+- private checked Q16.16 geometry;
+- a bounded validated private scene;
+- one safe-Rust CPU straight-alpha RGBA8 executor;
+- deterministic SVG from the same scene;
+- debug/release pixel KATs and parser-backed SVG checks;
+- a focused fuzz target and five Kani harnesses;
+- source-size enforcement at 500 lines per Rust file;
+- portable core CI for WASM, AArch64 Linux, and 32-bit x86 Linux.
 
-- alpha, beta, and release-candidate tags are pushed to GitHub;
-- prerelease crates are not published to crates.io;
-- `hashavatar-website` follows each reviewed tag through local path or checkout
-  dependencies;
-- every tag receives local release checks, GitHub CI and CodeQL, downstream
-  integration testing, and a permanent pentest summary;
-- crates.io publication resumes only for the approved stable `2.0.0` packages.
+The implementation is ready for exact-commit external pentesting. It must not
+be tagged until the findings are resolved, the permanent pentest digest is
+added, GitHub is green, and `hashavatar-website` passes against this source.
 
-This keeps unstable APIs and pixels out of the public registry while the real
-website continuously exercises the exact tagged source.
+## Prerelease Policy
+
+Alpha, beta, and release-candidate tags are pushed to GitHub but not crates.io.
+`hashavatar-website` follows each reviewed source tag through a local or Git
+dependency. Every tag receives local release checks, GitHub CI and CodeQL,
+downstream integration testing, and a permanent digest under
+[`security/pentest`](../security/pentest/README.md).
 
 ## Toolchain
 
@@ -33,29 +41,11 @@ website continuously exercises the exact tagged source.
 | --- | --- |
 | MSRV | Rust `1.90.0` |
 | Development toolchain | Rust `1.97.1` |
+| Workspace resolver | Cargo resolver `3` |
 | CodeQL | GitHub default setup |
 | Unsafe Rust | Forbidden in first-party library code |
-| Stable identity mode | SHA-512 |
-| Stable default raster format | WebP |
+| Alpha.1 identity mode | Domain-separated SHA-512 |
+| Alpha.1 outputs | Canonical RGBA8 and SVG |
 
-The repository checks supported feature combinations on the MSRV and uses the
-pinned development toolchain for full local and release gates.
-
-## Release Evidence
-
-The `v1.3.0` release completed:
-
-- all valid SHA-512, BLAKE3, XXH3, and format feature matrices;
-- formatting, strict Clippy, rustdoc, and integration tests;
-- Rust `1.90.0` compatibility checks;
-- dependency, license, RustSec, unsafe, and panic-policy checks;
-- fuzz-harness compilation and five bounded Kani proofs;
-- byte-identical package archive checks and SBOM generation;
-- `cargo-semver-checks` against `v1.2.0`;
-- crates.io publish dry-run;
-- independent pentesting, green GitHub validation, and successful
-  `hashavatar-website` integration testing.
-
-Version-specific details live in [release notes](../release-notes/) and the
-[changelog](../CHANGELOG.md). Starting with 2.0 prereleases, permanent pentest
-summaries live under [`security/pentest`](../security/pentest/README.md).
+Version details live in [release notes](../release-notes/) and the
+[changelog](../CHANGELOG.md).

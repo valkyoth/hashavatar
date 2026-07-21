@@ -24,8 +24,8 @@ fail_or_skip() {
     exit 0
 }
 
-if [ ! -s src/kani_proofs.rs ]; then
-    fail_or_skip "src/kani_proofs.rs is not present"
+if [ ! -s crates/hashavatar-core/src/kani_proofs.rs ]; then
+    fail_or_skip "crates/hashavatar-core/src/kani_proofs.rs is not present"
 fi
 
 kani_toolchain="${HASHAVATAR_KANI_TOOLCHAIN:-1.90.0-x86_64-unknown-linux-gnu}"
@@ -53,17 +53,17 @@ trap 'rm -f "$log"' EXIT
 echo "Kani checks: using Rust toolchain $kani_toolchain"
 
 harnesses="
-avatar_spec_new_preserves_supported_dimension_contract
-render_resource_budget_uses_saturating_memory_math
-resource_budget_memory_division_never_divides_by_zero
-rect_of_size_and_edges_remain_non_zero_and_saturating
-rect_intersection_when_present_is_inside_both_inputs
+request_dimension_admission_is_exact
+unit_fixed_conversion_stays_in_closed_interval
+fixed_lerp_stays_between_small_positive_bounds
+pixel_center_is_inside_its_pixel
+validated_scene_report_has_exact_rgba_size
 "
 
 status=0
 for harness in $harnesses; do
     echo "Kani checks: harness $harness" >>"$log"
-    if cargo_kani --harness "$harness" --no-default-features >>"$log" 2>&1; then
+    if cargo_kani -p hashavatar-core --harness "$harness" --no-default-features >>"$log" 2>&1; then
         :
     else
         status="$?"

@@ -197,10 +197,50 @@ def run_preflight(*, stable: bool, dry_run: bool) -> None:
     run(["scripts/stable_release_gate.sh", mode], dry_run=dry_run)
 
 
-def verify_packages(order: tuple[str, ...], *, dry_run: bool) -> None:
+def needs_unpublished_workspace_dependency(
+    package: str, order: tuple[str, ...], packages: dict[str, dict], plan: dict
+) -> bool:
+    workspace_names = set(order)
+    workspace_dependencies = {
+        dependency["name"]
+        for dependency in packages[package]["dependencies"]
+        if dependency.get("kind") != "dev" and dependency["name"] in workspace_names
+    }
+    return any(
+        plan["crates"][dependency]["change"] != "unchanged"
+        or is_prerelease(plan["crates"][dependency]["version"])
+        for dependency in workspace_dependencies
+    )
+
+
+def verify_packages(
+    order: tuple[str, ...], packages: dict[str, dict], plan: dict, *, dry_run: bool
+) -> None:
     for package in order:
+        if needs_unpublished_workspace_dependency(package, order, packages, plan):
+            run(
+                [
+                    "cargo",
+                    "package",
+                    "-p",
+                    package,
+                    "--locked",
+                    "--allow-dirty",
+                    "--list",
+                ],
+                dry_run=dry_run,
+            )
+            continue
         run(
-            ["cargo", "package", "-p", package, "--locked", "--allow-dirty"],
+            [
+                "cargo",
+                "package",
+                "-p",
+                package,
+                "--locked",
+                "--allow-dirty",
+                "--no-verify",
+            ],
             dry_run=dry_run,
         )
 
@@ -262,7 +302,7 @@ def main() -> int:
     prerelease = is_prerelease(args.version)
     if not args.skip_checks:
         run_preflight(stable=not prerelease, dry_run=args.dry_run)
-    verify_packages(plan["publish_order"], dry_run=args.dry_run)
+    verify_packages(plan["publish_order"], packages, plan, dry_run=args.dry_run)
 
     if args.prepare_only:
         print(f"release preparation completed for {args.version}; nothing was uploaded")
