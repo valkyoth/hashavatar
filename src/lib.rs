@@ -147,6 +147,7 @@ mod prepared;
 mod primitives;
 mod renderer_types;
 mod request;
+mod surface;
 mod svg;
 
 #[cfg(kani)]
@@ -173,3 +174,4 @@ pub use self::primitives::Color;
 pub use self::primitives::fuzz_draw_polygon_rgba;
 pub use self::renderer_types::*;
 pub use self::request::*;
+pub use self::surface::*;

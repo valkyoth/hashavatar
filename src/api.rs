@@ -609,13 +609,16 @@ impl AvatarRenderPlan {
 
 /// Fluent high-level API for common avatar rendering paths.
 ///
-/// The builder is additive over the lower-level free functions. It stores
-/// validation failures and returns them from render/encode methods, so invalid
+/// The builder is additive over the lower-level free functions. It defers
+/// complete spec validation and stores namespace validation failures until an
+/// output, key, identity plan, or prepared request is requested, so invalid
 /// size or namespace input remains non-panicking.
 #[derive(Clone)]
 pub struct AvatarBuilder<'a, T> {
     id: T,
-    spec: Result<AvatarSpec, AvatarSpecError>,
+    width: u32,
+    height: u32,
+    seed: u64,
     namespace: Result<AvatarNamespace<'a>, AvatarIdentityError>,
     style: Option<AvatarStyleOptions>,
 }
@@ -625,7 +628,9 @@ impl<T> std::fmt::Debug for AvatarBuilder<'_, T> {
         let namespace = self.namespace.as_ref().map(|_| "[REDACTED]");
         f.debug_struct("AvatarBuilder")
             .field("id", &"[REDACTED]")
-            .field("spec", &self.spec)
+            .field("width", &self.width)
+            .field("height", &self.height)
+            .field("seed", &self.seed)
             .field("namespace", &namespace)
             .field("style", &self.style)
             .finish()
@@ -635,9 +640,12 @@ impl<T> std::fmt::Debug for AvatarBuilder<'_, T> {
 impl<T> AvatarBuilder<'static, T> {
     /// Starts a builder for an identity input.
     pub fn for_id(id: T) -> Self {
+        let spec = AvatarSpec::default();
         Self {
             id,
-            spec: Ok(AvatarSpec::default()),
+            width: spec.width(),
+            height: spec.height(),
+            seed: spec.seed(),
             namespace: Ok(AvatarNamespace::default()),
             style: Some(AvatarStyleOptions::default()),
         }
@@ -647,15 +655,18 @@ impl<T> AvatarBuilder<'static, T> {
 impl<'a, T> AvatarBuilder<'a, T> {
     /// Uses an already validated avatar specification.
     pub fn spec(mut self, spec: AvatarSpec) -> Self {
-        self.spec = Ok(spec);
+        self.width = spec.width();
+        self.height = spec.height();
+        self.seed = spec.seed();
         self
     }
 
     /// Sets the avatar dimensions while preserving the current style variant
-    /// seed when possible.
+    /// seed. Complete dimension validation is deferred until an output, key,
+    /// identity plan, or prepared request is requested.
     pub fn size(mut self, width: u32, height: u32) -> Self {
-        let seed = self.spec.ok().map(AvatarSpec::seed).unwrap_or_default();
-        self.spec = AvatarSpec::new(width, height, seed);
+        self.width = width;
+        self.height = height;
         self
     }
 
@@ -665,10 +676,7 @@ impl<'a, T> AvatarBuilder<'a, T> {
     /// when an application wants a second deterministic variant for the same
     /// identity without changing tenant or namespace style-version values.
     pub fn style_variant(mut self, seed: u64) -> Self {
-        self.spec = match self.spec {
-            Ok(spec) => Ok(AvatarSpec::new_unchecked(spec.width, spec.height, seed)),
-            Err(error) => Err(error),
-        };
+        self.seed = seed;
         self
     }
 
@@ -682,7 +690,9 @@ impl<'a, T> AvatarBuilder<'a, T> {
     pub fn namespace<'b>(self, tenant: &'b str, style_version: &'b str) -> AvatarBuilder<'b, T> {
         AvatarBuilder {
             id: self.id,
-            spec: self.spec,
+            width: self.width,
+            height: self.height,
+            seed: self.seed,
             namespace: AvatarNamespace::new(tenant, style_version),
             style: self.style,
         }
@@ -810,7 +820,7 @@ impl<'a, T: AsRef<[u8]>> AvatarBuilder<'a, T> {
     }
 
     fn render_plan(&self) -> Result<AvatarRenderPlan, AvatarError> {
-        let spec = self.spec?;
+        let spec = AvatarSpec::new(self.width, self.height, self.seed)?;
         let namespace = self.namespace?;
         let identity_options = AvatarIdentityOptions::new(namespace);
         match self.style {

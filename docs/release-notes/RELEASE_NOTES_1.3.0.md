@@ -25,14 +25,17 @@ planned for 2.0 while continuing to use the frozen Hashavatar 1.x renderer.
 
 ## Output Ownership And Resources
 
-- Added `ResourceBudget` for the minimum RGBA8 stride/surface size, the known
-  1.x render-adapter temporary allocation, total known RGBA bytes, and
-  pre-encoder raster bytes.
+- Added `ResourceBudget` for minimum tight and actual declared strided surface
+  accounting, the known 1.x render-adapter temporary allocation, returned-Vec
+  initial base bytes, and writer-path base bytes. Codec scratch space and later
+  output growth remain explicitly excluded.
 - Added `RasterSurfaceMut::new_rgba8()` with checked stride, length, and
   dimension validation.
 - Added `PreparedAvatar::render_into()` for tight or padded caller-owned RGBA8
   surfaces. The 1.x adapter still renders through one sanitized temporary
-  `RgbaImage`; it is not a zero-allocation renderer.
+  `RgbaImage`; it validates renderer dimensions/storage and copies an exact
+  checked row count before reporting success. It is not a zero-allocation
+  renderer.
 - Added `write_svg()` and `encode_to_writer()` for caller-owned sinks. Partial
   output remains owned by the caller after a writer/codec error. SVG and codec
   internals can still allocate documented temporary buffers.
@@ -48,6 +51,8 @@ planned for 2.0 while continuing to use the frozen Hashavatar 1.x renderer.
   digest for every 1.x avatar family under the default SHA-512 identity mode.
 - Existing golden raster fingerprints and established output helpers remain
   unchanged.
+- Preserved width, height, and seed independently in both builders so invalid
+  intermediate dimensions cannot silently reset a selected style seed.
 
 ## 2.0 Migration Decision
 

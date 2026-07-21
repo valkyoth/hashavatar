@@ -134,8 +134,44 @@ fn resource_budget_is_explicit_and_conservative() {
     assert_eq!(budget.minimum_rgba8_stride(), 96 * 4);
     assert_eq!(budget.minimum_rgba8_surface_bytes(), 96 * 80 * 4);
     assert_eq!(budget.render_into_temporary_bytes(), 96 * 80 * 4);
-    assert_eq!(budget.render_into_known_rgba_bytes(), 96 * 80 * 4 * 2);
-    assert_eq!(budget.encoding_base_bytes(), 96 * 80 * 4);
+    assert_eq!(
+        budget.minimum_render_into_known_rgba_bytes(),
+        96 * 80 * 4 * 2
+    );
+    assert_eq!(budget.encode_vec_known_base_bytes(), Some(96 * 80 * 4 * 2));
+    assert_eq!(budget.encode_writer_known_base_bytes(), 96 * 80 * 4);
+
+    let stride = 96 * 4 + 17;
+    let mut pixels = vec![0_u8; stride * 80 + 29];
+    let surface = RasterSurfaceMut::new_rgba8(&mut pixels, 96, 80, stride).expect("padded surface");
+    assert_eq!(surface.required_len(), stride * 80);
+    assert_eq!(surface.provided_len(), stride * 80 + 29);
+    assert_eq!(
+        budget
+            .render_into_known_rgba_bytes_for(&surface)
+            .expect("matching surface"),
+        stride * 80 + 96 * 80 * 4
+    );
+}
+
+#[test]
+fn builders_preserve_seed_across_invalid_intermediate_dimensions() {
+    let expected = AvatarSpec::new(64, 64, 0xfeed_beef).expect("valid expected spec");
+    let request = AvatarRequest::builder(identity())
+        .seed(0xfeed_beef)
+        .size(0, 0)
+        .size(64, 64)
+        .build()
+        .expect("recovered request");
+    assert_eq!(request.spec(), expected);
+
+    let prepared = AvatarBuilder::for_id(b"seed-preservation")
+        .seed(0xfeed_beef)
+        .size(0, 0)
+        .size(64, 64)
+        .prepare()
+        .expect("recovered legacy builder");
+    assert_eq!(prepared.spec(), expected);
 }
 
 #[test]

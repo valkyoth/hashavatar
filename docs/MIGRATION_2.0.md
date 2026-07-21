@@ -107,8 +107,19 @@ prepared.render_into(&mut surface)?;
 ```
 
 The 1.3 adapter still renders through one internal `RgbaImage`; it does not
-claim zero-allocation rendering. `ResourceBudget` reports the known caller and
-temporary RGBA bytes, but excludes format-dependent codec allocations.
+claim zero-allocation rendering. For a tight surface,
+`minimum_render_into_known_rgba_bytes()` includes that surface and the internal
+image. For padding or a larger stride, call
+`render_into_known_rgba_bytes_for(&surface)` after constructing the surface.
+`RasterSurfaceMut::required_len()` reports declared stride-by-height storage;
+trailing bytes beyond that value are not accessed.
+
+For encoding, `encode_vec_known_base_bytes()` includes the internal image and
+the returned vector's initial reserve. `encode_writer_known_base_bytes()`
+includes only the internal image before writer/codec allocations. Both exclude
+codec scratch space, temporary replacement allocations during encoded-vector
+growth, and later output capacity; they are base values rather than total peak
+memory guarantees.
 
 ## Exact 1.x Compatibility Decision
 

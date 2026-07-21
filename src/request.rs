@@ -123,7 +123,9 @@ impl AvatarRequest {
 #[derive(Clone)]
 pub struct AvatarRequestBuilder {
     identity: AvatarIdentity,
-    spec: Result<AvatarSpec, AvatarSpecError>,
+    width: u32,
+    height: u32,
+    seed: u64,
     style: RequestStyle,
     compatibility: AvatarCompatibilityMode,
 }
@@ -132,7 +134,9 @@ impl std::fmt::Debug for AvatarRequestBuilder {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("AvatarRequestBuilder")
             .field("identity", &"[REDACTED]")
-            .field("spec", &self.spec)
+            .field("width", &self.width)
+            .field("height", &self.height)
+            .field("seed", &self.seed)
             .field("style", &self.style)
             .field("compatibility", &self.compatibility)
             .finish()
@@ -142,9 +146,12 @@ impl std::fmt::Debug for AvatarRequestBuilder {
 impl AvatarRequestBuilder {
     /// Starts a strict request builder from an already-derived identity.
     pub fn new(identity: AvatarIdentity) -> Self {
+        let spec = AvatarSpec::default();
         Self {
             identity,
-            spec: Ok(AvatarSpec::default()),
+            width: spec.width(),
+            height: spec.height(),
+            seed: spec.seed(),
             style: RequestStyle::Explicit(AvatarStyleOptions::default()),
             compatibility: AvatarCompatibilityMode::Strict,
         }
@@ -152,23 +159,25 @@ impl AvatarRequestBuilder {
 
     /// Replaces the request's validated image specification.
     pub fn spec(mut self, spec: AvatarSpec) -> Self {
-        self.spec = Ok(spec);
+        self.width = spec.width();
+        self.height = spec.height();
+        self.seed = spec.seed();
         self
     }
 
-    /// Validates and sets image dimensions while retaining the current seed.
+    /// Sets image dimensions while retaining the current seed.
+    ///
+    /// Complete dimension validation is deferred until [`Self::build`] or
+    /// [`Self::prepare`].
     pub fn size(mut self, width: u32, height: u32) -> Self {
-        let seed = self.spec.ok().map(AvatarSpec::seed).unwrap_or_default();
-        self.spec = AvatarSpec::new(width, height, seed);
+        self.width = width;
+        self.height = height;
         self
     }
 
     /// Sets the caller-controlled deterministic style-variant seed.
     pub fn style_variant(mut self, seed: u64) -> Self {
-        self.spec = match self.spec {
-            Ok(spec) => AvatarSpec::new(spec.width(), spec.height(), seed),
-            Err(error) => Err(error),
-        };
+        self.seed = seed;
         self
     }
 
@@ -238,9 +247,10 @@ impl AvatarRequestBuilder {
 
     /// Builds the immutable request, returning any deferred spec error.
     pub fn build(self) -> Result<AvatarRequest, AvatarRequestError> {
+        let spec = AvatarSpec::new(self.width, self.height, self.seed)?;
         Ok(AvatarRequest {
             identity: self.identity,
-            spec: self.spec?,
+            spec,
             style: self.style,
             compatibility: self.compatibility,
         })

@@ -78,64 +78,13 @@ impl LayoutReport {
     }
 }
 
-/// Conservative known memory requirements for the 1.x preview adapters.
-///
-/// Codec-internal allocations are format-dependent and intentionally excluded.
-#[must_use = "use ResourceBudget to enforce service-level concurrency policy"]
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub struct ResourceBudget {
-    spec: AvatarSpec,
-    rgba_stride: usize,
-    rgba_bytes: usize,
-}
-
-impl ResourceBudget {
-    const fn new(spec: AvatarSpec) -> Self {
-        let rgba_stride = (spec.width() as usize).saturating_mul(AVATAR_RGBA_BYTES_PER_PIXEL);
-        Self {
-            spec,
-            rgba_stride,
-            rgba_bytes: spec.rgba_buffer_len(),
-        }
-    }
-
-    /// Returns the specification used for these calculations.
-    pub const fn spec(self) -> AvatarSpec {
-        self.spec
-    }
-
-    /// Returns the minimum RGBA8 bytes required for one row.
-    pub const fn minimum_rgba8_stride(self) -> usize {
-        self.rgba_stride
-    }
-
-    /// Returns the minimum bytes required for a tightly packed RGBA8 surface.
-    pub const fn minimum_rgba8_surface_bytes(self) -> usize {
-        self.rgba_bytes
-    }
-
-    /// Internal temporary RGBA allocation used by the 1.x `render_into` adapter.
-    pub const fn render_into_temporary_bytes(self) -> usize {
-        self.rgba_bytes
-    }
-
-    /// Known RGBA bytes across caller surface and internal 1.x temporary image.
-    pub const fn render_into_known_rgba_bytes(self) -> usize {
-        self.rgba_bytes.saturating_mul(2)
-    }
-
-    /// Internal RGBA bytes before format-specific encoder overhead.
-    pub const fn encoding_base_bytes(self) -> usize {
-        self.rgba_bytes
-    }
-}
-
 /// Mutable caller-owned RGBA8 surface with an explicit row stride.
 pub struct RasterSurfaceMut<'a> {
     pixels: &'a mut [u8],
     width: u32,
     height: u32,
     stride: usize,
+    required_len: usize,
 }
 
 impl std::fmt::Debug for RasterSurfaceMut<'_> {
@@ -145,6 +94,7 @@ impl std::fmt::Debug for RasterSurfaceMut<'_> {
             .field("width", &self.width)
             .field("height", &self.height)
             .field("stride", &self.stride)
+            .field("required_len", &self.required_len)
             .finish()
     }
 }
@@ -189,6 +139,7 @@ impl<'a> RasterSurfaceMut<'a> {
             width,
             height,
             stride,
+            required_len: required,
         })
     }
 
@@ -205,6 +156,16 @@ impl<'a> RasterSurfaceMut<'a> {
     /// Returns the distance in bytes between consecutive rows.
     pub const fn stride(&self) -> usize {
         self.stride
+    }
+
+    /// Returns `stride * height`, the declared bytes used by this surface.
+    pub const fn required_len(&self) -> usize {
+        self.required_len
+    }
+
+    /// Returns the complete caller-provided slice length, including trailing bytes.
+    pub const fn provided_len(&self) -> usize {
+        self.pixels.len()
     }
 
     /// Borrows the complete caller-provided pixel slice.
@@ -236,6 +197,15 @@ pub enum RasterSurfaceError {
         expected_height: u32,
         actual_width: u32,
         actual_height: u32,
+    },
+    /// A renderer returned dimensions or storage inconsistent with its spec.
+    RendererOutputMismatch {
+        expected_width: u32,
+        expected_height: u32,
+        actual_width: u32,
+        actual_height: u32,
+        expected_len: usize,
+        actual_len: usize,
     },
     /// The prepared renderer rejected its image specification.
     Render(AvatarSpecError),
@@ -274,6 +244,17 @@ impl std::fmt::Display for RasterSurfaceError {
             } => write!(
                 f,
                 "raster surface dimensions must be {expected_width}x{expected_height}, got {actual_width}x{actual_height}"
+            ),
+            Self::RendererOutputMismatch {
+                expected_width,
+                expected_height,
+                actual_width,
+                actual_height,
+                expected_len,
+                actual_len,
+            } => write!(
+                f,
+                "renderer output must be {expected_width}x{expected_height} with {expected_len} RGBA8 bytes, got {actual_width}x{actual_height} with {actual_len} bytes"
             ),
             Self::Render(error) => error.fmt(f),
         }
@@ -427,29 +408,8 @@ impl PreparedAvatar {
         surface: &mut RasterSurfaceMut<'_>,
     ) -> Result<(), RasterSurfaceError> {
         let spec = self.spec();
-        if (surface.width, surface.height) != (spec.width(), spec.height()) {
-            return Err(RasterSurfaceError::DimensionMismatch {
-                expected_width: spec.width(),
-                expected_height: spec.height(),
-                actual_width: surface.width,
-                actual_height: surface.height,
-            });
-        }
-
         let image = SanitizingRgbaImage::new(self.plan.render_rgba()?);
-        let row_bytes = self.resource_budget.minimum_rgba8_stride();
-        for (source, destination) in image
-            .as_image()
-            .as_raw()
-            .chunks_exact(row_bytes)
-            .zip(surface.pixels.chunks_exact_mut(surface.stride))
-        {
-            let destination = destination
-                .get_mut(..row_bytes)
-                .ok_or(RasterSurfaceError::LengthOverflow)?;
-            destination.copy_from_slice(source);
-        }
-        Ok(())
+        copy_rgba_image_into_surface(spec, image.as_image(), surface)
     }
 
     /// Renders SVG into a newly allocated `String`.

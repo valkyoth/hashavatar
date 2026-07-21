@@ -436,8 +436,12 @@ sinks. `render_into()` accepts a validated RGBA8 surface with an explicit row
 stride. These are ownership adapters, not zero-allocation claims: the 1.x
 renderer still creates one temporary `RgbaImage`, SVG still creates a temporary
 `String`, and codecs can allocate format-specific scratch buffers. Use
-`ResourceBudget` for known RGBA memory and enforce aggregate concurrency at the
-service boundary.
+`minimum_render_into_known_rgba_bytes()` only for tightly packed surfaces and
+`render_into_known_rgba_bytes_for()` for an actual declared strided surface.
+`encode_vec_known_base_bytes()` includes the returned vector's initial reserve;
+`encode_writer_known_base_bytes()` does not. Neither encoding estimate includes
+codec scratch space or later output-buffer growth. Enforce aggregate
+concurrency with the helper matching the actual output path.
 
 See [docs/MIGRATION_2.0.md](docs/MIGRATION_2.0.md) for cache migration,
 surface setup, writer failure semantics, and the exact 1.x compatibility

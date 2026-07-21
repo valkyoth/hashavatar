@@ -98,10 +98,13 @@ currently promised.
 - The default build keeps SHA-512 identity hashing and WebP encoding.
 - Optional hash modes and extra raster encoders remain explicit Cargo feature
   choices.
-- `ResourceBudget` reports known RGBA memory only. Codec scratch allocations
-  and service-wide concurrency remain caller policy.
+- `ResourceBudget` distinguishes tight and declared strided surface memory,
+  returned-vector initial base memory, and writer-path base memory. Codec
+  scratch space, later output growth, and service-wide concurrency remain
+  caller policy.
 - `RasterSurfaceMut` validates dimensions, stride, and capacity before copy.
-  The 1.3 adapter still allocates one internal renderer image.
+  The 1.3 adapter also validates internal renderer dimensions and byte length
+  before copying an exact row count, and still allocates one internal image.
 - Writer methods propagate failures and leave partial caller-owned output in
   the caller's sink.
 

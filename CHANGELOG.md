@@ -10,11 +10,16 @@
   and expression fallbacks.
 - Added `LayoutReport` for the resolved style, family capabilities, catalog
   version, and render contract bound to a prepared request.
-- Added `ResourceBudget` for known caller-surface, temporary-render, and
-  pre-encoder RGBA memory accounting.
+- Added `ResourceBudget` for tight and actual declared strided surfaces,
+  temporary-render memory, returned-Vec initial base bytes, and writer-path
+  base bytes, with codec scratch space and later output growth explicitly
+  excluded.
 - Added validated, strided `RasterSurfaceMut` output and fail-closed errors for
   zero dimensions, short strides, short buffers, overflow, and request/surface
-  dimension mismatches.
+  dimension mismatches. Internal renderer dimensions/storage and exact row
+  counts are validated before success.
+- Preserved width, height, and seed independently in both builders so invalid
+  intermediate dimensions cannot silently reset the selected style seed.
 - Added `PreparedAvatar::write_svg()` and `encode_to_writer()` for
   caller-owned sinks with documented partial-output and internal-allocation
   semantics.
