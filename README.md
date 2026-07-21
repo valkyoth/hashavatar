@@ -28,12 +28,13 @@
 # hashavatar
 
 `hashavatar` is the recommended facade for deterministic avatar generation.
-The `2.0.0-alpha.1` source tree proves one complete Cat workflow: bounded
+The `2.0.0-alpha.2` source tree provides one complete Cat workflow: bounded
 identity input becomes independently derived traits, a private validated
 Q16.16 scene, canonical straight-alpha RGBA8 pixels, and deterministic SVG.
-Both outputs execute the same scene.
+Owned images, caller-provided surfaces, complete SVG documents, and SVG
+fragments all execute the same scene.
 
-Alpha.1 is deliberately small. It has no codecs, image-library types, mutable
+Alpha.2 is deliberately small. It has no codecs, image-library types, mutable
 rendering RNG, filesystem API, CLI, server, or user-supplied SVG. Later 2.0
 alphas will extend this proven architecture to the existing catalog and
 separate optional packages.
@@ -46,7 +47,7 @@ The latest crates.io release is `1.3.0`, maintained on
 are tested through GitHub and `hashavatar-website`; prereleases are neither
 tagged nor uploaded to crates.io.
 
-To test alpha.1 from a local checkout:
+To test alpha.2 from a local checkout:
 
 ```toml
 [dependencies]
@@ -63,7 +64,7 @@ let prepared = CatRequest::with_namespace(
     256,
     0,
     b"tenant-a",
-    b"website-v2-alpha1",
+    b"website-v2-alpha2",
     b"user-123",
 )?
 .prepare()?;
@@ -76,6 +77,34 @@ assert_eq!(rgba.dimensions(), (256, 256));
 assert_eq!(rgba.pixels().len(), report.rgba_bytes());
 assert!(svg.starts_with("<svg"));
 
+# Ok::<(), hashavatar::CatError>(())
+```
+
+Render into a padded caller-owned surface without modifying padding:
+
+```rust
+use hashavatar::{CatRequest, RgbaSurfaceMut};
+
+let prepared = CatRequest::new(128, 128, 0, b"user-123")?.prepare()?;
+let stride = 128 * 4 + 16;
+let mut storage = vec![0_u8; stride * 128];
+let mut surface = RgbaSurfaceMut::new(&mut storage, 128, 128, stride)?;
+prepared.render_into(&mut surface)?;
+let digest = surface.pixel_digest()?;
+
+assert_eq!(surface.visible_row_bytes(), 128 * 4);
+assert_eq!(digest, prepared.render_rgba()?.pixel_digest()?);
+# Ok::<(), hashavatar::CatError>(())
+```
+
+Embed multiple deterministic fragments safely by choosing distinct prefixes:
+
+```rust
+use hashavatar::{CatRequest, SvgOptions};
+
+let prepared = CatRequest::new(128, 128, 0, b"user-123")?.prepare()?;
+let fragment = prepared.render_svg_with(SvgOptions::fragment("profile-avatar")?)?;
+assert!(fragment.starts_with("<g id=\"profile-avatar-scene\">"));
 # Ok::<(), hashavatar::CatError>(())
 ```
 
@@ -92,9 +121,13 @@ not the raw identifier, tenant, style-version, or identity digest.
 - Traits are sampled independently by stable labels; adding a trait does not
   consume mutable RNG state or shift existing traits.
 - Geometry is private signed Q16.16 fixed point with checked construction.
-- Scenes contain at most 16 admitted commands in alpha.1.
+- Scenes contain at most 64 commands, eight paths, 48 points per path, and
+  eight levels each of clips and opacity groups.
 - Scene validation runs before raster or SVG execution.
-- Raster output is tightly packed, straight-alpha RGBA8.
+- External raster output is straight-alpha sRGB RGBA8. Owned output is tightly
+  packed; caller surfaces may use validated padded strides.
+- Source-over compositing, gradient interpolation, clipping, integer curve
+  lowering, and pixel-center sampling are integer-only and specified.
 - SVG numeric values are exact decimal representations of the same Q16.16
   scene values and are parser-tested as XML.
 - First-party Rust code forbids `unsafe` and production panic-like paths.
@@ -106,7 +139,7 @@ still enforce process-wide concurrency and rate limits.
 
 ## Crates
 
-| Package | Alpha.1 role |
+| Package | Alpha.2 role |
 | --- | --- |
 | `hashavatar` | Recommended thin facade and stable import path |
 | `hashavatar-core` | `no_std + alloc` identity, trait, scene, CPU RGBA8, and SVG core |

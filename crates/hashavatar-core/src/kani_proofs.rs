@@ -1,14 +1,15 @@
 use crate::{
-    CatRequest, MAX_DIMENSION, MIN_DIMENSION, RGBA8_BYTES_PER_PIXEL,
+    MAX_DIMENSION, MIN_DIMENSION, RGBA8_BYTES_PER_PIXEL,
     fixed::Fixed,
-    scene::{Color, Command, Scene},
+    paint::{Color, source_over},
+    scene::{rgba_len, validate_dimensions},
 };
 
 #[kani::proof]
 fn request_dimension_admission_is_exact() {
     let width = u32::from(kani::any::<u16>());
     let height = u32::from(kani::any::<u16>());
-    let admitted = CatRequest::new(width, height, kani::any::<u64>(), b"").is_ok();
+    let admitted = validate_dimensions(width, height).is_ok();
     let expected = (MIN_DIMENSION..=MAX_DIMENSION).contains(&width)
         && (MIN_DIMENSION..=MAX_DIMENSION).contains(&height);
     assert_eq!(admitted, expected);
@@ -58,15 +59,33 @@ fn pixel_center_is_inside_its_pixel() {
 fn validated_scene_report_has_exact_rgba_size() {
     let width = MIN_DIMENSION + (u32::from(kani::any::<u8>()) % 32);
     let height = MIN_DIMENSION + (u32::from(kani::any::<u8>()) % 32);
-    if let Ok(mut scene) = Scene::new(width, height) {
-        if scene.push(Command::Fill(Color::rgb(1, 2, 3))).is_ok() {
-            if let Ok(report) = scene.validate() {
-                let expected = usize::try_from(width)
-                    .unwrap_or(0)
-                    .saturating_mul(usize::try_from(height).unwrap_or(0))
-                    .saturating_mul(RGBA8_BYTES_PER_PIXEL);
-                assert_eq!(report.rgba_bytes(), expected);
-            }
-        }
+    if let Ok(actual) = rgba_len(width, height) {
+        let expected = usize::try_from(width)
+            .unwrap_or(0)
+            .saturating_mul(usize::try_from(height).unwrap_or(0))
+            .saturating_mul(RGBA8_BYTES_PER_PIXEL);
+        assert_eq!(actual, expected);
     }
+}
+
+#[kani::proof]
+fn source_over_channels_remain_canonical_bytes() {
+    let destination = kani::any::<[u8; 4]>();
+    let source = Color::rgba(
+        kani::any::<u8>(),
+        kani::any::<u8>(),
+        kani::any::<u8>(),
+        kani::any::<u8>(),
+    );
+    let output = source_over(destination, source);
+    if output.get(3).copied() == Some(0) {
+        assert_eq!(output, [0, 0, 0, 0]);
+    }
+}
+
+#[kani::proof]
+fn alpha_multiplication_stays_bounded() {
+    let color = Color::rgba(1, 2, 3, kani::any::<u8>());
+    let output = color.with_opacity(kani::any::<u8>());
+    assert!(output.alpha <= color.alpha);
 }

@@ -1,8 +1,8 @@
 //! Canonical rendering core for the Hashavatar 2.0 development line.
 //!
-//! Alpha.1 intentionally exposes only a Cat vertical slice. Identity-derived
-//! traits are stateless, geometry uses private fixed-point values, and both CPU
-//! RGBA8 and SVG output execute the same validated private scene.
+//! Alpha.2 completes the bounded canonical renderer used by the Cat vertical
+//! slice. Identity-derived traits are stateless, geometry and scene layouts stay
+//! private, and CPU RGBA8 and SVG output execute the same validated scene.
 
 #![no_std]
 #![forbid(unsafe_code)]
@@ -12,8 +12,11 @@ extern crate alloc;
 mod cat;
 mod error;
 mod fixed;
+mod geometry;
 mod identity;
+mod paint;
 mod raster;
+mod rasterize;
 mod scene;
 mod svg;
 
@@ -22,8 +25,9 @@ mod kani_proofs;
 
 pub use self::cat::{CatRequest, CatTraitVector, PreparedCat};
 pub use self::error::{CatError, IdentityComponent};
-pub use self::raster::CanonicalRgbaImage;
+pub use self::raster::{CanonicalRgbaImage, PixelDigest, RgbaSurfaceMut};
 pub use self::scene::SceneReport;
+pub use self::svg::{SvgMode, SvgOptions};
 
 /// Smallest supported canonical output dimension.
 pub const MIN_DIMENSION: u32 = 64;
@@ -39,3 +43,6 @@ pub const MAX_NAMESPACE_COMPONENT_BYTES: usize = 128;
 
 /// Number of bytes in one external straight-alpha RGBA8 pixel.
 pub const RGBA8_BYTES_PER_PIXEL: usize = 4;
+
+/// Versioned contract identifier included in canonical pixel digests.
+pub const PIXEL_CONTRACT_ID: &str = "hashavatar/rgba8-straight-srgb/v1";

@@ -9,21 +9,23 @@ changes belong to 2.0.
 
 ## Development Line
 
-`main` implements `2.0.0-alpha.1`. This source-only prerelease introduces the
-resolver-3 `hashavatar`/`hashavatar-core` workspace and one canonical Cat
-vertical slice:
+`main` implements `2.0.0-alpha.2`. This source-only prerelease completes the
+bounded canonical renderer beneath the Cat vertical slice:
 
 - stateless, label-separated SHA-512 trait derivation;
 - private checked Q16.16 geometry;
-- a bounded validated private scene;
+- a bounded validated private scene with primitives, paths, clips, opacity,
+  gradients, and exact integer compositing;
 - one safe-Rust CPU straight-alpha RGBA8 executor;
-- deterministic SVG from the same scene;
+- owned and caller-provided padded surfaces through the same executor;
+- versioned pixel digests over visible rows;
+- deterministic SVG documents and fragments from the same scene;
 - debug/release pixel KATs and parser-backed SVG checks;
-- a focused fuzz target and five Kani harnesses;
+- focused fuzz targets and seven Kani harnesses;
 - source-size enforcement at 500 lines per Rust file;
 - portable core CI for WASM, AArch64 Linux, and 32-bit x86 Linux.
 
-The implementation-stop commit is ready for exact-commit external pentesting.
+The alpha.2 implementation-stop candidate is ready for exact-commit external pentesting.
 The milestone is not complete until findings are resolved, the permanent
 pentest digest is added, GitHub is green, and `hashavatar-website` passes
 against the final reviewed commit.
@@ -46,8 +48,8 @@ digest under
 | Workspace resolver | Cargo resolver `3` |
 | CodeQL | GitHub default setup |
 | Unsafe Rust | Forbidden in first-party library code |
-| Alpha.1 identity mode | Domain-separated SHA-512 |
-| Alpha.1 outputs | Canonical RGBA8 and SVG |
+| Alpha.2 identity mode | Domain-separated SHA-512 |
+| Alpha.2 outputs | Canonical RGBA8, pixel digest, and semantic SVG |
 
 Version details live in [release notes](../release-notes/) and the
 [changelog](../CHANGELOG.md).

@@ -8,13 +8,27 @@ publish = false
 cargo-fuzz = true
 
 [dependencies]
-hashavatar = { path = "..", version = "2.0.0-alpha.1" }
+hashavatar = { path = "..", version = "2.0.0-alpha.2" }
 libfuzzer-sys = "0.4.13"
 roxmltree = "0.21.1"
 
 [[bin]]
 name = "avatar_inputs"
 path = "fuzz_targets/avatar_inputs.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "canonical_surface"
+path = "fuzz_targets/canonical_surface.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "svg_writer"
+path = "fuzz_targets/svg_writer.rs"
 test = false
 doc = false
 bench = false

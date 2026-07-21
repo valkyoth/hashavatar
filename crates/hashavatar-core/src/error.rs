@@ -21,7 +21,7 @@ impl IdentityComponent {
     }
 }
 
-/// Error returned by the alpha.1 canonical Cat workflow.
+/// Error returned by the alpha.2 canonical Cat workflow.
 #[non_exhaustive]
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum CatError {
@@ -45,6 +45,10 @@ pub enum CatError {
     NumericRange,
     /// The private scene failed validation before execution.
     InvalidScene,
+    /// A caller-provided RGBA8 surface has an invalid stride or buffer length.
+    InvalidSurface,
+    /// SVG document or fragment options failed validation.
+    InvalidSvgOptions,
     /// Writing the internally bounded SVG string failed.
     SvgWrite,
 }
@@ -64,6 +68,8 @@ impl fmt::Display for CatError {
             Self::Allocation => formatter.write_str("bounded avatar allocation failed"),
             Self::NumericRange => formatter.write_str("avatar geometry exceeded numeric limits"),
             Self::InvalidScene => formatter.write_str("canonical avatar scene validation failed"),
+            Self::InvalidSurface => formatter.write_str("caller RGBA8 surface is invalid"),
+            Self::InvalidSvgOptions => formatter.write_str("canonical SVG options are invalid"),
             Self::SvgWrite => formatter.write_str("canonical SVG construction failed"),
         }
     }

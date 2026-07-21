@@ -24,9 +24,10 @@
 # hashavatar-core
 
 `hashavatar-core` contains the canonical safe-Rust renderer used by the
-Hashavatar 2.0 work. Alpha.1 deliberately supports one Cat vertical slice so
-the fixed-point, scene-validation, CPU-raster, and SVG architecture can be
-reviewed before it is generalized.
+Hashavatar 2.0 work. Alpha.2 completes the bounded canonical renderer used by
+the Cat vertical slice: validated fixed-point primitives and paths, exact
+compositing, gradients, clips, opacity groups, caller surfaces, and SVG
+documents/fragments.
 
 Most applications should use the `hashavatar` facade. This companion crate is
 not published during the 2.0 alpha, beta, or release-candidate cycle.
@@ -58,7 +59,9 @@ assert_ne!(traits.head_width(), 0);
 - Scene commands and fixed-point layouts are private and validated before
   execution.
 - CPU RGBA8 and SVG consume the same immutable scene.
+- Caller-provided strided surfaces preserve padding and share the owned-image
+  executor.
+- Pixel digests exclude padding and bind the dimensions and pixel contract ID.
 - Returned pixels and SVG belong to the caller and are not secret containers.
 
-Alpha.2 will expand and freeze the complete canonical rendering contracts.
-Alpha.1 APIs and pixels remain explicitly unstable.
+Alpha.2 APIs and pixels remain explicitly unstable until the 2.0 beta freeze.

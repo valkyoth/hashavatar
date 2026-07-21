@@ -14,7 +14,7 @@ created and crates are not uploaded to crates.io. Every milestone must update
 its release note, current status, crate matrix, tests, and pentest digest before
 work begins on the next milestone.
 
-Alpha.1 freezes evidence for one Cat vertical slice, not the final 2.0 public
+Alpha.2 freezes evidence for one complete canonical renderer, not the final 2.0 public
 surface. The following are intentional current contracts:
 
 - checked request bounds and typed failures;
@@ -24,7 +24,7 @@ surface. The following are intentional current contracts:
 - deterministic output within the same source revision and contract labels;
 - no exposure of raw identity digests or scene internals.
 
-Changing alpha.1 domain labels, rounding, command order, containment tests,
+Changing alpha.2 domain labels, rounding, command order, containment tests,
 colors, or SVG serialization changes output and requires explicit KAT updates
 and release-note disclosure.
 

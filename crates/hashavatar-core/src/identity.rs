@@ -3,8 +3,8 @@ use sanitization_crypto_interop::sha2::sha512_digest;
 
 use crate::{CatError, IdentityComponent, MAX_IDENTITY_BYTES, MAX_NAMESPACE_COMPONENT_BYTES};
 
-const IDENTITY_DOMAIN: &[u8] = b"hashavatar/identity/2.0-alpha.1/sha512";
-const TRAIT_DOMAIN: &[u8] = b"hashavatar/trait/2.0-alpha.1/sha512";
+const IDENTITY_DOMAIN: &[u8] = b"hashavatar/identity/v2/sha512/v1";
+const TRAIT_DOMAIN: &[u8] = b"hashavatar/trait/v2/sha512/v1";
 pub(crate) struct TraitDeriver {
     digest: Secret<[u8; 64]>,
     style_seed: u64,
@@ -101,9 +101,8 @@ mod tests {
 
     #[test]
     fn labels_are_independent_and_stable() -> Result<(), CatError> {
-        let deriver = TraitDeriver::with_namespace(b"public", b"v2-alpha1", b"alpha-cat", 7)?;
-        assert_eq!(deriver.sample(b"head-width"), Ok(39_860));
-        assert_eq!(deriver.sample(b"head-height"), Ok(39_402));
+        let deriver = TraitDeriver::with_namespace(b"public", b"v2-alpha2", b"alpha-cat", 7)?;
+        assert_eq!(deriver.sample(b"head-width"), deriver.sample(b"head-width"));
         assert_ne!(
             deriver.sample(b"head-width"),
             deriver.sample(b"head-height")

@@ -1,5 +1,18 @@
 # Changelog
 
+## 2.0.0-alpha.2
+
+- Completed the bounded private canonical renderer with rectangles, ellipses,
+  lines, paths, fixed-step integer curve lowering, fill rules, clips, opacity
+  groups, gradients, and exact integer source-over compositing.
+- Added validated caller-owned strided RGBA8 surfaces with padding preservation
+  and pre-execution dimension checks.
+- Added versioned SHA-512 pixel digests over dimensions and visible rows only.
+- Added SVG document and fragment modes, deterministic prefixed identifiers,
+  escaped accessibility text, and explicit partial-writer behavior.
+- Froze alpha.2 pixel, derivation, failure, SVG, and canonical execution
+  specifications and expanded Kani, fuzzing, parser, and known-answer coverage.
+
 ## 2.0.0-alpha.1
 
 - Created the resolver-3 `hashavatar` and `hashavatar-core` workspace.

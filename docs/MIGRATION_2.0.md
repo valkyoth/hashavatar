@@ -34,7 +34,8 @@ let svg = prepared.render_svg()?;
 The request borrows identity bytes only during preparation. The prepared value
 owns one validated private scene and can execute either output without
 rehashing. Encoders, automatic family selection, accessories, expressions,
-frames, and typed cache keys are not yet part of alpha.1.
+frames and typed asset keys are not yet part of alpha.2. Alpha.2 does provide
+versioned pixel digests for canonical output comparison and caching.
 
 ## Rollout Rules
 

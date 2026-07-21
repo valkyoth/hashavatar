@@ -1,16 +1,19 @@
+mod compiler;
+
+use self::compiler::compile_scene;
 use crate::{
-    CanonicalRgbaImage, CatError, MAX_IDENTITY_BYTES, MAX_NAMESPACE_COMPONENT_BYTES, SceneReport,
-    fixed::Fixed,
+    CanonicalRgbaImage, CatError, MAX_IDENTITY_BYTES, MAX_NAMESPACE_COMPONENT_BYTES,
+    RgbaSurfaceMut, SceneReport, SvgOptions,
     identity::TraitDeriver,
-    raster::render_scene,
-    scene::{Color, Command, Point, Scene},
-    svg::render_scene_svg,
+    raster::{render_scene, render_scene_into},
+    scene::Scene,
+    svg::{render_scene_svg, render_scene_svg_with, write_scene_svg},
 };
 
 const DEFAULT_TENANT: &[u8] = b"public";
-const DEFAULT_STYLE: &[u8] = b"v2-alpha1";
+const DEFAULT_STYLE: &[u8] = b"v2-alpha2";
 
-/// Borrowed inputs for one canonical alpha.1 Cat avatar.
+/// Borrowed inputs for one canonical alpha.2 Cat avatar.
 ///
 /// Construction validates public resource bounds. [`Self::prepare`] derives
 /// traits and compiles the request into a validated private scene without
@@ -26,7 +29,7 @@ pub struct CatRequest<'a> {
 }
 
 impl<'a> CatRequest<'a> {
-    /// Creates a request in Hashavatar's public alpha.1 namespace.
+    /// Creates a request in Hashavatar's public alpha.2 namespace.
     pub fn new(
         width: u32,
         height: u32,
@@ -82,7 +85,7 @@ impl<'a> CatRequest<'a> {
     }
 }
 
-/// Stable named trait samples used by the alpha.1 Cat compiler.
+/// Stable named trait samples used by the alpha.2 Cat compiler.
 ///
 /// Each value is independently derived from a domain-separated label. Values
 /// are exposed for reproducibility and diagnostics; the identity digest is not.
@@ -216,9 +219,37 @@ impl PreparedCat {
         render_scene(&self.scene)
     }
 
+    /// Executes into a validated caller-owned RGBA8 surface.
+    ///
+    /// Validation occurs before visible bytes are changed. An execution error
+    /// may leave visible pixels partially modified; row padding is preserved.
+    pub fn render_into(&self, surface: &mut RgbaSurfaceMut<'_>) -> Result<(), CatError> {
+        render_scene_into(&self.scene, surface)
+    }
+
     /// Serializes the same canonical scene as deterministic SVG.
     pub fn render_svg(&self) -> Result<alloc::string::String, CatError> {
         render_scene_svg(&self.scene)
+    }
+
+    /// Serializes the scene using validated document or fragment options.
+    pub fn render_svg_with(
+        &self,
+        options: SvgOptions<'_>,
+    ) -> Result<alloc::string::String, CatError> {
+        render_scene_svg_with(&self.scene, options)
+    }
+
+    /// Streams SVG to a [`core::fmt::Write`] destination.
+    ///
+    /// Writer failure may leave a valid prefix in the destination. Retry with
+    /// a fresh destination.
+    pub fn write_svg(
+        &self,
+        writer: &mut impl core::fmt::Write,
+        options: SvgOptions<'_>,
+    ) -> Result<(), CatError> {
+        write_scene_svg(&self.scene, writer, options)
     }
 }
 
@@ -248,135 +279,4 @@ fn validate_request(
         }
     }
     Ok(())
-}
-
-fn compile_scene(width: u32, height: u32, traits: CatTraitVector) -> Result<Scene, CatError> {
-    let width = Fixed::from_integer(i32::try_from(width).map_err(|_| CatError::NumericRange)?)?;
-    let height = Fixed::from_integer(i32::try_from(height).map_err(|_| CatError::NumericRange)?)?;
-    let center_x = scale(width, 50, 100)?;
-    let center_y = scale(height, 54, 100)?.checked_add(vary(height, 0, 4, traits.head_drop)?)?;
-    let head_rx = scale(width, 27, 100)?.checked_add(vary(width, 0, 5, traits.head_width)?)?;
-    let head_ry = scale(height, 23, 100)?.checked_add(vary(height, 0, 5, traits.head_height)?)?;
-    let ear_half = scale(width, 11, 100)?.checked_add(vary(width, 0, 3, traits.ear_width)?)?;
-    let ear_height = scale(height, 18, 100)?.checked_add(vary(height, 0, 5, traits.ear_height)?)?;
-    let eye_offset = scale(width, 12, 100)?.checked_add(vary(width, 0, 3, traits.eye_spacing)?)?;
-    let eye_rx = scale(width, 4, 100)?.checked_add(vary(width, 0, 2, traits.eye_size)?)?;
-    let eye_ry = scale(height, 6, 100)?.checked_add(vary(height, 0, 2, traits.eye_size)?)?;
-    let eye_y = center_y.checked_sub(scale(head_ry, 18, 100)?)?;
-    let ear_base_y = center_y.checked_sub(scale(head_ry, 72, 100)?)?;
-    let ear_tip_y = ear_base_y.checked_sub(ear_height)?;
-    let left_ear_x = center_x.checked_sub(scale(head_rx, 58, 100)?)?;
-    let right_ear_x = center_x.checked_add(scale(head_rx, 58, 100)?)?;
-
-    let background = themed_color(traits.background_hue, 36, 84, 72);
-    let accent = themed_color(traits.accent_hue, 48, 94, 86);
-    let fur = themed_color(traits.fur_hue, 54, 210, 188);
-    let muzzle = themed_color(traits.muzzle_hue, 168, 246, 222);
-    let iris = themed_color(traits.eye_hue, 36, 224, 170);
-    let ink = Color::rgb(24, 27, 32);
-
-    let mut scene = Scene::new(
-        u32::try_from(width.floor()?).map_err(|_| CatError::NumericRange)?,
-        u32::try_from(height.floor()?).map_err(|_| CatError::NumericRange)?,
-    )?;
-    scene.push(Command::Fill(background))?;
-    scene.push(Command::Ellipse {
-        center: Point::new(scale(width, 82, 100)?, scale(height, 18, 100)?),
-        radius_x: scale(width, 18, 100)?,
-        radius_y: scale(height, 18, 100)?,
-        color: accent,
-    })?;
-    scene.push(Command::Triangle {
-        points: [
-            Point::new(left_ear_x.checked_sub(ear_half)?, ear_base_y),
-            Point::new(left_ear_x, ear_tip_y),
-            Point::new(left_ear_x.checked_add(ear_half)?, ear_base_y),
-        ],
-        color: fur,
-    })?;
-    scene.push(Command::Triangle {
-        points: [
-            Point::new(right_ear_x.checked_sub(ear_half)?, ear_base_y),
-            Point::new(right_ear_x, ear_tip_y),
-            Point::new(right_ear_x.checked_add(ear_half)?, ear_base_y),
-        ],
-        color: fur,
-    })?;
-    scene.push(Command::Ellipse {
-        center: Point::new(center_x, center_y),
-        radius_x: head_rx,
-        radius_y: head_ry,
-        color: fur,
-    })?;
-    scene.push(Command::Ellipse {
-        center: Point::new(center_x, center_y.checked_add(scale(head_ry, 35, 100)?)?),
-        radius_x: scale(head_rx, 38, 100)?,
-        radius_y: scale(head_ry, 28, 100)?,
-        color: muzzle,
-    })?;
-    for direction in [-1_i32, 1_i32] {
-        let offset = if direction < 0 {
-            Fixed::ZERO.checked_sub(eye_offset)?
-        } else {
-            eye_offset
-        };
-        let eye_x = center_x.checked_add(offset)?;
-        scene.push(Command::Ellipse {
-            center: Point::new(eye_x, eye_y),
-            radius_x: eye_rx,
-            radius_y: eye_ry,
-            color: Color::rgb(248, 250, 252),
-        })?;
-        scene.push(Command::Ellipse {
-            center: Point::new(eye_x, eye_y),
-            radius_x: scale(eye_rx, 48, 100)?,
-            radius_y: scale(eye_ry, 62, 100)?,
-            color: iris,
-        })?;
-        scene.push(Command::Ellipse {
-            center: Point::new(eye_x, eye_y),
-            radius_x: scale(eye_rx, 18, 100)?,
-            radius_y: scale(eye_ry, 44, 100)?,
-            color: ink,
-        })?;
-    }
-    let nose_y = center_y.checked_add(scale(head_ry, 31, 100)?)?;
-    scene.push(Command::Triangle {
-        points: [
-            Point::new(center_x.checked_sub(scale(width, 3, 100)?)?, nose_y),
-            Point::new(center_x.checked_add(scale(width, 3, 100)?)?, nose_y),
-            Point::new(center_x, nose_y.checked_add(scale(height, 3, 100)?)?),
-        ],
-        color: ink,
-    })?;
-    Ok(scene)
-}
-
-fn scale(value: Fixed, numerator: i32, denominator: i32) -> Result<Fixed, CatError> {
-    value.checked_mul(Fixed::from_ratio(numerator, denominator)?)
-}
-
-fn vary(
-    value: Fixed,
-    minimum_percent: i32,
-    maximum_percent: i32,
-    sample: u16,
-) -> Result<Fixed, CatError> {
-    let minimum = scale(value, minimum_percent, 100)?;
-    let maximum = scale(value, maximum_percent, 100)?;
-    Fixed::lerp(minimum, maximum, sample)
-}
-
-fn themed_color(sample: u16, floor: u8, ceiling: u8, phase: u8) -> Color {
-    let span = u16::from(ceiling.saturating_sub(floor));
-    let channel = |shift: u16| {
-        let mixed = sample.rotate_left(u32::from(shift % 16));
-        let scaled = u32::from(mixed)
-            .saturating_mul(u32::from(span))
-            .checked_div(u32::from(u16::MAX))
-            .unwrap_or(0);
-        let bounded = u8::try_from(scaled).unwrap_or(u8::MAX);
-        floor.saturating_add(bounded)
-    };
-    Color::rgb(channel(0), channel(u16::from(phase % 13)), channel(11))
 }

@@ -711,8 +711,8 @@ publication begin with the approved stable `2.0.0` workspace.
 
 ### v2.0.0-alpha.1 - Cat Vertical Slice And Workspace
 
-**Status:** Implementation complete; pending exact-commit pentest, downstream
-website validation, and green GitHub checks before beginning alpha.2.
+**Status:** Complete. Exact-commit pentest passed and permanent evidence is
+recorded under `security/pentest/`.
 
 **Goal:** Prove the complete architecture with real artwork before generalizing
 the rendering abstraction.
@@ -734,7 +734,8 @@ no independent family geometry path. The abstractions remain changeable.
 
 ### v2.0.0-alpha.2 - Complete Canonical Renderer
 
-**Status:** Planned.
+**Status:** Implementation complete; pending exact-commit pentest, downstream
+website validation, and green GitHub checks before beginning alpha.3.
 
 **Goal:** Generalize only the scene operations demonstrated by real avatar
 needs and finish the canonical CPU/SVG contracts.

@@ -58,6 +58,8 @@ unit_fixed_conversion_stays_in_closed_interval
 fixed_lerp_stays_between_small_positive_bounds
 pixel_center_is_inside_its_pixel
 validated_scene_report_has_exact_rgba_size
+source_over_channels_remain_canonical_bytes
+alpha_multiplication_stays_bounded
 "
 
 status=0

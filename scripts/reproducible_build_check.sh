@@ -15,7 +15,7 @@ fi
 export SOURCE_DATE_EPOCH
 
 package_name="hashavatar-core"
-version="0.1.0-alpha.1"
+version="0.1.0-alpha.2"
 CARGO_TARGET_DIR="$first_target" cargo package -p "$package_name" --locked --allow-dirty --no-verify
 CARGO_TARGET_DIR="$second_target" cargo package -p "$package_name" --locked --allow-dirty --no-verify
 

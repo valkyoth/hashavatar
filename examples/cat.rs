@@ -1,4 +1,4 @@
-//! Prepares one Cat scene and executes both canonical alpha.1 outputs.
+//! Prepares one Cat scene and executes both canonical alpha.2 outputs.
 
 use hashavatar::CatRequest;
 

@@ -20,18 +20,23 @@ supply-chain scope.
 - SHA-512 runs through `sanitization-crypto-interop`, including its reviewed
   upstream hasher cleanup path.
 - Geometry uses checked signed Q16.16 values. No floating point is used.
-- The alpha.1 scene is private, flat, and capped at 16 commands. Validation
-  rejects empty commands, transparent paint, invalid bounds, non-positive
-  ellipse radii, degenerate triangles, and arithmetic failure.
+- The alpha.2 scene is private and capped at 64 commands, eight paths, 48
+  lowered points per path, and eight levels each of clip and opacity stacks.
+  Validation rejects malformed commands, stack imbalance, invalid paint or
+  geometry, degenerate shapes, bad path references, and arithmetic failure.
 - Both raster and SVG executors revalidate the scene before execution.
-- Raster allocation length uses checked arithmetic and fallible reservation.
+- Raster allocation, stride, and visible-row lengths use checked arithmetic;
+  owned allocations use fallible reservation.
 - Pixel writes use checked offsets and bounds-checked slices.
 - Raster loop bounds are clipped to validated output dimensions.
 - `SceneReport` exposes exact RGBA bytes and conservative pixel-test work.
-- SVG contains only static text, validated numeric geometry, and internally
-  generated colors. No caller string enters markup.
-- SVG writes are capped at an 8 KiB pre-reserved document bound and fail closed
-  instead of triggering implicit buffer growth.
+- Caller surfaces are prevalidated and preserve all row-padding bytes.
+- Source-over compositing, opacity, gradients, paths, and curve lowering are
+  integer-only and covered by explicit contracts.
+- SVG caller prefixes are restricted to a safe ASCII identifier grammar.
+  Accessibility strings are XML escaped before entering markup.
+- Owned SVG writes are capped at a 64 KiB pre-reserved document bound; writer
+  failures return a typed error with documented partial-prefix behavior.
 - SVG is tested with an XML parser, including command-count parity with the
   validated scene.
 - Production code is checked for panic-like sites; debug and release pixel
@@ -82,7 +87,7 @@ exploit path exists.
 ## Assurance
 
 The gate includes strict Clippy, debug/release KATs, parser-backed SVG tests,
-MSRV checks, cross-target core compilation, fuzz-harness compilation, five
+MSRV checks, cross-target core compilation, fuzz-harness compilation, seven
 bounded Kani proofs, RustSec, cargo-deny, package inspection, unsafe/panic
 policy checks, and reproducible archive comparison. Independent pentest
 digests are retained under [`security/pentest`](../security/pentest/README.md).

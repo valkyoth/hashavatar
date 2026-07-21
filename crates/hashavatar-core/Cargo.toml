@@ -1,9 +1,9 @@
 [package]
 name = "hashavatar-core"
-version = "0.1.0-alpha.1"
+version = "0.1.0-alpha.2"
 edition.workspace = true
 rust-version.workspace = true
-description = "Canonical fixed-point Cat rendering core for Hashavatar 2.0 alpha"
+description = "Bounded canonical fixed-point rendering core for Hashavatar 2.0 alpha"
 license.workspace = true
 repository.workspace = true
 homepage.workspace = true

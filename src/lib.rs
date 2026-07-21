@@ -1,6 +1,6 @@
 //! Security-oriented facade for canonical Hashavatar rendering.
 //!
-//! `2.0.0-alpha.1` is a source-only development release. It intentionally
+//! `2.0.0-alpha.2` is a source-only development release. It intentionally
 //! exposes one complete Cat vertical slice while the 2.0 contracts are
 //! validated. The maintained crates.io line remains `1.3.x`.
 //!
@@ -24,11 +24,15 @@
 
 pub use hashavatar_core::{
     CanonicalRgbaImage, CatError, CatRequest, CatTraitVector, IdentityComponent, MAX_DIMENSION,
-    MAX_IDENTITY_BYTES, MAX_NAMESPACE_COMPONENT_BYTES, MIN_DIMENSION, PreparedCat,
-    RGBA8_BYTES_PER_PIXEL, SceneReport,
+    MAX_IDENTITY_BYTES, MAX_NAMESPACE_COMPONENT_BYTES, MIN_DIMENSION, PIXEL_CONTRACT_ID,
+    PixelDigest, PreparedCat, RGBA8_BYTES_PER_PIXEL, RgbaSurfaceMut, SceneReport, SvgMode,
+    SvgOptions,
 };
 
-/// Common alpha.1 facade imports.
+/// Common alpha.2 facade imports.
 pub mod prelude {
-    pub use crate::{CanonicalRgbaImage, CatError, CatRequest, CatTraitVector, PreparedCat};
+    pub use crate::{
+        CanonicalRgbaImage, CatError, CatRequest, CatTraitVector, PreparedCat, RgbaSurfaceMut,
+        SvgOptions,
+    };
 }

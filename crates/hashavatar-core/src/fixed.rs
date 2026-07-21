@@ -127,12 +127,14 @@ pub(crate) fn write_decimal(output: &mut impl Write, value: Fixed) -> fmt::Resul
         .ok_or(fmt::Error)?
         .checked_div(u128::from(one))
         .ok_or(fmt::Error)?;
-    let mut digits = alloc::format!("{fraction:016}");
-    while digits.ends_with('0') {
-        let _ = digits.pop();
+    let mut fraction = u64::try_from(fraction).map_err(|_| fmt::Error)?;
+    let mut digits = 16_usize;
+    while fraction % 10 == 0 {
+        fraction /= 10;
+        digits = digits.checked_sub(1).ok_or(fmt::Error)?;
     }
     output.write_char('.')?;
-    output.write_str(&digits)
+    write!(output, "{fraction:0digits$}")
 }
 
 #[cfg(test)]
