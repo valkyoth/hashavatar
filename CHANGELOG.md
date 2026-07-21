@@ -8,6 +8,8 @@
 - Added validated caller-owned strided RGBA8 surfaces with padding preservation
   and pre-execution dimension checks.
 - Added versioned SHA-512 pixel digests over dimensions and visible rows only.
+- Streamed pixel digests through clear-on-drop SHA-512 state, avoiding an
+  additional image-sized preimage allocation.
 - Added SVG document and fragment modes, deterministic prefixed identifiers,
   escaped accessibility text, and explicit partial-writer behavior.
 - Froze alpha.2 pixel, derivation, failure, SVG, and canonical execution

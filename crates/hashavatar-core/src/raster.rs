@@ -1,6 +1,6 @@
 use alloc::vec::Vec;
 
-use sanitization_crypto_interop::sha2::sha512_digest;
+use sanitization_crypto_interop::sha2::SanitizedSha512;
 
 use crate::{
     CatError, PIXEL_CONTRACT_ID, RGBA8_BYTES_PER_PIXEL,
@@ -377,30 +377,20 @@ fn digest_rows(
         .ok()
         .and_then(|value| value.checked_mul(RGBA8_BYTES_PER_PIXEL))
         .ok_or(CatError::NumericRange)?;
-    let pixel_bytes = visible
-        .checked_mul(usize::try_from(height).map_err(|_| CatError::NumericRange)?)
-        .ok_or(CatError::NumericRange)?;
-    let capacity = PIXEL_CONTRACT_ID
-        .len()
-        .checked_add(8)
-        .and_then(|value| value.checked_add(pixel_bytes))
-        .ok_or(CatError::NumericRange)?;
-    let mut preimage = Vec::new();
-    preimage
-        .try_reserve_exact(capacity)
-        .map_err(|_| CatError::Allocation)?;
-    preimage.extend_from_slice(PIXEL_CONTRACT_ID.as_bytes());
-    preimage.extend_from_slice(&width.to_le_bytes());
-    preimage.extend_from_slice(&height.to_le_bytes());
+
+    let mut hasher = SanitizedSha512::new();
+    hasher.update(PIXEL_CONTRACT_ID.as_bytes());
+    hasher.update(&width.to_le_bytes());
+    hasher.update(&height.to_le_bytes());
     for row in 0..height {
         let start = usize::try_from(row)
             .ok()
             .and_then(|value| value.checked_mul(stride))
             .ok_or(CatError::NumericRange)?;
         let end = start.checked_add(visible).ok_or(CatError::NumericRange)?;
-        preimage.extend_from_slice(pixels.get(start..end).ok_or(CatError::InvalidSurface)?);
+        hasher.update(pixels.get(start..end).ok_or(CatError::InvalidSurface)?);
     }
-    Ok(PixelDigest(sha512_digest(&preimage)))
+    Ok(PixelDigest(hasher.finalize()))
 }
 
 #[cfg(test)]

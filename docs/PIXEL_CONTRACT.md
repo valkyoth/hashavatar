@@ -37,3 +37,5 @@ preserved. Zero-sized and dimension-mismatched surfaces are rejected.
 endian `u32` width, little-endian `u32` height, and each visible row. Stride,
 padding, allocation capacity, and trailing bytes are excluded. Equal canonical
 pixels therefore have equal digests across tight and padded surfaces.
+Digesting streams each visible row through a fixed-size, clear-on-drop SHA-512
+state and does not allocate a second image-sized preimage buffer.

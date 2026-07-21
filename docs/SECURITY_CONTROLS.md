@@ -30,6 +30,8 @@ supply-chain scope.
 - Pixel writes use checked offsets and bounds-checked slices.
 - Raster loop bounds are clipped to validated output dimensions.
 - `SceneReport` exposes exact RGBA bytes and conservative pixel-test work.
+- Pixel fingerprints stream visible rows through fixed-size, clear-on-drop
+  SHA-512 state without allocating another image-sized buffer.
 - Caller surfaces are prevalidated and preserve all row-padding bytes.
 - Source-over compositing, opacity, gradients, paths, and curve lowering are
   integer-only and covered by explicit contracts.

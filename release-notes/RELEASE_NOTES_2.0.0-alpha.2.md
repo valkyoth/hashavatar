@@ -17,6 +17,8 @@ tagged, published to crates.io, or API/pixel compatible with alpha.1.
 - Added `RgbaSurfaceMut` for validated padded caller buffers and `render_into`.
 - Added `PixelDigest`, bound to dimensions, visible rows, and a versioned pixel
   contract while excluding row padding.
+- Streamed pixel digest input through clear-on-drop SHA-512 state without a
+  second image-sized preimage allocation.
 - Added SVG document/fragment options, escaped accessibility fields,
   deterministic caller prefixes, and streaming writer output.
 - Added explicit pixel, digest/derivation, failure, SVG, and canonical execution
