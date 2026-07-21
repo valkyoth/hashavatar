@@ -9,8 +9,8 @@ Repository: `hashavatar`
 
 About:
 
-> Secure deterministic procedural avatars in Rust with bounded inputs, typed
-> cache keys, and WebP/SVG output.
+> Canonical deterministic procedural avatars in Rust with stateless traits,
+> bounded fixed-point scenes, RGBA8, and SVG output.
 
 Suggested topics:
 
@@ -19,9 +19,9 @@ Suggested topics:
 - `identicon`
 - `procedural-generation`
 - `graphics`
-- `webp`
 - `svg`
 - `image-processing`
+- `no-std`
 - `security`
 
 Repository security settings:
@@ -39,8 +39,9 @@ version's root `release-notes/RELEASE_NOTES_X.Y.Z.md`, link the permanent
 `security/pentest/vX.Y.Z.md` report, identify compatibility changes, and state
 whether crates were published.
 
-Hashavatar 2.0 alpha, beta, and release-candidate tags are source-only. Their
-release bodies must state that they were not published to crates.io.
+Hashavatar 2.0 alpha, beta, and release-candidate milestones use clearly named
+implementation-stop commits instead of Git tags or GitHub releases. Only
+approved stable releases require signed tags and release bodies.
 
 ## Website Repository
 

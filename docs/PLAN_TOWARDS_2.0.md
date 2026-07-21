@@ -576,13 +576,13 @@ pixels does not make bytes stable across dependency upgrades.
   and policy scripts deliberate failing-fixture self-tests rather than testing
   only their successful path.
 
-Every tagged version, including documentation-only patches and prereleases,
-requires exact-commit pentest evidence. The implementation commit is tested
-first; a permanent `security/pentest/vX.Y.Z.md` report then records `Status:
-PASS`, the full `Reviewed-Commit`, tester, scope, and date. The report-only
-commit may change only that report, and release readiness verifies the reviewed
-commit is its first parent. Root `PENTEST.md` remains temporary and must never be
-committed.
+Every prerelease milestone and stable release requires exact-commit pentest
+evidence. Record both the previous implementation stop and candidate stop so
+review covers `<base>..<candidate>` plus the candidate's complete tree. The
+permanent `security/pentest/vX.Y.Z.md` report records `Status: PASS`, the full
+`Reviewed-Range`, `Reviewed-Commit`, tester, scope, and date. A report-only
+commit may change only that report. Root `PENTEST.md` remains temporary and
+must never be committed.
 
 Each release stop must end with:
 
@@ -590,10 +590,11 @@ Each release stop must end with:
 vX.Y.Z implementation stop reached. Run pentest for this exact commit.
 ```
 
-No tag is created at that point. After a clean retest, GitHub CI and CodeQL
-default setup must be green for the report commit. A version-specific readiness
-gate verifies the tag is absent, metadata, release notes, semantic SBOM,
-packages, checksums, pentest evidence, and publish order before tagging.
+No prerelease tag is created. After a clean retest, GitHub CI and CodeQL default
+setup must be green for the report commit. A milestone readiness gate verifies
+metadata, release notes, semantic SBOM, packages, checksums, pentest evidence,
+and publish order before work begins on the next milestone. Only the approved
+stable release receives a signed tag.
 
 ## Completeness Review Register
 
@@ -619,7 +620,7 @@ past its dependency point.
 | AVIF adds a large codec/provider boundary. | Admit it fail-closed in `alpha.8`; no provider is accepted without license, MSRV, resource, conformance, and security evidence. |
 | GPU support requires scene access without making the scene a public graphics API. | Freeze a narrow read-only backend protocol in `alpha.9` and complete optional noncanonical execution in `alpha.10`. |
 | JPEG XL currently adds unnecessary license/provider uncertainty. | Leave it unplanned; reconsider only in a future minor release from current evidence. |
-| Release evidence could drift from the reviewed commit or package graph. | Use exact-commit report-only pentest commits, semantic SBOM comparison, package-archive tests, release matrices, and version-specific readiness gates for every tag. |
+| Release evidence could drift from the reviewed commit or package graph. | Use exact commit ranges, report-only pentest commits, semantic SBOM comparison, package-archive tests, release matrices, and milestone readiness gates. |
 
 ## 1.x Preparation Releases
 
@@ -704,13 +705,14 @@ real downstream demand justifies maintaining and auditing two renderers.
 Alpha APIs and pixels may change. Each alpha must compile examples, document
 its current limitations, and pass the repository's local and GitHub gates. The
 sequence contains release-critical work only. Alpha, beta, and release-
-candidate tags are pushed to GitHub for local downstream testing but are not
-published to crates.io; crates.io publication begins with the approved stable
-`2.0.0` workspace.
+candidate milestones use named implementation-stop commits for local downstream
+testing; they are not tagged or published to crates.io. Tags and crates.io
+publication begin with the approved stable `2.0.0` workspace.
 
 ### v2.0.0-alpha.1 - Cat Vertical Slice And Workspace
 
-**Status:** Planned.
+**Status:** Implementation complete; pending exact-commit pentest, downstream
+website validation, and green GitHub checks before beginning alpha.2.
 
 **Goal:** Prove the complete architecture with real artwork before generalizing
 the rendering abstraction.

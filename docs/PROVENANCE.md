@@ -1,41 +1,17 @@
 # Provenance
 
-This repository is intended to be a code-generated avatar system.
+Hashavatar visuals are generated from first-party Rust geometry. The repository
+does not bundle character illustrations, sprite sheets, icon packs, fonts,
+templates, or external media used in avatar output.
 
-## Asset statement
+Alpha.1 Cat geometry, colors, raster containment rules, and SVG serialization
+are implemented in `hashavatar-core`. The repository image under
+`.github/images/` is documentation artwork only and is excluded from package
+archives.
 
-- No raster sprite sheets are bundled with the crate.
-- No third-party character packs are bundled with the crate.
-- No licensed avatar art is embedded in the crate as source assets.
-- Avatar output is drawn procedurally from Rust code using geometric primitives.
+Runtime dependencies provide secret-container cleanup and SHA-512 hashing;
+they do not provide avatar art. `roxmltree` is test/fuzz-only. Dependency
+licenses and notices are reviewed through `cargo-deny` and documented in
+[THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
 
-## Generation model
-
-- Identity input is hashed with SHA-512 by default. Builds may explicitly
-  select BLAKE3 or the documented non-cryptographic XXH3-128 mode instead;
-  hash modes are mutually exclusive.
-- Digest bytes are mapped into visual parameters such as proportions, colors, spacing, and facial details.
-- Final images are rendered using first-party geometric primitives and the
-  `image` crate's RGBA buffers and encoders.
-
-## Current avatar families
-
-- Cat, dog, robot, fox, alien, monster, ghost, slime, bird, wizard, and skull
-- Paws, planet, rocket, mushroom, cactus, frog, panda, cupcake, pizza, ice
-  cream, octopus, and knight
-- Bear, penguin, dragon, ninja, astronaut, diamond, coffee cup, and shield
-
-## Background modes
-
-- Themed, white, black, dark, light, and transparent
-- Polka dot, striped, checkerboard, grid, sunrise, ocean, and starry
-
-## Practical implication
-
-The repository is materially different from avatar systems that depend on pre-made asset packs. The visuals are generated from code at runtime, which avoids the usual licensing concerns around bundled image libraries. This file is not legal advice; it is a technical provenance statement about how the repository is constructed.
-
-## Output formats
-
-- Lossless WebP is available in default builds.
-- PNG, JPEG, and GIF are explicit opt-in Cargo features.
-- SVG string rendering is available without an encoder feature.
+This is a technical provenance statement, not legal advice.

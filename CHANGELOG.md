@@ -1,6 +1,21 @@
 # Changelog
 
-## Unreleased
+## 2.0.0-alpha.1
+
+- Created the resolver-3 `hashavatar` and `hashavatar-core` workspace.
+- Added a source-only canonical Cat vertical slice with bounded request input,
+  stateless labeled SHA-512 traits, private checked Q16.16 geometry, validated
+  scenes, CPU RGBA8, and SVG from the same scene.
+- Removed the 1.x engine from `main`; `release/1.3` remains the maintained
+  published line.
+- Removed runtime image, codec, RNG, color, serde, and alternate-hash
+  dependencies from the alpha.1 workspace.
+- Added focused KATs, XML parsing, malformed-scene tests, fuzzing, Kani,
+  cross-target core builds, and a 500-line Rust source limit.
+- Updated repository documentation and workspace release tooling for
+  source-only prerelease tags.
+
+## 2.0 Preparation
 
 - Reorganized repository documentation under `docs/`, moved immutable release
   notes to the root `release-notes/` directory, and added a permanent

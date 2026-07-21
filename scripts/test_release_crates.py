@@ -63,7 +63,7 @@ def test_prerelease_publication_is_rejected() -> None:
         previous="1.3.0", version="2.0.0-alpha.1", change="code", publish=True
     )
     assert_fails(
-        "source-only",
+        "commit-only",
         release_crates.validate_plan_entry,
         "hashavatar",
         candidate,
@@ -130,6 +130,38 @@ def test_current_release_plan_matches_workspace() -> None:
     plan = release_crates.load_release_plan(ROOT / "release-crates.toml")
     packages = release_crates.workspace_packages(release_crates.cargo_metadata())
     release_crates.verify_workspace(packages, plan)
+
+
+def test_source_only_facade_defers_archive_until_core_exists() -> None:
+    packages = {
+        "hashavatar-core": package("hashavatar-core", "0.1.0-alpha.1"),
+        "hashavatar": package(
+            "hashavatar", "2.0.0-alpha.1", ("hashavatar-core",)
+        ),
+    }
+    plan = {
+        "crates": {
+            "hashavatar-core": entry(
+                previous="0.0.0",
+                version="0.1.0-alpha.1",
+                change="code",
+                publish=False,
+            ),
+            "hashavatar": entry(
+                previous="1.3.0",
+                version="2.0.0-alpha.1",
+                change="code",
+                publish=False,
+            ),
+        }
+    }
+    order = ("hashavatar-core", "hashavatar")
+    assert not release_crates.needs_unpublished_workspace_dependency(
+        "hashavatar-core", order, packages, plan
+    )
+    assert release_crates.needs_unpublished_workspace_dependency(
+        "hashavatar", order, packages, plan
+    )
 
 
 def main() -> int:

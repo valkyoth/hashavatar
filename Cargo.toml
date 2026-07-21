@@ -1,45 +1,64 @@
-[package]
-name = "hashavatar"
-version = "1.3.0"
+[workspace]
+members = [".", "crates/hashavatar-core"]
+default-members = ["."]
+exclude = ["fuzz"]
+resolver = "3"
+
+[workspace.package]
 edition = "2024"
 rust-version = "1.90"
-description = "Stable deterministic procedural avatars in Rust with configurable identity hashing, WebP, optional PNG/JPEG/GIF, and SVG export"
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/valkyoth/hashavatar"
 homepage = "https://github.com/valkyoth/hashavatar"
-documentation = "https://docs.rs/hashavatar/latest/hashavatar/"
-readme = "README.md"
-keywords = ["avatar", "identicon", "procedural", "webp", "svg"]
-categories = ["multimedia::images", "graphics"]
-exclude = ["Screenshot_*.png", ".github/images/**", "fuzz/**", "target/**"]
 
-[lints.rust]
-unexpected_cfgs = { level = "warn", check-cfg = ["cfg(fuzzing)", "cfg(kani)"] }
-
-[dependencies]
-blake3 = { version = "1.8.5", default-features = true, optional = true }
-image = { version = "0.25.10", default-features = false, features = ["webp"] }
-palette = { version = "0.7.6", default-features = false, features = ["std"] }
-rand = { version = "0.10.2", default-features = false, features = ["std", "std_rng"] }
+[workspace.dependencies]
+roxmltree = "0.21.1"
 sanitization = { version = "2.0.1", default-features = false, features = ["alloc"] }
 sanitization-crypto-interop = { version = "2.0.1", default-features = false, features = ["sha2"] }
-serde = { version = "1.0.229", default-features = false, optional = true }
-subtle = { version = "2.6.1", default-features = false }
-xxhash-rust = { version = "0.8.17", default-features = false, features = ["xxh3"], optional = true }
 
-[dev-dependencies]
-roxmltree = "0.21.1"
-serde_json = "1.0.151"
-sha2 = { version = "0.11.0", default-features = false, features = ["alloc"] }
+[workspace.lints.rust]
+unsafe_code = "forbid"
+unsafe_op_in_unsafe_fn = "forbid"
+unused_must_use = "deny"
+missing_docs = "deny"
+unexpected_cfgs = { level = "warn", check-cfg = ["cfg(kani)"] }
 
-[features]
-default = []
-all-formats = ["png", "jpeg", "gif"]
-blake3 = ["dep:blake3", "sanitization-crypto-interop/blake3"]
-fuzzing = []
-gif = ["image/gif"]
-jpeg = ["image/jpeg"]
-kani = []
-png = ["image/png"]
-serde = ["dep:serde"]
-xxh3 = ["dep:xxhash-rust"]
+[workspace.lints.clippy]
+panic = "forbid"
+unwrap_used = "forbid"
+expect_used = "forbid"
+undocumented_unsafe_blocks = "forbid"
+indexing_slicing = "forbid"
+cast_possible_truncation = "deny"
+cast_sign_loss = "deny"
+
+[profile.release]
+overflow-checks = true
+panic = "abort"
+
+[package]
+name = "hashavatar"
+version = "2.0.0-alpha.1"
+edition.workspace = true
+rust-version.workspace = true
+description = "Security-oriented deterministic procedural avatar rendering facade"
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+documentation = "https://docs.rs/hashavatar/latest/hashavatar/"
+readme = "README.md"
+keywords = ["avatar", "identicon", "procedural", "graphics", "svg"]
+categories = ["multimedia::images", "graphics"]
+exclude = [
+    ".github/**",
+    "docs/archive/**",
+    "fuzz/**",
+    "security/**",
+    "target/**",
+]
+
+[dependencies]
+hashavatar-core = { path = "crates/hashavatar-core", version = "0.1.0-alpha.1" }
+
+[lints]
+workspace = true

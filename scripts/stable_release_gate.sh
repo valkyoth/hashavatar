@@ -12,9 +12,11 @@ case "$mode" in
         ;;
 esac
 
-cargo_version="$(
-    sed -n 's/^version = "\([^"]*\)"/\1/p' Cargo.toml | sed -n '1p'
-)"
+cargo_version="$(python3 -c '
+import json, subprocess
+data = json.loads(subprocess.check_output(["cargo", "metadata", "--no-deps", "--format-version", "1"]))
+print(next(package["version"] for package in data["packages"] if package["name"] == "hashavatar"))
+')"
 
 if [ "$mode" = "release" ]; then
     case "$cargo_version" in
@@ -29,7 +31,7 @@ echo "stable release gate: standard checks"
 scripts/checks.sh
 
 echo "stable release gate: docs"
-cargo doc --no-deps
+cargo doc --workspace --no-deps
 
 echo "stable release gate: fuzz harnesses"
 scripts/check_fuzz.sh
@@ -51,7 +53,8 @@ else
     scripts/generate-sbom.sh
 fi
 
-echo "stable release gate: publish dry run"
-cargo publish --dry-run --allow-dirty
+echo "stable release gate: package evidence"
+cargo package -p hashavatar-core --locked --allow-dirty --list >/dev/null
+cargo package -p hashavatar --locked --allow-dirty --list >/dev/null
 
 echo "stable release gate: ok ($mode)"

@@ -1,33 +1,25 @@
 # Contributing
 
-Thanks for helping improve `hashavatar`.
-
-## Development
-
-Use the pinned development toolchain from `rust-toolchain.toml`.
+Use the pinned toolchain from `rust-toolchain.toml` and run:
 
 ```bash
 scripts/checks.sh
 ```
 
-For a faster local loop while developing, run the individual Cargo commands the
-script prints before the failing step.
+Keep changes focused, keep every Rust source file at or below 500 lines, and
+add tests for public behavior, rendering, parsing, arithmetic, or error changes.
+Do not add bundled avatar art, unreviewed binary assets, service dependencies,
+or public scene internals.
 
-## Pull Requests
+Rendering changes must state whether they intentionally change trait vectors,
+pixels, SVG, work estimates, or allocation bounds. Update KATs only after the
+new output has been reviewed, and document the reason in the changelog and
+release note.
 
-- Keep changes focused and explain the user-visible behavior.
-- Add or update tests when rendering behavior, encoders, parsing, or public API types change.
-- Do not add bundled avatar art, stock assets, or generated binary assets without prior discussion.
-- Preserve deterministic output unless the change is explicitly a visual-version change.
+Root `PENTEST.md` is temporary review input. Resolve each finding, test concrete
+bugs, document accepted limitations, delete the scratch report, and retain a
+sanitized milestone digest under
+[`security/pentest`](../security/pentest/README.md).
 
-## Pentest Findings
-
-Root `PENTEST.md` is temporary review input. Resolve each actionable finding,
-add focused regression coverage, record accepted limitations in the relevant
-security document, and delete the scratch report. Release candidates retain a
-sanitized per-tag summary under `security/pentest/` according to
-[`security/pentest/README.md`](../security/pentest/README.md).
-
-## Visual Stability
-
-`hashavatar` is deterministic. Changes to shape generation, colors, hashing, randomization, or encoder behavior can affect downstream users. When a change intentionally affects output, document it in the changelog.
+The 1.3 maintenance branch accepts serious security and correctness fixes.
+Feature work and visual changes target the current 2.0 prerelease on `main`.

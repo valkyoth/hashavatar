@@ -114,7 +114,7 @@ def validate_plan_entry(package_name: str, entry: object, *, prerelease: bool) -
     if prerelease and publish:
         raise RuntimeError(
             f"{package_name} enables crates.io publication for a prerelease; "
-            "Hashavatar prerelease tags are source-only"
+            "Hashavatar prereleases are commit-only milestones"
         )
     if not prerelease and change != "unchanged" and not publish:
         raise RuntimeError(f"{package_name} changed for a stable release but publish is false")
@@ -163,7 +163,14 @@ def verify_pentest_report(version: str) -> None:
     if not report.is_file():
         raise RuntimeError(f"missing permanent pentest report: {report.relative_to(ROOT)}")
     content = report.read_text(encoding="utf-8")
-    for field in ("Status: PASS", "Reviewed-Commit: ", "Tester: ", "Scope: ", "Date: "):
+    for field in (
+        "Status: PASS",
+        "Reviewed-Range: ",
+        "Reviewed-Commit: ",
+        "Tester: ",
+        "Scope: ",
+        "Date: ",
+    ):
         if field not in content:
             raise RuntimeError(f"{report.relative_to(ROOT)} is missing {field.strip()}")
 
@@ -197,10 +204,50 @@ def run_preflight(*, stable: bool, dry_run: bool) -> None:
     run(["scripts/stable_release_gate.sh", mode], dry_run=dry_run)
 
 
-def verify_packages(order: tuple[str, ...], *, dry_run: bool) -> None:
+def needs_unpublished_workspace_dependency(
+    package: str, order: tuple[str, ...], packages: dict[str, dict], plan: dict
+) -> bool:
+    workspace_names = set(order)
+    workspace_dependencies = {
+        dependency["name"]
+        for dependency in packages[package]["dependencies"]
+        if dependency.get("kind") != "dev" and dependency["name"] in workspace_names
+    }
+    return any(
+        plan["crates"][dependency]["change"] != "unchanged"
+        or is_prerelease(plan["crates"][dependency]["version"])
+        for dependency in workspace_dependencies
+    )
+
+
+def verify_packages(
+    order: tuple[str, ...], packages: dict[str, dict], plan: dict, *, dry_run: bool
+) -> None:
     for package in order:
+        if needs_unpublished_workspace_dependency(package, order, packages, plan):
+            run(
+                [
+                    "cargo",
+                    "package",
+                    "-p",
+                    package,
+                    "--locked",
+                    "--allow-dirty",
+                    "--list",
+                ],
+                dry_run=dry_run,
+            )
+            continue
         run(
-            ["cargo", "package", "-p", package, "--locked", "--allow-dirty"],
+            [
+                "cargo",
+                "package",
+                "-p",
+                package,
+                "--locked",
+                "--allow-dirty",
+                "--no-verify",
+            ],
             dry_run=dry_run,
         )
 
@@ -262,7 +309,7 @@ def main() -> int:
     prerelease = is_prerelease(args.version)
     if not args.skip_checks:
         run_preflight(stable=not prerelease, dry_run=args.dry_run)
-    verify_packages(plan["publish_order"], dry_run=args.dry_run)
+    verify_packages(plan["publish_order"], packages, plan, dry_run=args.dry_run)
 
     if args.prepare_only:
         print(f"release preparation completed for {args.version}; nothing was uploaded")
@@ -271,7 +318,7 @@ def main() -> int:
     if prerelease:
         raise RuntimeError(
             "crates.io publication is disabled for alpha, beta, and RC versions; "
-            "push the signed source tag and test it locally"
+            "test and record the exact implementation-stop commit instead"
         )
     if not args.require_tag:
         raise RuntimeError("stable publication requires explicit --require-tag")

@@ -1,122 +1,37 @@
 # Stability Policy
 
-`hashavatar` 1.0.0 is the first stable release of the public crate API and the
-documented rendering contract.
+## Published 1.x
 
-## Public API
+`v1.3.0` is the final feature release of the 1.x renderer. The `release/1.3`
+branch receives serious security and correctness fixes. Its public API and
+frozen pixels remain governed by the documentation and corpus on that branch.
 
-The crate follows Cargo semver for exported Rust API items:
+## 2.0 Prereleases
 
-- Removing or renaming public items requires a major version.
-- Changing public function signatures, error types, constructor behavior, or
-  feature names requires a major version unless the change is strictly
-  additive and source-compatible.
-- `AvatarKind`, `AvatarBackground`, `AvatarAccessory`, `AvatarColor`,
-  `AvatarExpression`, `AvatarShape`, and `AvatarOutputFormat` are currently
-  exhaustive Rust enums; they are not marked `#[non_exhaustive]`.
-- Adding a variant to one of those enums is therefore a breaking API change and
-  is not allowed in the remaining 1.x series. New variants require a major
-  release or a new additive type that does not alter an existing enum.
-- New optional Cargo features may be added in minor releases when they are
-  disabled by default and documented.
+Alpha, beta, and RC APIs and pixels may change. Each milestone ends at a named
+implementation-stop commit used for exact-SHA testing; prerelease tags are not
+created and crates are not uploaded to crates.io. Every milestone must update
+its release note, current status, crate matrix, tests, and pentest digest before
+work begins on the next milestone.
 
-## Rendering Contract
+Alpha.1 freezes evidence for one Cat vertical slice, not the final 2.0 public
+surface. The following are intentional current contracts:
 
-For a concrete crate release and explicitly selected options, the intended
-stable rendering tuple is:
+- checked request bounds and typed failures;
+- stateless label-separated trait derivation;
+- private fixed-point scene representation;
+- one scene used by canonical CPU RGBA8 and SVG output;
+- deterministic output within the same source revision and contract labels;
+- no exposure of raw identity digests or scene internals.
 
-```text
-crate identity hash mode + namespace tenant + namespace style version + identity bytes + avatar kind + background + accessory + color + expression + shape + dimensions + seed
-```
+Changing alpha.1 domain labels, rounding, command order, containment tests,
+colors, or SVG serialization changes output and requires explicit KAT updates
+and release-note disclosure.
 
-Within a major release, patch releases should not intentionally change output
-for the same tuple except to fix a correctness or security bug. Minor releases
-may add source-compatible APIs and opt-in capabilities, but existing exhaustive
-enum variant sets remain frozen for 1.x.
+## Stable 2.0
 
-`AvatarOptions` keeps `accessory = none`, `color = default`,
-`expression = default`, and `shape = square`. `AvatarStyleOptions` includes the
-full visual-layer tuple.
-
-Automatic style rendering derives options from public enum `ALL` lists. Those
-lists and the equivalent `CatalogVersion::LEGACY_V1` manifests remain frozen
-with their explicit IDs and weights for the rest of 1.x. The active renderer is
-identified by `RenderContractId::LEGACY_V1`. A future mapping or rendering
-contract must receive a new identifier instead of changing either legacy
-contract in place. Services should continue using
-`AvatarNamespace::new(tenant, style_version)` for controlled visual rollouts.
-
-The typed cache-key hierarchy introduced in 1.2 is also contract-versioned:
-
-- `IdentityCacheKey` covers the active identity hash mode and derived identity;
-- `AvatarAssetKey` additionally covers catalog, renderer, dimensions, seed, and
-  every effective style layer, canonicalizing legacy layers a family ignores;
-- `SemanticEncodedAssetKey` from `encoded()` additionally covers the output
-  format and fixed encoder settings as a semantic request key;
-- `BuildEncodedAssetKey` from `encoded_for_build()` additionally binds a
-  caller-supplied `EncoderBuildId` for deployment-specific byte caches.
-
-The distinct encoded-key types prevent a semantic request key from being used
-accidentally where a deployment-specific byte key is required.
-Serialization necessarily erases that distinction. Integrations should retain
-the nominal type through their cache API and convert to hexadecimal only inside
-the final storage adapter.
-
-Neither encoded-key method is a digest of actual output bytes. Content-addressed
-storage must hash the bytes after encoding. Applications own the build-ID
-policy and should include resolved codec versions, target, relevant build
-flags, and application revision whenever those can affect output.
-
-The older string `cache_key()` output remains frozen for existing 1.1 caches.
-Typed keys are the preferred path for new application caches.
-
-Legacy rendering skips unsupported face layers. Strict validation is additive:
-`AvatarStyleOptions::validate_strict()` and `StrictAvatarBuilder` reject those
-combinations without changing legacy output.
-
-The 1.3 `AvatarRequest`/`PreparedAvatar` workflow is also additive. Explicit
-request styles are strict by default, while `LegacyV1` mode canonicalizes
-unsupported face layers and reports both requested and effective styles.
-Existing `AvatarBuilder::prepare()` retains the builder's legacy policy;
-`StrictAvatarBuilder::prepare()` retains strict validation. Preparation binds
-metadata, typed keys, and output to one immutable validated tuple.
-
-The complete default-SHA-512 request/style/key/RGBA/SVG corpus for every 1.x
-family is frozen in `tests/compatibility_corpus_v1.tsv`. Hashavatar 2.0 may use
-a new renderer. Applications requiring exact 1.x pixels should pin 1.3 as
-described in `docs/MIGRATION_2.0.md`; no separate compatibility renderer is
-currently promised.
-
-## Security And Resource Contract
-
-- Public dimensions remain bounded by `AvatarSpec`.
-- Identity and namespace input lengths remain bounded before hashing.
-- Public rendering APIs return typed errors for invalid inputs instead of
-  panicking.
-- The crate remains a pure library crate with no HTTP server, CLI, filesystem
-  writing API, async runtime, or network dependency.
-- The default build keeps SHA-512 identity hashing and WebP encoding.
-- Optional hash modes and extra raster encoders remain explicit Cargo feature
-  choices.
-- `ResourceBudget` distinguishes tight and declared strided surface memory,
-  returned-vector initial base memory, and writer-path base memory. Codec
-  scratch space, later output growth, and service-wide concurrency remain
-  caller policy.
-- `RasterSurfaceMut` validates dimensions, stride, and capacity before copy.
-  The 1.3 adapter also validates internal renderer dimensions and byte length
-  before copying an exact row count. Caller dimension mismatches return before
-  rendering; valid requests still allocate one internal image.
-- Writer methods propagate failures and leave partial caller-owned output in
-  the caller's sink.
-
-## Known Residuals
-
-The renderer still uses floating-point arithmetic in family-specific geometry.
-Frame-shape hit-testing uses integer arithmetic, and golden fingerprints protect
-the release-platform output, but the crate does not claim formal bit-identical
-raster output across every CPU architecture and compiler backend.
-
-Rendering time, SVG size, and encoded raster size are not constant-time with
-respect to the identity digest. High-assurance services should use stable cache
-keys, CDN caching, rate limits, concurrency limits, and fixed-minimum-latency
-wrappers when their threat model requires it.
+The stable release will freeze the package/API contract, public trait and
+catalog identifiers, numeric and compositing rules, canonical CPU output,
+schema conversions, cache-key domains, and supported target matrix described
+in [PLAN_TOWARDS_2.0.md](PLAN_TOWARDS_2.0.md). Optional format and GPU package
+output has separate compatibility semantics.
