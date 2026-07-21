@@ -1,6 +1,6 @@
 use super::util::{Canvas, themed_color};
 use crate::{
-    AvatarBackground, AvatarTraitVector, CatError,
+    AvatarBackground, AvatarPalette, AvatarTraitVector, CatError, ResolvedStyle,
     geometry::Point,
     paint::{Color, Paint},
     scene::{Command, Scene, Stroke},
@@ -8,17 +8,25 @@ use crate::{
 
 pub(super) fn compile(
     scene: &mut Scene,
-    background: AvatarBackground,
+    style: ResolvedStyle,
     traits: AvatarTraitVector,
 ) -> Result<(), CatError> {
     let canvas = Canvas::new(scene)?;
-    match background {
+    match style.background() {
         AvatarBackground::Transparent => Ok(()),
+        AvatarBackground::Themed if matches!(style.palette(), AvatarPalette::Default) => {
+            push_gradient(
+                scene,
+                canvas,
+                themed_color(traits.primary_hue(), 52, 224, 7),
+                themed_color(traits.secondary_hue(), 28, 172, 11),
+            )
+        }
         AvatarBackground::Themed => push_gradient(
             scene,
             canvas,
-            themed_color(traits.primary_hue(), 52, 224, 7),
-            themed_color(traits.secondary_hue(), 28, 172, 11),
+            super::util::role_color(style.color_roles().secondary()),
+            super::util::role_color(style.color_roles().primary()),
         ),
         AvatarBackground::Sunrise => push_gradient(
             scene,

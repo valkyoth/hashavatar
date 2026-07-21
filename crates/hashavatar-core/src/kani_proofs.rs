@@ -6,6 +6,21 @@ use crate::{
 };
 
 #[kani::proof]
+fn accessory_stack_capacity_is_fail_closed() {
+    let mut stack = crate::AccessoryStack::new();
+    for _ in 0..crate::MAX_ACCESSORY_LAYERS {
+        let accessory = crate::AvatarAccessory::from_sample(kani::any());
+        assert!(stack.try_push(accessory).is_ok());
+    }
+    assert!(
+        stack
+            .try_push(crate::AvatarAccessory::from_sample(kani::any()))
+            .is_err()
+    );
+    assert_eq!(stack.len(), crate::MAX_ACCESSORY_LAYERS);
+}
+
+#[kani::proof]
 fn catalog_byte_selection_stays_in_frozen_bounds() {
     let value = kani::any::<u8>();
     assert!(usize::from(AvatarKind::from_byte(value).catalog_id()) < AvatarKind::ALL.len());

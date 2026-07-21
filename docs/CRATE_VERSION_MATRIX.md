@@ -4,8 +4,8 @@ The machine-readable release decision is [`release-crates.toml`](../release-crat
 
 | Package | Current source version | crates.io state | Role |
 | --- | --- | --- | --- |
-| `hashavatar-core` | `0.1.0-alpha.3` | Source-only; never published for this alpha | Portable canonical renderer core |
-| `hashavatar` | `2.0.0-alpha.3` | Source-only; crates.io remains `1.3.0` | Recommended facade |
+| `hashavatar-core` | `0.1.0-alpha.4` | Source-only; never published for this alpha | Portable canonical renderer and layered-style core |
+| `hashavatar` | `2.0.0-alpha.4` | Source-only; crates.io remains `1.3.0` | Recommended facade |
 
 Dependencies precede dependants in `publish_order`. Every workspace package
 must have an explicit version, change classification, publication decision,

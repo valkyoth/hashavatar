@@ -42,6 +42,15 @@ pixels intentionally use the new 2.0 renderer. The complete aggregate pixel
 fingerprint detects cross-family drift; it remains a prerelease KAT rather than
 a stable compatibility promise.
 
+## Alpha.4 Contract
+
+Alpha.4 records deterministic evidence for typed layered composition. It
+freezes prerelease accessory/palette/expression identifiers, fixed stack
+capacity, canonical slot and z-band ordering, strict errors, automatic fallback
+order, family anchor profiles, and complete decision reporting. Layer-free
+alpha.3 KATs remain unchanged; layered pixels remain prerelease evidence rather
+than a stable compatibility promise.
+
 ## Exact 1.x Output
 
 Applications requiring exact 1.x output should pin `=1.3.0` or a later

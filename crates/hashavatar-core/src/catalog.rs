@@ -154,7 +154,7 @@ impl AvatarKind {
         }
     }
 
-    /// Returns this family's alpha.3 capability declaration.
+    /// Returns this family's alpha.4 capability declaration.
     pub const fn capabilities(self) -> AvatarFamilyCapabilities {
         AvatarFamilyCapabilities {
             face_anchors: !matches!(
@@ -313,42 +313,7 @@ impl AvatarShape {
     }
 }
 
-/// Explicit alpha.3 style selections.
-#[must_use = "pass the style to AvatarRequest"]
-#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
-pub struct AvatarStyle {
-    kind: AvatarKind,
-    background: AvatarBackground,
-    shape: AvatarShape,
-}
-
-impl AvatarStyle {
-    /// Creates an explicit family, background, and frame selection.
-    pub const fn new(kind: AvatarKind, background: AvatarBackground, shape: AvatarShape) -> Self {
-        Self {
-            kind,
-            background,
-            shape,
-        }
-    }
-
-    /// Returns the family.
-    pub const fn kind(self) -> AvatarKind {
-        self.kind
-    }
-
-    /// Returns the background.
-    pub const fn background(self) -> AvatarBackground {
-        self.background
-    }
-
-    /// Returns the frame shape.
-    pub const fn shape(self) -> AvatarShape {
-        self.shape
-    }
-}
-
-/// Declared alpha.3 capabilities for one family.
+/// Declared alpha.4 capabilities for one family.
 #[must_use = "inspect family capabilities before requesting later style layers"]
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct AvatarFamilyCapabilities {
@@ -361,12 +326,36 @@ impl AvatarFamilyCapabilities {
         self.face_anchors
     }
 
-    /// Every alpha.3 family supports every built-in background.
+    /// Returns whether this family admits the requested accessory slot.
+    pub const fn supports_accessory_slot(self, slot: crate::AvatarAccessorySlot) -> bool {
+        self.face_anchors
+            && matches!(
+                slot,
+                crate::AvatarAccessorySlot::Aura
+                    | crate::AvatarAccessorySlot::Headwear
+                    | crate::AvatarAccessorySlot::Earwear
+                    | crate::AvatarAccessorySlot::Facewear
+                    | crate::AvatarAccessorySlot::Eyewear
+                    | crate::AvatarAccessorySlot::Neckwear
+            )
+    }
+
+    /// Returns whether this family admits expression overlays.
+    pub const fn supports_expressions(self) -> bool {
+        self.face_anchors
+    }
+
+    /// Every family admits all built-in integer palettes.
+    pub const fn supports_palettes(self) -> bool {
+        true
+    }
+
+    /// Every built-in family supports every built-in background.
     pub const fn supports_backgrounds(self) -> bool {
         true
     }
 
-    /// Every alpha.3 family supports every built-in frame shape.
+    /// Every built-in family supports every built-in frame shape.
     pub const fn supports_shapes(self) -> bool {
         true
     }
@@ -399,7 +388,7 @@ impl AvatarFamilyCapabilityEntry {
     }
 }
 
-/// Complete immutable alpha.3 family capability manifest.
+/// Complete immutable alpha.4 family capability manifest.
 pub const AVATAR_FAMILY_CAPABILITIES: [AvatarFamilyCapabilityEntry; 31] = [
     AvatarFamilyCapabilityEntry::new(AvatarKind::Cat),
     AvatarFamilyCapabilityEntry::new(AvatarKind::Dog),

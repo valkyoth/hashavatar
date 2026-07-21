@@ -15,14 +15,18 @@ its release note, current status, crate matrix, tests, and pentest digest before
 work begins on the next milestone.
 
 Alpha.2 freezes evidence for one complete canonical renderer. Alpha.3 adds
-evidence for the existing 31-family, 13-background, five-frame catalog, not the
-final 2.0 public surface. The following are intentional current contracts:
+evidence for the existing 31-family, 13-background, five-frame catalog.
+Alpha.4 adds typed layered composition, not the final 2.0 public surface. The
+following are intentional current contracts:
 
 - checked request bounds and typed failures;
 - stateless label-separated trait derivation;
 - private fixed-point scene representation;
 - one scene used by canonical CPU RGBA8 and SVG output;
 - frozen catalog IDs and explicit family capability declarations;
+- bounded accessory capacity, typed slots, canonical ordering, and reported
+  strict/automatic compatibility decisions;
+- integer palette roles and per-family integer anchor profiles;
 - deterministic output within the same source revision and contract labels;
 - no exposure of raw identity digests or scene internals.
 

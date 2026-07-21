@@ -53,6 +53,7 @@ trap 'rm -f "$log"' EXIT
 echo "Kani checks: using Rust toolchain $kani_toolchain"
 
 harnesses="
+accessory_stack_capacity_is_fail_closed
 catalog_byte_selection_stays_in_frozen_bounds
 request_dimension_admission_is_exact
 unit_fixed_conversion_stays_in_closed_interval

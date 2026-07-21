@@ -32,6 +32,11 @@ supply-chain scope.
 - `SceneReport` exposes exact RGBA bytes and conservative pixel-test work,
   including every active clip predicate for each enclosed command's candidate
   pixels.
+- Accessory requests are fixed-capacity, canonicalized without allocation, and
+  resolved before scene compilation. Strict incompatibilities fail with typed
+  errors; automatic substitutions and rejections are immutable report data.
+- Family anchors, palette roles, transforms, collision rules, and fallback
+  order are integer-only and independent of insertion or hash-map order.
 - Pixel fingerprints stream visible rows through fixed-size, clear-on-drop
   SHA-512 state without allocating another image-sized buffer.
 - Caller surfaces are prevalidated and preserve all row-padding bytes.

@@ -5,14 +5,14 @@ contracts in `hashavatar-core`. These proofs complement tests and fuzzing; they
 are not whole-crate formal verification and do not prove SHA-512 internals.
 
 - Source: `crates/hashavatar-core/src/kani_proofs.rs`
-- Current admitted harness count: `8`.
+- Current admitted harness count: `9`.
 - Pinned tool: `cargo-kani 0.67.0`
 - Toolchain: Rust `1.90.0-x86_64-unknown-linux-gnu`
 
 The harnesses cover exact dimension admission, Q16.16 unit conversion,
 bounded fixed-point interpolation, pixel-center rounding, exact RGBA resource
-accounting, source-over canonicalization, opacity multiplication bounds, and
-catalog byte-selection bounds.
+accounting, source-over canonicalization, opacity multiplication bounds,
+catalog byte-selection bounds, and fail-closed accessory-stack capacity.
 
 Run opportunistically:
 

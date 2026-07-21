@@ -759,8 +759,8 @@ renderer receives focused adversarial review.
 
 ### v2.0.0-alpha.3 - Existing Catalog Port
 
-**Status:** Implementation complete; pending exact-commit pentest, downstream
-website validation, and green GitHub checks before beginning alpha.4.
+**Status:** Complete. Exact-commit external pentest passed after remediation;
+permanent evidence is recorded in `security/pentest/v2.0.0-alpha.3.md`.
 
 **Goal:** Port all existing 1.x families, backgrounds, and frames without
 expanding the art catalog.
@@ -781,7 +781,8 @@ the prior compatibility decision.
 
 ### v2.0.0-alpha.4 - Layered Style And Layout
 
-**Status:** Planned.
+**Status:** Implementation complete; pending exact-commit pentest, downstream
+website validation, and green GitHub checks before beginning alpha.5.
 
 **Goal:** Complete secure, deterministic style composition.
 

@@ -1,7 +1,7 @@
 //! Canonical rendering core for the Hashavatar 2.0 development line.
 //!
-//! Alpha.3 ports the complete existing family, background, and frame catalog
-//! onto the bounded canonical renderer. Identity-derived traits are stateless,
+//! Alpha.4 adds bounded typed palettes, expressions, and multi-accessory
+//! composition to the complete catalog. Identity-derived traits are stateless,
 //! geometry and scene layouts stay private, and CPU RGBA8 and SVG output execute
 //! the same validated scene.
 
@@ -18,10 +18,12 @@ mod error;
 mod fixed;
 mod geometry;
 mod identity;
+mod layout;
 mod paint;
 mod raster;
 mod rasterize;
 mod scene;
+mod style;
 mod svg;
 
 #[cfg(kani)]
@@ -30,11 +32,19 @@ mod kani_proofs;
 pub use self::cat::{CatRequest, CatTraitVector, PreparedCat};
 pub use self::catalog::{
     AVATAR_FAMILY_CAPABILITIES, AvatarBackground, AvatarFamilyCapabilities,
-    AvatarFamilyCapabilityEntry, AvatarKind, AvatarShape, AvatarStyle,
+    AvatarFamilyCapabilityEntry, AvatarKind, AvatarShape,
 };
 pub use self::error::{CatError, IdentityComponent};
+pub use self::layout::{
+    AccessoryLayoutDecision, AvatarAnchorPoint, AvatarAnchorSet, AvatarZBand,
+    ExpressionLayoutDecision, LayoutDisposition, LayoutReport, ResolvedStyle,
+};
 pub use self::raster::{CanonicalRgbaImage, PixelDigest, RgbaSurfaceMut};
 pub use self::scene::SceneReport;
+pub use self::style::{
+    AccessoryStack, AvatarAccessory, AvatarAccessorySlot, AvatarColorRoles, AvatarExpression,
+    AvatarPalette, AvatarRgb, AvatarStyle, MAX_ACCESSORY_LAYERS, StyleResolutionPolicy,
+};
 pub use self::svg::{SvgMode, SvgOptions};
 
 /// Error returned by canonical avatar preparation and execution.
@@ -58,6 +68,6 @@ pub const RGBA8_BYTES_PER_PIXEL: usize = 4;
 /// Versioned contract identifier included in canonical pixel digests.
 pub const PIXEL_CONTRACT_ID: &str = "hashavatar/rgba8-straight-srgb/v1";
 
-/// Source-only alpha.3 catalog contract identifier.
-pub const CATALOG_CONTRACT_ID: &str = "hashavatar/catalog/v2-alpha3";
+/// Source-only alpha.4 catalog contract identifier.
+pub const CATALOG_CONTRACT_ID: &str = "hashavatar/catalog/v2-alpha4";
 pub use self::avatar::{AvatarRequest, AvatarTraitVector, PreparedAvatar};

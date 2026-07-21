@@ -1,6 +1,6 @@
 use crate::{
-    AvatarTraitVector, CatError,
-    art::util::{Canvas, themed_color, vary},
+    AvatarColorRoles, AvatarTraitVector, CatError,
+    art::util::{Canvas, role_color, vary},
     fixed::Fixed,
     geometry::{FillRule, Path, Point, Rect},
     paint::{Color, Paint},
@@ -19,15 +19,19 @@ pub(super) struct FamilyRig {
 }
 
 impl FamilyRig {
-    pub(super) fn new(scene: &Scene, traits: AvatarTraitVector) -> Result<Self, CatError> {
+    pub(super) fn new(
+        scene: &Scene,
+        traits: AvatarTraitVector,
+        colors: AvatarColorRoles,
+    ) -> Result<Self, CatError> {
         Ok(Self {
             canvas: Canvas::new(scene)?,
             traits,
-            primary: themed_color(traits.primary_hue(), 72, 224, 5),
-            secondary: themed_color(traits.secondary_hue(), 96, 238, 9),
-            accent: themed_color(traits.accent_hue(), 74, 232, 12),
-            light: Color::rgb(244, 247, 243),
-            ink: Color::rgb(25, 29, 36),
+            primary: role_color(colors.primary()),
+            secondary: role_color(colors.secondary()),
+            accent: role_color(colors.accent()),
+            light: role_color(colors.light()),
+            ink: role_color(colors.ink()),
         })
     }
 

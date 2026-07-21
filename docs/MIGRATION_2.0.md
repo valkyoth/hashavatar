@@ -4,12 +4,11 @@ Hashavatar 2.0 intentionally changes API and pixels. The final 1.x renderer is
 preserved by `v1.3.0` and `release/1.3`; applications requiring exact 1.x
 output should pin `hashavatar = "=1.3.0"` until they deliberately migrate.
 
-Alpha.3 ports the complete 1.3 family, background, and frame catalog to the new
-canonical renderer. Pixels intentionally differ from 1.x. Accessories,
-expressions, palette layers, codecs, and final typed asset keys remain later
-milestones.
+Alpha.4 ports the complete 1.3 style catalog to typed canonical composition.
+Pixels intentionally differ from 1.x. Established codecs and final typed asset
+keys remain later milestones.
 
-## Alpha.3 Trial
+## Alpha.4 Trial
 
 Replace the 1.x builder or free function with one prepared request:
 
@@ -28,7 +27,7 @@ let prepared = AvatarRequest::with_namespace(
     256,
     0,
     b"tenant-a",
-    b"visual-rollout-alpha3",
+    b"visual-rollout-alpha4",
     b"user-123",
     style,
 )?
@@ -42,10 +41,10 @@ let svg = prepared.render_svg()?;
 
 The request borrows identity bytes only during preparation. The prepared value
 owns one validated private scene and can execute either output without
-rehashing. Explicit families, backgrounds, and frames are available. Encoders,
-automatic style selection, accessories, expressions, palette layers, and typed
-asset keys are not yet part of alpha.3. Versioned pixel digests are available
-for canonical output comparison and isolated trial caching.
+rehashing. Explicit and automatic layered styles are available through
+`AvatarStyle`, `AccessoryStack`, `ResolvedStyle`, and `LayoutReport`. Encoders
+and typed asset keys are not yet part of alpha.4. Versioned pixel digests are
+available for canonical output comparison and isolated trial caching.
 
 ## Rollout Rules
 
@@ -58,5 +57,5 @@ for canonical output comparison and isolated trial caching.
 6. Move production only after the required 2.0 package and compatibility
    contracts reach stable.
 
-Do not reuse a 1.x cache key for 2.0 bytes. Alpha.3 does not yet expose the
+Do not reuse a 1.x cache key for 2.0 bytes. Alpha.4 does not yet expose the
 final typed asset-key contract; keep trial output in an isolated cache.

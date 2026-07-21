@@ -1,5 +1,5 @@
 use crate::{
-    CatError,
+    AvatarRgb, CatError,
     fixed::Fixed,
     geometry::{Point, Rect},
     paint::Color,
@@ -63,7 +63,7 @@ pub(super) fn vary(
     )
 }
 
-pub(super) fn themed_color(sample: u16, floor: u8, ceiling: u8, phase: u8) -> Color {
+pub(crate) fn themed_color(sample: u16, floor: u8, ceiling: u8, phase: u8) -> Color {
     let span = u16::from(ceiling.saturating_sub(floor));
     let channel = |shift: u16| {
         let mixed = sample.rotate_left(u32::from(shift % 16));
@@ -74,4 +74,9 @@ pub(super) fn themed_color(sample: u16, floor: u8, ceiling: u8, phase: u8) -> Co
         floor.saturating_add(u8::try_from(scaled).unwrap_or(u8::MAX))
     };
     Color::rgb(channel(0), channel(u16::from(phase % 13)), channel(11))
+}
+
+pub(crate) fn role_color(color: AvatarRgb) -> Color {
+    let [red, green, blue] = color.channels();
+    Color::rgb(red, green, blue)
 }

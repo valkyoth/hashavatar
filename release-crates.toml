@@ -1,17 +1,17 @@
 [release]
-version = "2.0.0-alpha.3"
+version = "2.0.0-alpha.4"
 publish_order = ["hashavatar-core", "hashavatar"]
 
 [crates.hashavatar-core]
-previous_version = "0.1.0-alpha.2"
-version = "0.1.0-alpha.3"
+previous_version = "0.1.0-alpha.3"
+version = "0.1.0-alpha.4"
 change = "code"
 publish = false
-reason = "Port the complete existing family, background, and frame catalog; all prerelease packages remain source-only."
+reason = "Add bounded typed layered-style resolution and canonical layer compilers; all prerelease packages remain source-only."
 
 [crates.hashavatar]
-previous_version = "2.0.0-alpha.2"
-version = "2.0.0-alpha.3"
+previous_version = "2.0.0-alpha.3"
+version = "2.0.0-alpha.4"
 change = "code"
 publish = false
-reason = "Expose the alpha.3 catalog request, capability, and prepared-avatar APIs; prerelease publication is prohibited."
+reason = "Expose alpha.4 accessory, expression, palette, resolved-style, and layout-report APIs; prerelease publication is prohibited."

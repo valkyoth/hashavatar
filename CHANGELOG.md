@@ -1,5 +1,23 @@
 # Changelog
 
+## 2.0.0-alpha.4
+
+- Added fixed-capacity `AccessoryStack` composition with typed aura, headwear,
+  earwear, facewear, eyewear, and neckwear slots.
+- Added nine existing accessory variants, eight expressions, and six
+  integer-only semantic palettes without expanding the family catalog.
+- Added per-family integer anchor profiles, calibrated transforms, exclusion
+  rules, stable z-bands, and deterministic insertion-order-independent layout.
+- Added strict typed errors for unsupported layers, duplicate slots, and
+  collisions plus an opt-in frozen automatic fallback policy.
+- Added immutable `ResolvedStyle`, `LayoutReport`, accessory decisions, and
+  expression decisions so substitutions and rejections are never silent.
+- Compiled every accepted layer into the shared canonical scene used by both
+  CPU RGBA8 and SVG output while preserving layer-free alpha.3 pixel KATs.
+- Added complete family/layer capability coverage, capacity and permutation
+  tests, pixel-distinct catalog checks, collision fuzzing, a ninth Kani proof,
+  and a complete layered raster visual corpus.
+
 ## 2.0.0-alpha.3
 
 - Corrected conservative scene work accounting so every active clip predicate

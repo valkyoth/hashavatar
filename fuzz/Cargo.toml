@@ -8,7 +8,7 @@ publish = false
 cargo-fuzz = true
 
 [dependencies]
-hashavatar = { path = "..", version = "2.0.0-alpha.3" }
+hashavatar = { path = "..", version = "2.0.0-alpha.4" }
 libfuzzer-sys = "0.4.13"
 roxmltree = "0.21.1"
 
@@ -29,6 +29,13 @@ bench = false
 [[bin]]
 name = "svg_writer"
 path = "fuzz_targets/svg_writer.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "layout_resolution"
+path = "fuzz_targets/layout_resolution.rs"
 test = false
 doc = false
 bench = false

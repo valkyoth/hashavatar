@@ -28,12 +28,12 @@
 # hashavatar
 
 `hashavatar` is the recommended facade for deterministic avatar generation.
-The `2.0.0-alpha.3` source tree ports all 31 existing families, 13 backgrounds,
-and five frame shapes onto one private validated Q16.16 scene. Canonical
-straight-alpha RGBA8, caller-provided surfaces, complete SVG documents, and SVG
-fragments all execute that same scene.
+The `2.0.0-alpha.4` source tree adds bounded typed palettes, expressions, and
+multi-accessory composition to all 31 families, 13 backgrounds, and five frame
+shapes. Canonical straight-alpha RGBA8, caller-provided surfaces, complete SVG
+documents, and SVG fragments all execute one private validated Q16.16 scene.
 
-Alpha.3 has no codecs, image-library types, mutable rendering RNG, filesystem
+Alpha.4 has no codecs, image-library types, mutable rendering RNG, filesystem
 API, CLI, server, or user-supplied SVG. Optional formats and service-oriented
 packages remain later milestones.
 
@@ -45,7 +45,7 @@ The latest crates.io release is `1.3.0`, maintained on
 are tested through GitHub and `hashavatar-website`; prereleases are neither
 tagged nor uploaded to crates.io.
 
-To test alpha.3 from a local checkout:
+To test alpha.4 from a local checkout:
 
 ```toml
 [dependencies]
@@ -69,7 +69,7 @@ let prepared = AvatarRequest::with_namespace(
     256,
     0,
     b"tenant-a",
-    b"website-v2-alpha3",
+    b"website-v2-alpha4",
     b"user-123",
     style,
 )?
@@ -130,10 +130,48 @@ assert!(fragment.starts_with("<g id=\"profile-avatar-scene\">"));
 # Ok::<(), hashavatar::CatError>(())
 ```
 
+## Layered Style
+
+Explicit styles are strict by default. Unsupported face layers, duplicate
+slots, and collisions return typed errors before scene execution:
+
+```rust
+use hashavatar::{
+    AccessoryStack, AvatarAccessory, AvatarBackground, AvatarExpression,
+    AvatarKind, AvatarPalette, AvatarRequest, AvatarShape, AvatarStyle,
+};
+
+let accessories = AccessoryStack::from_slice(&[
+    AvatarAccessory::Hat,
+    AvatarAccessory::Eyepatch,
+    AvatarAccessory::Bowtie,
+])?;
+let style = AvatarStyle::new(
+    AvatarKind::Cat,
+    AvatarBackground::Sunrise,
+    AvatarShape::Circle,
+)
+.with_palette(AvatarPalette::Gold)
+.with_expression(AvatarExpression::Winking)
+.with_accessories(accessories);
+let prepared = AvatarRequest::new(256, 256, 0, b"user-123", style)?.prepare()?;
+
+assert_eq!(prepared.resolved_style().accessories().len(), 3);
+assert_eq!(prepared.layout_report().accessory_decision_count(), 3);
+# Ok::<(), hashavatar::AvatarError>(())
+```
+
+`AvatarStyle::automatic(...)` derives optional layers from independent labeled
+traits and applies a frozen fallback policy. Explicit callers can opt into the
+same behavior with `StyleResolutionPolicy::AutomaticFallback`. Every adjusted,
+substituted, or rejected request is visible through `LayoutReport`; no layer is
+silently skipped. See the [layered style contract](docs/LAYERED_STYLE_CONTRACT.md).
+
 `AvatarRequest` borrows input only until `prepare()`. `PreparedAvatar` retains
-the private scene, explicit style, public named trait samples, and validated
-resource report, but not the raw identifier, tenant, style-version, or identity
-digest. `AvatarKind::ALL`, `AvatarBackground::ALL`, and `AvatarShape::ALL`
+the private scene, requested and resolved styles, layout decisions, public
+named trait samples, and validated resource report, but not the raw identifier,
+tenant, style-version, or identity digest. `AvatarKind::ALL`,
+`AvatarBackground::ALL`, and `AvatarShape::ALL`
 provide the frozen catalog order; family capability declarations are available
 through `AvatarKind::capabilities()` and `AVATAR_FAMILY_CAPABILITIES`.
 
@@ -145,6 +183,12 @@ through `AvatarKind::capabilities()` and `AVATAR_FAMILY_CAPABILITIES`.
 - Components are length-prefixed and SHA-512 domain separated.
 - Catalog IDs and capability behavior follow the documented
   [catalog contract](docs/CATALOG_CONTRACT.md).
+- Accessory stacks contain at most four entries and are canonicalized by
+  z-band, typed slot, and stable accessory ID.
+- Explicit unsupported layers and collisions fail closed; automatic fallback
+  is deterministic and completely reported.
+- Palette roles, family anchors, transforms, and expression geometry use only
+  integer or checked fixed-point arithmetic.
 - Traits are sampled independently by stable labels; adding a trait does not
   consume mutable RNG state or shift existing traits.
 - Geometry is private signed Q16.16 fixed point with checked construction.
@@ -168,7 +212,7 @@ still enforce process-wide concurrency and rate limits.
 
 ## Crates
 
-| Package | Alpha.3 role |
+| Package | Alpha.4 role |
 | --- | --- |
 | `hashavatar` | Recommended thin facade and stable import path |
 | `hashavatar-core` | `no_std + alloc` catalog, identity, scene, CPU RGBA8, and SVG core |
@@ -199,6 +243,7 @@ scripts/check_kani.sh
 cargo test --workspace --release
 cargo run --example catalog_sheet
 cargo run --example catalog_raster_sheet
+cargo run --example layered_raster_sheet
 ```
 
 The standard gate checks formatting, strict Clippy, debug and release KATs,

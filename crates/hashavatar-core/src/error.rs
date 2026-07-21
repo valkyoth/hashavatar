@@ -1,5 +1,7 @@
 use core::fmt;
 
+use crate::{AvatarAccessory, AvatarAccessorySlot, AvatarExpression};
+
 /// Identity component rejected by a bounded constructor.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum IdentityComponent {
@@ -51,6 +53,36 @@ pub enum CatError {
     InvalidSvgOptions,
     /// Writing the internally bounded SVG string failed.
     SvgWrite,
+    /// A bounded accessory stack exceeded its fixed capacity.
+    AccessoryCapacity {
+        /// Maximum admitted accessory count.
+        maximum: usize,
+    },
+    /// The family has no compatible anchors for this accessory.
+    UnsupportedAccessory {
+        /// Rejected accessory.
+        accessory: AvatarAccessory,
+    },
+    /// Two requested accessories require the same semantic slot.
+    AccessorySlotConflict {
+        /// Duplicated slot.
+        slot: AvatarAccessorySlot,
+    },
+    /// An accessory overlaps an already admitted exclusion zone.
+    AccessoryCollision {
+        /// Rejected accessory slot.
+        slot: AvatarAccessorySlot,
+    },
+    /// The family has no compatible anchors for this expression.
+    UnsupportedExpression {
+        /// Rejected expression.
+        expression: AvatarExpression,
+    },
+    /// The expression conflicts with an admitted face layer.
+    ExpressionCollision {
+        /// Rejected expression.
+        expression: AvatarExpression,
+    },
 }
 
 impl fmt::Display for CatError {
@@ -71,6 +103,37 @@ impl fmt::Display for CatError {
             Self::InvalidSurface => formatter.write_str("caller RGBA8 surface is invalid"),
             Self::InvalidSvgOptions => formatter.write_str("canonical SVG options are invalid"),
             Self::SvgWrite => formatter.write_str("canonical SVG construction failed"),
+            Self::AccessoryCapacity { maximum } => {
+                write!(
+                    formatter,
+                    "accessory stack exceeds the maximum of {maximum}"
+                )
+            }
+            Self::UnsupportedAccessory { accessory } => write!(
+                formatter,
+                "accessory {} is unsupported by this avatar family",
+                accessory.as_str()
+            ),
+            Self::AccessorySlotConflict { slot } => write!(
+                formatter,
+                "multiple accessories require the {} slot",
+                slot.as_str()
+            ),
+            Self::AccessoryCollision { slot } => write!(
+                formatter,
+                "accessory in the {} slot intersects an exclusion zone",
+                slot.as_str()
+            ),
+            Self::UnsupportedExpression { expression } => write!(
+                formatter,
+                "expression {} is unsupported by this avatar family",
+                expression.as_str()
+            ),
+            Self::ExpressionCollision { expression } => write!(
+                formatter,
+                "expression {} conflicts with an admitted face layer",
+                expression.as_str()
+            ),
         }
     }
 }

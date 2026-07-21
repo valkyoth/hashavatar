@@ -84,14 +84,14 @@ dependencies = [
 
 [[package]]
 name = "hashavatar"
-version = "2.0.0-alpha.3"
+version = "2.0.0-alpha.4"
 dependencies = [
  "hashavatar-core",
 ]
 
 [[package]]
 name = "hashavatar-core"
-version = "0.1.0-alpha.3"
+version = "0.1.0-alpha.4"
 dependencies = [
  "sanitization",
  "sanitization-crypto-interop",

@@ -1,8 +1,9 @@
 use crate::{
-    AvatarKind, AvatarStyle, CanonicalRgbaImage, CatError, MAX_IDENTITY_BYTES,
-    MAX_NAMESPACE_COMPONENT_BYTES, RgbaSurfaceMut, SceneReport, SvgOptions,
+    AvatarKind, AvatarStyle, CanonicalRgbaImage, CatError, LayoutReport, MAX_IDENTITY_BYTES,
+    MAX_NAMESPACE_COMPONENT_BYTES, ResolvedStyle, RgbaSurfaceMut, SceneReport, SvgOptions,
     art::compile_avatar_scene,
     identity::TraitDeriver,
+    layout::resolve_style,
     raster::{render_scene, render_scene_into},
     scene::Scene,
     svg::{render_scene_svg, render_scene_svg_with, write_scene_svg},
@@ -11,7 +12,7 @@ use crate::{
 const DEFAULT_TENANT: &[u8] = b"public";
 const DEFAULT_STYLE_VERSION: &[u8] = b"v2-alpha3";
 
-/// Borrowed inputs for one canonical alpha.3 avatar.
+/// Borrowed inputs for one canonical alpha.4 avatar.
 #[must_use = "prepare and render the validated avatar request"]
 pub struct AvatarRequest<'a> {
     width: u32,
@@ -24,7 +25,7 @@ pub struct AvatarRequest<'a> {
 }
 
 impl<'a> AvatarRequest<'a> {
-    /// Creates a request in Hashavatar's public alpha.3 namespace.
+    /// Creates a request in Hashavatar's canonical baseline namespace.
     pub fn new(
         width: u32,
         height: u32,
@@ -75,18 +76,27 @@ impl<'a> AvatarRequest<'a> {
             self.style_seed,
         )?;
         let traits = AvatarTraitVector::derive(&deriver, self.style.kind())?;
-        let scene = compile_avatar_scene(self.width, self.height, self.style, traits)?;
+        let (resolved_style, layout_report) = resolve_style(self.style, traits)?;
+        let scene = compile_avatar_scene(
+            self.width,
+            self.height,
+            resolved_style,
+            &layout_report,
+            traits,
+        )?;
         let report = scene.validate()?;
         Ok(PreparedAvatar {
             scene,
-            style: self.style,
+            requested_style: self.style,
+            resolved_style,
+            layout_report,
             traits,
             report,
         })
     }
 }
 
-/// Named stateless samples used by all alpha.3 family compilers.
+/// Named stateless samples used by all alpha.4 family and style compilers.
 #[must_use = "trait vectors describe deterministic avatar appearance"]
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct AvatarTraitVector {
@@ -149,11 +159,13 @@ impl AvatarTraitVector {
     }
 }
 
-/// Prepared alpha.3 scene shared by CPU and SVG executors.
+/// Prepared alpha.4 scene shared by CPU and SVG executors.
 #[must_use = "render or inspect the prepared avatar scene"]
 pub struct PreparedAvatar {
     scene: Scene,
-    style: AvatarStyle,
+    requested_style: AvatarStyle,
+    resolved_style: ResolvedStyle,
+    layout_report: LayoutReport,
     traits: AvatarTraitVector,
     report: SceneReport,
 }
@@ -167,9 +179,19 @@ impl PreparedAvatar {
     pub const fn height(&self) -> u32 {
         self.scene.height()
     }
-    /// Returns the resolved explicit style.
+    /// Returns the caller-requested style before compatibility resolution.
     pub const fn style(&self) -> AvatarStyle {
-        self.style
+        self.requested_style
+    }
+
+    /// Returns the immutable effective style consumed by scene compilation.
+    pub const fn resolved_style(&self) -> ResolvedStyle {
+        self.resolved_style
+    }
+
+    /// Returns deterministic compatibility and placement decisions.
+    pub const fn layout_report(&self) -> LayoutReport {
+        self.layout_report
     }
     /// Returns the named stateless trait samples.
     pub const fn trait_vector(&self) -> AvatarTraitVector {

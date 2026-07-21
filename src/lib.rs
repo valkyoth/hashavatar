@@ -1,7 +1,7 @@
 //! Security-oriented facade for canonical Hashavatar rendering.
 //!
-//! `2.0.0-alpha.3` is a source-only development release. It ports the existing
-//! family, background, and frame catalog onto the canonical scene renderer.
+//! `2.0.0-alpha.4` is a source-only development release. It adds bounded typed
+//! layered styles to the canonical catalog renderer.
 //! The maintained crates.io line remains `1.3.x`.
 //!
 //! # Example
@@ -27,18 +27,23 @@
 #![forbid(unsafe_code)]
 
 pub use hashavatar_core::{
-    AVATAR_FAMILY_CAPABILITIES, AvatarBackground, AvatarError, AvatarFamilyCapabilities,
-    AvatarFamilyCapabilityEntry, AvatarKind, AvatarRequest, AvatarShape, AvatarStyle,
-    AvatarTraitVector, CATALOG_CONTRACT_ID, CanonicalRgbaImage, CatError, CatRequest,
-    CatTraitVector, IdentityComponent, MAX_DIMENSION, MAX_IDENTITY_BYTES,
-    MAX_NAMESPACE_COMPONENT_BYTES, MIN_DIMENSION, PIXEL_CONTRACT_ID, PixelDigest, PreparedAvatar,
-    PreparedCat, RGBA8_BYTES_PER_PIXEL, RgbaSurfaceMut, SceneReport, SvgMode, SvgOptions,
+    AVATAR_FAMILY_CAPABILITIES, AccessoryLayoutDecision, AccessoryStack, AvatarAccessory,
+    AvatarAccessorySlot, AvatarAnchorPoint, AvatarAnchorSet, AvatarBackground, AvatarColorRoles,
+    AvatarError, AvatarExpression, AvatarFamilyCapabilities, AvatarFamilyCapabilityEntry,
+    AvatarKind, AvatarPalette, AvatarRequest, AvatarRgb, AvatarShape, AvatarStyle,
+    AvatarTraitVector, AvatarZBand, CATALOG_CONTRACT_ID, CanonicalRgbaImage, CatError, CatRequest,
+    CatTraitVector, ExpressionLayoutDecision, IdentityComponent, LayoutDisposition, LayoutReport,
+    MAX_ACCESSORY_LAYERS, MAX_DIMENSION, MAX_IDENTITY_BYTES, MAX_NAMESPACE_COMPONENT_BYTES,
+    MIN_DIMENSION, PIXEL_CONTRACT_ID, PixelDigest, PreparedAvatar, PreparedCat,
+    RGBA8_BYTES_PER_PIXEL, ResolvedStyle, RgbaSurfaceMut, SceneReport, StyleResolutionPolicy,
+    SvgMode, SvgOptions,
 };
 
-/// Common alpha.3 facade imports.
+/// Common alpha.4 facade imports.
 pub mod prelude {
     pub use crate::{
-        AvatarBackground, AvatarError, AvatarKind, AvatarRequest, AvatarShape, AvatarStyle,
-        CanonicalRgbaImage, PreparedAvatar, RgbaSurfaceMut, SvgOptions,
+        AccessoryStack, AvatarAccessory, AvatarBackground, AvatarError, AvatarExpression,
+        AvatarKind, AvatarPalette, AvatarRequest, AvatarShape, AvatarStyle, CanonicalRgbaImage,
+        PreparedAvatar, RgbaSurfaceMut, StyleResolutionPolicy, SvgOptions,
     };
 }
