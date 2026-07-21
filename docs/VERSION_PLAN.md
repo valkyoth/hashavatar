@@ -3,7 +3,7 @@
 Status: historical plan through the 1.0-era milestones
 
 The accepted preparation and 2.0 roadmap is
-[`plan-towards-2.0.0.md`](../plan-towards-2.0.0.md). This document preserves the
+[`PLAN_TOWARDS_2.0.md`](PLAN_TOWARDS_2.0.md). This document preserves the
 post-`0.6.0` decisions that led to the current 1.x crate; it no longer defines
 future release scope.
 
@@ -21,8 +21,8 @@ release without letting exploratory work blur into the release criteria.
 - Prefer latest compatible stable crate releases; check crates.io, docs.rs,
   upstream repositories, and RustSec advisories before adding or upgrading
   dependencies.
-- Keep web/API concerns in `hashavatar-api`; keep this crate focused on
-  reusable avatar generation.
+- Keep website and HTTP concerns in `hashavatar-website`; keep this crate
+  focused on reusable avatar-generation building blocks.
 - Treat self-testing as part of implementation, not a follow-up task.
 - Keep GitHub CodeQL on the repository default setup unless there is a
   documented reason to move to advanced setup.
@@ -358,7 +358,7 @@ than merely supported by the API.
 - Raster and SVG outputs are visually consistent for frame shapes.
 - Tests cover fallback behavior and representative cross-family combinations.
 - README and docs explain the full layer model.
-- `hashavatar-api` has enough documented guidance to expose the new layers
+- `hashavatar-website` has enough documented guidance to expose the new layers
   safely when that project is ready.
 - `scripts/stable_release_gate.sh check` passes.
 - crates.io publish dry run passes.

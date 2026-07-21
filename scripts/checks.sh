@@ -10,6 +10,13 @@ cargo fmt --all --check
 echo "checks: release metadata"
 scripts/validate-release-metadata.sh
 
+echo "checks: documentation links"
+scripts/check_doc_links.sh
+
+echo "checks: workspace release policy"
+scripts/release_crates.py --check
+python3 scripts/test_release_crates.py
+
 echo "checks: minimal dependency graph"
 scripts/validate-dependencies.sh
 

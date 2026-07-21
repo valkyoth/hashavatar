@@ -2,7 +2,15 @@
 
 ## Supported Versions
 
-Security fixes are expected for the latest published release series.
+| Version | Support |
+| --- | --- |
+| `2.0.0-alpha.x` | Active development on `main`; reviewed fixes move forward with the alpha line. |
+| `1.3.x` | Supported on `release/1.3` for serious security and correctness fixes. |
+| `<1.3` | Unsupported; upgrade to the latest `1.3.x` release. |
+
+Relevant fixes discovered during 2.0 development are assessed for backport to
+`release/1.3`. New features and intentional rendering changes are not
+backported.
 
 ## Reporting a Vulnerability
 

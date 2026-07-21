@@ -11,7 +11,9 @@ This repository is intended to be a code-generated avatar system.
 
 ## Generation model
 
-- Identity input is hashed with `SHA-512`.
+- Identity input is hashed with SHA-512 by default. Builds may explicitly
+  select BLAKE3 or the documented non-cryptographic XXH3-128 mode instead;
+  hash modes are mutually exclusive.
 - Digest bytes are mapped into visual parameters such as proportions, colors, spacing, and facial details.
 - Final images are rendered using first-party geometric primitives and the
   `image` crate's RGBA buffers and encoders.

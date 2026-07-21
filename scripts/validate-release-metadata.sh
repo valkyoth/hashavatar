@@ -59,19 +59,40 @@ test -s LICENSE-APACHE
 test -s rust-toolchain.toml
 test -s deny.toml
 test -s README.md
-test -s CONTRIBUTING.md
 test -s SECURITY.md
+test -s release-crates.toml
+test -s docs/CONTRIBUTING.md
+test -s docs/CRATE_VERSION_MATRIX.md
+test -s docs/CURRENT_STATUS.md
 test -s docs/DEPENDENCIES.md
+test -s docs/GITHUB_METADATA.md
 test -s docs/KANI.md
 test -s docs/MIGRATION_2.0.md
 test -s docs/PANIC_POLICY.md
+test -s docs/PLAN_TOWARDS_2.0.md
+test -s docs/PROVENANCE.md
+test -s docs/README_POLICY.md
 test -s docs/RELEASE.md
 test -s docs/SECURITY_CONTROLS.md
 test -s docs/STABILITY.md
-test -s "docs/release-notes/RELEASE_NOTES_${cargo_version}.md"
+test -s docs/THIRD_PARTY_NOTICES.md
+test -s docs/VERSIONING.md
+test -s "release-notes/RELEASE_NOTES_${cargo_version}.md"
+test -s security/pentest/README.md
+
+if [ -e PENTEST.md ]; then
+    echo "release metadata: root PENTEST.md is temporary input and must be removed" >&2
+    exit 1
+fi
+
+if ! grep -q '^readme = "README.md"$' Cargo.toml; then
+    echo "release metadata: Cargo.toml must use the canonical root README.md" >&2
+    exit 1
+fi
 
 for required_script in \
     "scripts/check_fuzz.sh" \
+    "scripts/check_doc_links.sh" \
     "scripts/check_kani.sh" \
     "scripts/checks.sh" \
     "scripts/generate-sbom.sh" \
@@ -89,6 +110,21 @@ do
 
     if [ "$(sed -n '1p' "$required_script")" != "#!/usr/bin/env sh" ]; then
         echo "release metadata: $required_script must use #!/usr/bin/env sh" >&2
+        exit 1
+    fi
+done
+
+for required_python_script in \
+    "scripts/release_crates.py" \
+    "scripts/test_release_crates.py"
+do
+    if [ ! -x "$required_python_script" ]; then
+        echo "release metadata: $required_python_script must be executable" >&2
+        exit 1
+    fi
+
+    if [ "$(sed -n '1p' "$required_python_script")" != "#!/usr/bin/env python3" ]; then
+        echo "release metadata: $required_python_script must use #!/usr/bin/env python3" >&2
         exit 1
     fi
 done
@@ -155,7 +191,7 @@ if command -v git >/dev/null 2>&1 && git rev-parse --git-dir >/dev/null 2>&1; th
             | grep -vx "v$cargo_version" \
             | sed -n '1p'
     )}"
-    release_notes="docs/release-notes/RELEASE_NOTES_${cargo_version}.md"
+    release_notes="release-notes/RELEASE_NOTES_${cargo_version}.md"
     if [ -n "$previous_tag" ] \
         && ! git diff --quiet "$previous_tag" -- \
             Cargo.toml Cargo.lock fuzz/Cargo.toml fuzz/Cargo.lock \
@@ -172,29 +208,41 @@ package_list="$(
 
 for required_package_file in \
     "CHANGELOG.md" \
-    "CONTRIBUTING.md" \
     "Cargo.lock" \
     "Cargo.toml" \
     "deny.toml" \
+    "docs/CONTRIBUTING.md" \
+    "docs/CRATE_VERSION_MATRIX.md" \
+    "docs/CURRENT_STATUS.md" \
     "docs/DEPENDENCIES.md" \
     "docs/KANI.md" \
     "docs/MIGRATION_2.0.md" \
     "docs/PANIC_POLICY.md" \
+    "docs/PLAN_TOWARDS_2.0.md" \
+    "docs/PROVENANCE.md" \
+    "docs/README_POLICY.md" \
     "docs/RELEASE.md" \
     "docs/SECURITY_CONTROLS.md" \
     "docs/STABILITY.md" \
+    "docs/THIRD_PARTY_NOTICES.md" \
+    "docs/VERSIONING.md" \
     "LICENSE-APACHE" \
     "LICENSE-MIT" \
     "README.md" \
-    "docs/release-notes/RELEASE_NOTES_${cargo_version}.md" \
+    "release-crates.toml" \
+    "release-notes/RELEASE_NOTES_${cargo_version}.md" \
     "rust-toolchain.toml" \
     "SECURITY.md" \
+    "security/pentest/README.md" \
+    "scripts/check_doc_links.sh" \
     "scripts/check_fuzz.sh" \
     "scripts/check_kani.sh" \
     "scripts/checks.sh" \
     "scripts/generate-sbom.sh" \
     "scripts/reproducible_build_check.sh" \
+    "scripts/release_crates.py" \
     "scripts/stable_release_gate.sh" \
+    "scripts/test_release_crates.py" \
     "scripts/validate-dependencies.sh" \
     "scripts/validate-panic-policy.sh" \
     "scripts/validate-release-metadata.sh" \

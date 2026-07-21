@@ -21,7 +21,7 @@ impl From<Color> for Rgba<u8> {
 }
 
 // Raster primitive implementations adapted from imageproc's MIT-licensed
-// drawing modules. See THIRD_PARTY_NOTICES.md.
+// drawing modules. See docs/THIRD_PARTY_NOTICES.md.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(crate) struct Point<T> {
     pub(crate) x: T,

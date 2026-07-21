@@ -32,7 +32,7 @@
   - Writer-based and convenience encoding APIs.
   - Typed capability, validation, capacity, rendering, writer, and encoding errors.
 
-  The proposed preparation flow in plan-towards-2.0.0.md:222 is particularly good. PreparedAvatar prevents an application from validating one tuple, deriving a key from
+  The proposed preparation flow in docs/PLAN_TOWARDS_2.0.md is particularly good. PreparedAvatar prevents an application from validating one tuple, deriving a key from
   another, and rendering a third.
 
   A suitable facade might look like:
@@ -59,8 +59,7 @@
 
   ### No: an HTTP or hosted service API
 
-  HTTP should remain the responsibility of the application using the crate. The plan already makes the correct decision at plan-towards-2.0.0.md:62 and provides a good
-  service recipe at plan-towards-2.0.0.md:283.
+  HTTP should remain the responsibility of the application using the crate. The accepted plan in docs/PLAN_TOWARDS_2.0.md already makes that decision and provides a good service recipe.
 
   The crate should not own:
 
@@ -98,21 +97,20 @@
 
   The largest contradiction is:
 
-  - AVIF decision at plan-towards-2.0.0.md:957.
+  - AVIF decision in docs/PLAN_TOWARDS_2.0.md.
   - JPEG XL decision at alpha.19.
-  - GPU scaffold and execution at plan-towards-2.0.0.md:993.
-  - Schema adapter at plan-towards-2.0.0.md:1028.
+  - GPU scaffold and execution in docs/PLAN_TOWARDS_2.0.md.
+  - Schema adapter in docs/PLAN_TOWARDS_2.0.md.
   - User-facing facade only at alpha.23.
 
   If releases are sequential, those tasks block facade stabilization regardless of the text saying otherwise.
 
   Move them into separate documents:
 
-  roadmaps/gpu.md
-  roadmaps/avif.md
-  roadmaps/jpeg-xl.md
-  roadmaps/schema.md
-  roadmaps/heapless.md
+  docs/roadmaps/gpu.md
+  docs/roadmaps/avif.md
+  docs/roadmaps/schema.md
+  docs/roadmaps/heapless.md
 
   They may proceed in parallel, but the main roadmap must be capable of advancing directly from established formats to facade freeze.
 

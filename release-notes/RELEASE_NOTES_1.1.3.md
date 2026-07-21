@@ -32,7 +32,7 @@ public Rust API, Cargo feature names, raster rendering, or raster fingerprints.
 
 ## Roadmap
 
-- Made `plan-towards-2.0.0.md` the accepted preparation and 2.0 roadmap.
+- Made `docs/PLAN_TOWARDS_2.0.md` the accepted preparation and 2.0 roadmap.
 - Marked `docs/VERSION_PLAN.md` as historical context for the path from 0.6 to
   the current crate.
 - Documented that `hashavatar` remains one crate for `1.1.3`, `1.2.0`, and

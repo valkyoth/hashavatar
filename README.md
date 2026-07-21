@@ -1,366 +1,370 @@
 <p align="center">
   <b>Secure deterministic procedural avatars for Rust.</b><br>
-  Stable identity hashing, safe Rust rendering, in-memory WebP/SVG output, and release-gated security evidence.
+  Bounded identity hashing, asset-free rendering, WebP/SVG output, typed cache keys, and explicit resource controls.
 </p>
 
 <div align="center">
+  <a href="https://crates.io/crates/hashavatar">Crates.io</a>
+  |
   <a href="https://docs.rs/hashavatar">Docs.rs</a>
   |
-  <a href="docs/SECURITY_CONTROLS.md">Security Controls</a>
+  <a href="https://github.com/valkyoth/hashavatar/blob/main/docs/CURRENT_STATUS.md">Current Status</a>
   |
-  <a href="docs/STABILITY.md">Stability Policy</a>
+  <a href="https://github.com/valkyoth/hashavatar/blob/main/docs/SECURITY_CONTROLS.md">Security Controls</a>
   |
-  <a href="plan-towards-2.0.0.md">Roadmap</a>
+  <a href="https://github.com/valkyoth/hashavatar/blob/main/docs/PLAN_TOWARDS_2.0.md">2.0 Plan</a>
   |
-  <a href="SECURITY.md">Security</a>
+  <a href="https://github.com/valkyoth/hashavatar/blob/main/SECURITY.md">Security</a>
 </div>
 
 <br>
 
 <p align="center">
-  <img src="https://raw.githubusercontent.com/valkyoth/hashavatar/main/.github/images/hashavatar.webp" alt="hashavatar Rust crate overview">
+  <a href="https://github.com/valkyoth/hashavatar">
+    <img src="https://raw.githubusercontent.com/valkyoth/hashavatar/main/.github/images/hashavatar.webp" alt="hashavatar Rust crate overview">
+  </a>
 </p>
 
 # hashavatar
 
-`hashavatar` is a Rust crate for deterministic, procedural avatar generation. It is designed for services that need stable user or tenant avatars without bundled artwork, sprite sheets, external asset packs, or filesystem-side effects.
+`hashavatar` generates deterministic avatars from bounded identity bytes. It
+ships no character artwork, sprite sheets, templates, HTTP server, CLI, or
+filesystem-writing API. Raster and SVG output are produced from Rust drawing
+code and returned to the caller.
 
-The crate starts conservative: validated avatar dimensions, bounded identity input, namespace-isolated hashing, safe Rust rendering, in-memory raster encoding, SVG string rendering, and a release process with dependency, audit, fuzz, package, SBOM, and reproducibility checks.
+The normal path validates dimensions and identity lengths, derives a
+namespace-isolated identity, resolves a complete style, exposes conservative
+resource information, and binds output and cache keys to one prepared request.
 
-## Current Status
+The examples below describe the published `1.3.0` API. Development and support
+state lives in [Current Status](https://github.com/valkyoth/hashavatar/blob/main/docs/CURRENT_STATUS.md).
 
-The current crate version is `1.3.0`.
+## Start Here
 
-Implemented now:
-
-- Pure library crate; no bundled demo server and no CLI binary.
-- Deterministic avatars derived from SHA-512 identity hashes by default.
-- Optional BLAKE3 and XXH3-128 identity derivation behind explicit Cargo
-  features.
-- Public enum variant lists use single-source `ALL` slices and byte-to-variant
-  helpers for deterministic option derivation.
-- Frozen `CatalogVersion` and `RenderContractId` values, explicit legacy
-  catalog IDs and weights, and a public family-capability manifest.
-- Visual layer options for accessories, accent palettes, expressions, and
-  frame shapes through `AvatarStyleOptions`.
-- Automatic style derivation uses distinct identity digest bytes for kind,
-  background, accessory, color, expression, and shape.
-- Namespace-aware identity derivation for tenant isolation and visual rollouts.
-- Length-prefixed hash components to avoid delimiter ambiguity.
-- Avatar families through `AvatarKind`: animals, characters, fantasy/sci-fi
-  faces, playful objects, and symbols. Current labels are listed in the public
-  option catalog below.
-- Background modes through `AvatarBackground`: fixed, transparent, patterned,
-  gradient, and star-field canvas treatments.
-- Visual layers through `AvatarAccessory`, `AvatarColor`,
-  `AvatarExpression`, and `AvatarShape`.
-- In-memory `WebP` encoding through `AvatarOutputFormat`; `PNG`, `JPEG`, and
-  single-frame `GIF` export are explicit opt-in features.
-- Compact SVG string rendering.
-- Fluent `AvatarBuilder` API for common render, encode, SVG, and cache-key
-  workflows.
-- Additive `AvatarRequest` and `PreparedAvatar` migration API that freezes one
-  validated identity/spec/style tuple before metadata, keys, or output are
-  produced.
-- Strict-by-default explicit request styles with opt-in 1.x fallback reporting
-  through `ResolvedStyle` and family capabilities through `LayoutReport`.
-- `ResourceBudget`, validated strided `RasterSurfaceMut`, and caller-owned SVG
-  and encoded writers for applications preparing their 2.0 ownership model.
-- Opt-in strict style validation that rejects unsupported accessory and
-  expression layers before rendering.
-- Typed `IdentityCacheKey`, `AvatarAssetKey`, `SemanticEncodedAssetKey`, and
-  `BuildEncodedAssetKey` values that prevent cache-layer confusion while
-  covering identity mode, catalog, render contract, effective style/spec
-  tuples, output format, fixed encoder settings, and optionally a deployment's
-  resolved encoder build.
-- Typed low-level errors plus unified `AvatarError` for high-level builder
-  calls.
-- Optional `serde` feature for public style enums only. `AvatarIdentity` is
-  intentionally not serializable.
-- Opaque identity cache keys through `AvatarIdentity::cache_key()` and
-  `AvatarBuilder::cache_key()`.
-- Private `AvatarSpec` fields so dimensions must pass construction-time validation.
-- No public path-writing helpers; callers own their storage and filesystem boundary.
-- `#![forbid(unsafe_code)]` in library code.
-- Golden visual regression fingerprints.
-- A frozen compatibility corpus covering the request, complete style, asset
-  key, RGBA digest, and SVG digest for every 1.x avatar family.
-- Isolated fuzz harness for avatar identities, families, backgrounds, SVG
-  rendering, default WebP encoding, and feature-gated encoder paths.
-- Local release gates for formatting, clippy, tests, docs, dependency policy,
-  RustSec advisories, bounded Kani proofs, package contents, SBOM generation,
-  byte-identical `.crate` package checks, and crates.io publish dry runs. Stable
-  release mode requires the documented exact Kani and SBOM tool versions;
-  ordinary check mode may report explicit tooling skips.
-
-Planned or intentionally external:
-
-- HTTP serving, rate limits, cache headers, security headers, observability, and
-  abuse controls live at the application boundary. The hosted reference
-  implementation is [`hashavatar-website`](https://github.com/valkyoth/hashavatar-website).
-- AVIF is planned behind an explicit formats boundary for 2.0 and requires
-  dependency-policy review before admission. JPEG XL is currently unplanned.
-- Larger identity inputs should be normalized or mapped by the application before calling this crate.
-
-## Trust Dashboard
-
-| Area | Status |
+| Need | Start with |
 | --- | --- |
-| License | `MIT OR Apache-2.0` |
-| MSRV | Rust `1.90.0` |
-| Development toolchain | Rust `1.97.1` |
-| Crate shape | Library only |
-| Runtime graph | `image`, `palette`, `rand`, `sanitization`, `sanitization-crypto-interop`, transitive `sha2`, `subtle`; optional `blake3`, `xxhash-rust`, `image/png`, `image/jpeg`, `image/gif` |
-| Unsafe policy | `#![forbid(unsafe_code)]` |
-| Filesystem policy | No public path-writing APIs |
-| Dimension limits | `64..=2048` pixels per side |
-| Identity limits | 1024 bytes per identity input |
-| Namespace limits | 128 bytes per tenant/style-version component |
-| Hashing posture | SHA-512 default with length-prefixed domain, namespace, style, and identity components; optional BLAKE3 and non-cryptographic XXH3-128 |
-| SVG posture | Generated numeric markup only; caller input is not inserted into SVG fragments |
-| Prepared output posture | Strict explicit styles by default; validated caller surfaces and writers; documented 1.x internal allocations |
-| Kani | Bounded no-default-features harnesses for spec/resource/geometry arithmetic through the Rust `1.90.0` verifier toolchain; mandatory in stable release mode, but not a whole-crate formal-verification claim |
-| Release evidence | fmt, clippy, tests, docs, deny, audit, fuzz harness compile, mandatory Kani and SBOM evidence in release mode, byte-identical package check, publish dry run |
+| New application workflow | `AvatarIdentity` + `AvatarRequest::builder(...).prepare()` |
+| Existing concise integration | `AvatarBuilder::for_id(...)` |
+| Automatic complete style | `.automatic_style()` |
+| User-selected strict style | `AvatarRequestBuilder` or `.strict_style_validation()` |
+| Caller-owned RGBA memory | `PreparedAvatar::render_into()` |
+| SVG or encoded writer | `write_svg()` or `encode_to_writer()` |
+| Stable cache routing | Typed identity, avatar, semantic, and build asset keys |
+| Tenant isolation | `AvatarNamespace` |
+| Public web endpoint | Crate validation plus application rate/concurrency limits |
 
-Security-control details live in [docs/SECURITY_CONTROLS.md](docs/SECURITY_CONTROLS.md). Dependency policy lives in [docs/DEPENDENCIES.md](docs/DEPENDENCIES.md). Panic policy lives in [docs/PANIC_POLICY.md](docs/PANIC_POLICY.md). Kani proof policy lives in [docs/KANI.md](docs/KANI.md). Stable API and rendering policy lives in [docs/STABILITY.md](docs/STABILITY.md).
-
-The accepted preparation and 2.0 roadmap lives in
-[plan-towards-2.0.0.md](plan-towards-2.0.0.md). The historical path to the
-current crate remains in [docs/VERSION_PLAN.md](docs/VERSION_PLAN.md).
-`hashavatar` remains one crate through `1.3.0`; the workspace split begins with
-`2.0.0-alpha.1`. Applications preparing for that transition should follow
-[docs/MIGRATION_2.0.md](docs/MIGRATION_2.0.md).
-
-## Rust Version Support
-
-The minimum supported Rust version is Rust `1.90.0`, as declared by
-`Cargo.toml`. Local development and release checks use the pinned
-`rust-toolchain.toml` toolchain, currently Rust `1.97.1`. CI also checks back
-to Rust `1.90.0` so the MSRV stays honest. New deployments should prefer the
-latest stable Rust; as of July 21, 2026, that is Rust `1.97.1`.
-
-Compatibility evidence for `1.3.0`:
-
-| Rust | Local Evidence |
-| --- | --- |
-| `1.90.0` | ✓ `cargo check`; ✓ `cargo check --features all-formats`; ✓ `cargo check --features "blake3 all-formats"`; ✓ `cargo check --features "xxh3 all-formats"` |
-| `1.91.0` | ✓ `cargo check --features all-formats` |
-| `1.92.0` | ✓ `cargo check --features all-formats` |
-| `1.93.0` | ✓ `cargo check --features all-formats` |
-| `1.94.0` | ✓ `cargo check --features all-formats` |
-| `1.95.0` | ✓ `cargo check --features all-formats` |
-| `1.96.0` | ✓ `cargo check --features all-formats` |
-| `1.96.1` | ✓ `cargo check --features all-formats` |
-| `1.97.0` | ✓ `cargo check --features all-formats` |
-| `1.97.1` | ✓ full release gate; ✓ `cargo check --features all-formats` |
-
-Optional hash modes are mutually exclusive, so `hashavatar` cannot use a single
-`--all-features` evidence run.
+New code should prefer a prepared request. `AvatarBuilder` remains supported
+for established integrations and short examples.
 
 ## Install
+
+Default SHA-512 identity derivation, WebP encoding, and SVG rendering:
 
 ```toml
 [dependencies]
 hashavatar = "1.3.0"
 ```
 
-Optional identity hash modes and extra raster encoders are disabled by default.
-Hash modes are mutually exclusive, so enable at most one of `blake3` or `xxh3`:
-
-```toml
-[dependencies]
-hashavatar = { version = "1.3.0", features = ["blake3"] }
-```
-
-Enable additional raster formats explicitly:
+Enable additional raster encoders explicitly:
 
 ```toml
 [dependencies]
 hashavatar = { version = "1.3.0", features = ["png", "jpeg", "gif"] }
 ```
 
-Or enable every optional raster encoder at once:
+Enable BLAKE3 identity derivation:
 
 ```toml
 [dependencies]
-hashavatar = { version = "1.3.0", features = ["all-formats"] }
+hashavatar = { version = "1.3.0", features = ["blake3"] }
 ```
 
-Enable string serialization/deserialization for public style enums:
+`blake3` and `xxh3` are mutually exclusive crate-wide identity modes. Extra
+raster encoders and `serde` support for public style enums are disabled by
+default.
 
-```toml
-[dependencies]
-hashavatar = { version = "1.3.0", features = ["serde"] }
-```
+## Quick Start
 
-Combine these as needed, for example `features = ["blake3", "png", "serde"]`.
-The `kani` feature is reserved for verifier harnesses and has no runtime API
-effect in normal builds.
-
-For a local checkout:
-
-```toml
-[dependencies]
-hashavatar = { path = "../hashavatar" }
-```
-
-The crate is dual-licensed:
-
-```toml
-license = "MIT OR Apache-2.0"
-```
-
-## Builder API
-
-`AvatarBuilder` remains the established entry point for application code. It keeps
-the same validation and security boundaries as the lower-level functions while
-avoiding long positional argument lists.
-
-The builder stores the supplied identifier until it is consumed and derives
-`Clone`, so cloning a builder also clones an owned identifier. For sensitive
-identifiers, pass a short-lived borrow to sanitized storage or derive a keyed
-pseudonym first, as shown below. The builder cannot sanitize an arbitrary
-caller-owned `String`, `Vec<u8>`, or custom identifier type.
+Prepare one immutable request and use it for metadata, keys, and output:
 
 ```rust
 use hashavatar::prelude::*;
 
-fn main() -> Result<(), AvatarError> {
-    let svg = AvatarBuilder::for_id("user@example.com")
-        .size(256, 256)
-        .namespace("tenant-a", "v2")
-        .kind(AvatarKind::Robot)
-        .background(AvatarBackground::Transparent)
-        .accessory(AvatarAccessory::Glasses)
-        .shape(AvatarShape::Circle)
-        .render_svg()?;
+let namespace = AvatarNamespace::new("tenant-a", "avatars-v2")?;
+let identity = AvatarIdentity::new_with_namespace(namespace, "user-123")?;
+let prepared = AvatarRequest::builder(identity)
+    .size(256, 256)
+    .kind(AvatarKind::Robot)
+    .background(AvatarBackground::Transparent)
+    .accessory(AvatarAccessory::Glasses)
+    .color(AvatarColor::Gold)
+    .expression(AvatarExpression::Happy)
+    .shape(AvatarShape::Circle)
+    .prepare()?;
 
-    println!("{svg}");
-    Ok(())
-}
+let key = prepared.avatar_asset_key();
+let image = prepared.render()?;
+let svg = prepared.render_svg();
+let webp = prepared.encode(AvatarOutputFormat::WebP)?;
+
+assert_eq!(image.dimensions(), (256, 256));
+assert!(svg.starts_with("<svg "));
+assert!(!webp.is_empty());
+assert!(!key.to_hex().is_empty());
+
+# Ok::<(), Box<dyn std::error::Error>>(())
 ```
 
-Use `.automatic_style()` when you want kind, background, accessory, color,
-expression, and shape to be derived from distinct identity digest bytes.
+Preparation validates the specification, resolves style compatibility, and
+freezes the identity/spec/style tuple used by layout reports, resource budgets,
+cache keys, rendering, SVG, and encoding.
+
+## Automatic Style
+
+Derive family, background, accessory, accent color, expression, and frame from
+distinct identity digest bytes:
 
 ```rust
 use hashavatar::prelude::*;
 
-fn main() -> Result<(), AvatarError> {
-    let bytes = AvatarBuilder::for_id("user@example.com")
-        .size(256, 256)
-        .automatic_style()
-        .encode(AvatarOutputFormat::WebP)?;
+let identity = AvatarIdentity::new("user@example.com")?;
+let prepared = AvatarRequest::builder(identity)
+    .size(256, 256)
+    .automatic_style()
+    .prepare()?;
 
-    println!("{} bytes", bytes.len());
-    Ok(())
-}
+let style = prepared.resolved_style();
+let bytes = prepared.encode(AvatarOutputFormat::WebP)?;
+
+assert!(style.is_automatically_derived());
+assert!(!bytes.is_empty());
+
+# Ok::<(), Box<dyn std::error::Error>>(())
 ```
 
-For new cache storage, use the typed keys rather than assembling cache keys
-from labels or internal digest bytes. The identity key identifies only the
-derived identity, the avatar key adds the effective render tuple, and the
-semantic encoded key also adds the format's fixed encoder contract. Ignored
-accessory and expression values are canonicalized for families without face
-anchors, so identical legacy output cannot create redundant cache entries.
+Automatic mapping is deterministic. Changing the identity hash mode, tenant,
+style version, size, seed, or style inputs deliberately changes the output and
+its typed asset key.
+
+## Explicit Style Validation
+
+`AvatarRequest` rejects explicit accessories and expressions that a family
+cannot render. This is the recommended boundary for user-selected styles:
 
 ```rust
 use hashavatar::prelude::*;
 
-fn main() -> Result<(), AvatarError> {
-    let avatar = AvatarBuilder::for_id("user@example.com")
-        .namespace("tenant-a", "v2")
-        .kind(AvatarKind::Robot)
-        .background(AvatarBackground::Transparent);
+let identity = AvatarIdentity::new("user@example.com")?;
+let prepared = AvatarRequest::builder(identity)
+    .kind(AvatarKind::Cat)
+    .background(AvatarBackground::Ocean)
+    .accessory(AvatarAccessory::Hat)
+    .expression(AvatarExpression::Winking)
+    .shape(AvatarShape::Squircle)
+    .prepare()?;
 
-    println!("identity={}", avatar.identity_cache_key()?);
-    println!("avatar={}", avatar.avatar_asset_key()?);
-    println!(
-        "webp={}",
-        avatar.encoded_asset_key(AvatarOutputFormat::WebP)?
-    );
-    Ok(())
-}
+assert!(prepared
+    .layout_report()
+    .family_capabilities()
+    .supports_accessories());
+
+# Ok::<(), Box<dyn std::error::Error>>(())
 ```
 
-`encoded_asset_key()` is a semantic request key. Encoder dependency versions,
-the compilation target, build flags, and the application revision can still
-change encoded bytes. Applications that share byte caches across deployments
-should compute a 32-byte digest over those deployment inputs and bind it with
-`EncoderBuildId`:
+Legacy `AvatarBuilder` and free functions preserve their 1.x deterministic
+skip behavior for unsupported face layers. Existing code can opt into strict
+validation with `.strict_style_validation()` or migrate with `.prepare()`.
+Use `.legacy_v1_compatibility()` on a new request only when reproducing old
+output intentionally; `resolved_style()` reports any ignored layer.
+
+## Concise Builder
+
+For a short established workflow:
 
 ```rust
 use hashavatar::prelude::*;
 
-fn deployment_webp_key(
-    encoder_build_digest: [u8; 32],
-) -> Result<BuildEncodedAssetKey, AvatarError> {
-    AvatarBuilder::for_id("user@example.com")
-        .namespace("tenant-a", "v2")
-        .encoded_asset_key_for_build(
-            AvatarOutputFormat::WebP,
-            EncoderBuildId::from_bytes(encoder_build_digest),
-        )
-}
+let svg = AvatarBuilder::for_id("user@example.com")
+    .size(256, 256)
+    .namespace("tenant-a", "avatars-v2")
+    .kind(AvatarKind::Fox)
+    .background(AvatarBackground::Starry)
+    .shape(AvatarShape::Circle)
+    .render_svg()?;
+
+assert!(svg.contains("fox avatar"));
+
+# Ok::<(), AvatarError>(())
 ```
 
-For content-addressable integrity, encode first and hash the actual returned
-bytes. Predictive asset keys, including build-bound keys, are cache-routing
-identifiers rather than proofs of byte equality.
+The builder owns or borrows the supplied identifier until consumed. Cloning a
+builder may create another identifier copy. For sensitive identifiers, prefer
+a short-lived borrow from protected storage or pass a keyed pseudonym.
 
-Keep typed keys intact until the storage boundary. Calling `to_hex()` or
-`to_string()` necessarily erases Rust's distinction between
-`SemanticEncodedAssetKey` and `BuildEncodedAssetKey`, so a byte-exact cache
-adapter should accept `BuildEncodedAssetKey` directly and serialize internally:
+## Namespaces
 
-```rust
-use hashavatar::BuildEncodedAssetKey;
-
-fn deployment_cache_storage_key(key: BuildEncodedAssetKey) -> String {
-    key.to_hex()
-}
-```
-
-Avoid application-level byte-cache APIs that accept an arbitrary `String` key;
-those interfaces allow a semantic key to be supplied accidentally.
-
-`AvatarIdentity::cache_key()` and `AvatarBuilder::cache_key()` remain available
-with their exact 1.1 output for existing caches. New integrations should prefer
-the typed keys because their domains explicitly include the active identity
-hash mode and all inputs that affect rendered or encoded assets.
-
-All cache keys are stable and display-safe, but they still allow correlation:
-the same tuple maps to the same key. An opaque cache key is not a password hash;
-an attacker who obtains one can still test a dictionary of likely email
-addresses, usernames, or personnel identifiers offline.
-
-When explicit styles originate from users, opt into strict validation so a
-family cannot silently skip an unsupported face layer:
+Namespaces separate the same identifier across tenants, products, and visual
+rollouts:
 
 ```rust
 use hashavatar::prelude::*;
 
-fn main() -> Result<(), StrictAvatarError> {
-    let image = AvatarBuilder::for_id("user@example.com")
-        .kind(AvatarKind::Robot)
-        .accessory(AvatarAccessory::Glasses)
-        .expression(AvatarExpression::Happy)
-        .strict_style_validation()
-        .render()?;
+let a = AvatarIdentity::new_with_namespace(
+    AvatarNamespace::new("customer-a", "v1")?,
+    "user-123",
+)?;
+let b = AvatarIdentity::new_with_namespace(
+    AvatarNamespace::new("customer-b", "v1")?,
+    "user-123",
+)?;
 
-    assert_eq!(image.dimensions(), (256, 256));
-    Ok(())
-}
+assert_ne!(a.cache_key(), b.cache_key());
+
+# Ok::<(), Box<dyn std::error::Error>>(())
 ```
 
-Legacy render methods continue to skip accessories and expressions on families
-without face anchors. `AvatarStyleOptions::validate_strict()` and
-`StrictAvatarBuilder` provide the additive fail-closed path.
+Namespace components are length-prefixed before hashing, so embedded separator
+bytes cannot create tenant/style ambiguity. Treat `style_version` as an
+application-controlled visual rollout identifier.
 
-For sensitive, guessable identifiers, derive a keyed pseudonym at the service
-boundary and pass only that pseudonym to `hashavatar`. Keep the key in a KMS or
-equivalent secret store and use a separate key per security domain or tenant.
-For example, using keyed BLAKE3 from the sanitization sister crate:
+## Caller-Owned Output
+
+Render into validated tightly packed or padded RGBA8 storage:
+
+```rust
+use hashavatar::prelude::*;
+
+let identity = AvatarIdentity::new("user-123")?;
+let prepared = AvatarRequest::builder(identity).size(128, 128).prepare()?;
+let budget = prepared.resource_budget();
+let mut pixels = vec![0_u8; budget.minimum_rgba8_surface_bytes()];
+let mut surface = RasterSurfaceMut::new_rgba8(
+    &mut pixels,
+    prepared.spec().width(),
+    prepared.spec().height(),
+    budget.minimum_rgba8_stride(),
+)?;
+
+prepared.render_into(&mut surface)?;
+
+# Ok::<(), Box<dyn std::error::Error>>(())
+```
+
+The 1.x adapter still uses one sanitized temporary `RgbaImage`; this API makes
+destination ownership and stride explicit but is not a zero-allocation claim.
+Caller padding is preserved. Dimension, stride, capacity, renderer-shape, and
+row-count mismatches fail closed before success is reported.
+
+Write SVG or encoded output into a caller-owned sink:
+
+```rust
+use hashavatar::prelude::*;
+
+let identity = AvatarIdentity::new("user-123")?;
+let prepared = AvatarRequest::builder(identity).automatic_style().prepare()?;
+let mut svg = Vec::new();
+let mut webp = Vec::new();
+
+prepared.write_svg(&mut svg)?;
+prepared.encode_to_writer(AvatarOutputFormat::WebP, &mut webp)?;
+
+assert!(svg.starts_with(b"<svg "));
+assert!(!webp.is_empty());
+
+# Ok::<(), Box<dyn std::error::Error>>(())
+```
+
+Partial output remains caller-owned if a writer or codec fails. SVG currently
+builds one temporary `String`, and codecs may allocate private scratch buffers.
+
+## Typed Cache Keys
+
+Keep key types distinct until the storage boundary:
+
+```rust
+use hashavatar::prelude::*;
+
+let identity = AvatarIdentity::new("user-123")?;
+let prepared = AvatarRequest::builder(identity)
+    .size(256, 256)
+    .automatic_style()
+    .prepare()?;
+
+let identity_key: IdentityCacheKey = prepared.identity_cache_key();
+let avatar_key: AvatarAssetKey = prepared.avatar_asset_key();
+let semantic_webp: SemanticEncodedAssetKey =
+    prepared.encoded_asset_key(AvatarOutputFormat::WebP);
+let deployment_webp: BuildEncodedAssetKey = prepared.encoded_asset_key_for_build(
+    AvatarOutputFormat::WebP,
+    EncoderBuildId::from_bytes([7_u8; 32]),
+);
+
+assert_ne!(identity_key.to_hex(), avatar_key.to_hex());
+assert_ne!(semantic_webp.to_hex(), deployment_webp.to_hex());
+
+# Ok::<(), Box<dyn std::error::Error>>(())
+```
+
+- `IdentityCacheKey` binds the active identity mode and identity.
+- `AvatarAssetKey` adds the complete effective render tuple.
+- `SemanticEncodedAssetKey` adds the fixed format contract.
+- `BuildEncodedAssetKey` adds a caller-supplied deployment/encoder build ID.
+
+These are cache-routing identifiers, not proofs that independently built
+encoded bytes are identical. Hash actual output bytes for content-addressable
+integrity. Keys are display-safe but correlatable and do not make guessable
+identifiers anonymous.
+
+## Visual Options
+
+All public option enums provide `ALL`, `from_byte`, `as_str`, `Display`, and
+`FromStr`. The optional `serde` feature serializes style enums with the same
+lowercase labels.
+
+| Type | Values |
+| --- | --- |
+| `AvatarKind` | `cat`, `dog`, `robot`, `fox`, `alien`, `monster`, `ghost`, `slime`, `bird`, `wizard`, `skull`, `paws`, `planet`, `rocket`, `mushroom`, `cactus`, `frog`, `panda`, `cupcake`, `pizza`, `icecream`, `octopus`, `knight`, `bear`, `penguin`, `dragon`, `ninja`, `astronaut`, `diamond`, `coffee-cup`, `shield` |
+| `AvatarBackground` | `themed`, `white`, `black`, `dark`, `light`, `transparent`, `polka-dot`, `striped`, `checkerboard`, `grid`, `sunrise`, `ocean`, `starry` |
+| `AvatarAccessory` | `none`, `glasses`, `hat`, `headphones`, `crown`, `bowtie`, `eyepatch`, `scarf`, `halo`, `horns` |
+| `AvatarColor` | `default`, `neon-mint`, `pastel-pink`, `crimson`, `gold`, `deep-sea-blue` |
+| `AvatarExpression` | `default`, `happy`, `grumpy`, `surprised`, `sleepy`, `winking`, `cool`, `crying` |
+| `AvatarShape` | `square`, `circle`, `squircle`, `hexagon`, `octagon` |
+
+One `AvatarStyleOptions` value has one accessory slot. Families without face
+anchors reject explicit accessories/expressions in strict mode and skip them
+deterministically in legacy mode. Query parsers should reject unknown labels
+instead of silently mapping them to defaults.
+
+## Output Formats
+
+| Output | Feature | Notes |
+| --- | --- | --- |
+| WebP | built in | Default in-memory raster encoder |
+| SVG | built in | Numeric generated markup returned as text or written to a sink |
+| PNG | `png` | Optional lossless raster encoder |
+| JPEG | `jpeg` | Optional; alpha is flattened over white |
+| GIF | `gif` | Optional single-frame encoder with codec-owned quantization buffers |
+| All optional raster formats | `all-formats` | Enables PNG, JPEG, and GIF |
+
+AVIF is under 2.0 dependency and security review. JPEG XL is not currently
+planned. The default graph does not include optional encoders.
+
+## Identity Hash Modes
+
+The default build uses SHA-512. Select at most one optional crate-wide mode:
+
+| Mode | Cargo feature | Intended use |
+| --- | --- | --- |
+| SHA-512 | none | Default cryptographic identity derivation |
+| BLAKE3 | `blake3` | Cryptographic identity derivation with upstream platform acceleration |
+| XXH3-128 | `xxh3` | Fast non-adversarial visual distribution only |
+
+XXH3-128 is not collision-resistant. Do not use it directly with
+attacker-controlled or sensitive identifiers. Changing modes changes identities
+and output; coordinate it with namespace `style_version` and cache invalidation.
+
+For sensitive, guessable identifiers, map the raw identifier through a keyed
+pseudonym at the application boundary:
 
 ```toml
 [dependencies]
@@ -370,774 +374,172 @@ sanitization-crypto-interop = { version = "2.0.1", features = ["blake3"] }
 ```
 
 ```rust
-use hashavatar::{AvatarBuilder, AvatarError, IdentityCacheKey};
+use hashavatar::{AvatarIdentity, AvatarIdentityError};
 use sanitization::Secret;
 use sanitization_crypto_interop::blake3::blake3_keyed_digest;
 
-fn sensitive_identity_cache_key(
+fn protected_identity(
     tenant_key: &Secret<[u8; 32]>,
     raw_identity: &[u8],
-) -> Result<IdentityCacheKey, AvatarError> {
+) -> Result<AvatarIdentity, AvatarIdentityError> {
     let pseudonym = Secret::new(
         tenant_key.with_secret(|key| blake3_keyed_digest(key, raw_identity)),
     );
-
-    pseudonym.with_secret(|id| AvatarBuilder::for_id(id).identity_cache_key())
+    pseudonym.with_secret(|bytes| AvatarIdentity::new(bytes))
 }
 ```
 
-The pseudonym is an avatar identifier, not an authentication token. Rotating
-the tenant key deliberately changes avatar/cache identity, so coordinate key
-rotation with cache invalidation and visual-stability requirements. The caller
-still owns and must handle the raw identifier according to its own memory and
-logging policy.
+Keep tenant keys in an appropriate key-management boundary. The pseudonym is
+still an avatar identifier, not an authentication token.
 
-## Prepared Request API
-
-New integrations and applications preparing for 2.0 can derive an identity
-once and freeze validation, effective style, metadata, resource accounting,
-cache keys, and output behind `PreparedAvatar`:
-
-```rust
-use hashavatar::prelude::*;
-
-let namespace = AvatarNamespace::new("tenant-a", "v2")?;
-let identity = AvatarIdentity::new_with_namespace(namespace, "user-123")?;
-let prepared = AvatarRequest::builder(identity)
-    .size(256, 256)
-    .kind(AvatarKind::Robot)
-    .background(AvatarBackground::Transparent)
-    .accessory(AvatarAccessory::Glasses)
-    .shape(AvatarShape::Circle)
-    .prepare()?;
-
-let report = prepared.layout_report();
-let budget = prepared.resource_budget();
-let cache_key = prepared.avatar_asset_key();
-let webp = prepared.encode(AvatarOutputFormat::WebP)?;
-
-assert!(report.family_capabilities().supports_accessories());
-assert_eq!(budget.minimum_rgba8_surface_bytes(), 256 * 256 * 4);
-assert!(!cache_key.to_hex().is_empty());
-assert!(!webp.is_empty());
-
-# Ok::<(), Box<dyn std::error::Error>>(())
-```
-
-Explicit `AvatarRequest` styles are strict by default, so unsupported
-accessory or expression selections return `AvatarRequestError::Style`. Use
-`.legacy_v1_compatibility()` only when reproducing the old deterministic skip
-behavior; `resolved_style()` then reports requested and effective values.
-Existing `AvatarBuilder` and `StrictAvatarBuilder` values can adopt this
-workflow with `.prepare()` without changing their compatibility policy.
-
-`PreparedAvatar::write_svg()` and `encode_to_writer()` write to caller-owned
-sinks. `render_into()` accepts a validated RGBA8 surface with an explicit row
-stride. These are ownership adapters, not zero-allocation claims: the 1.x
-renderer still creates one temporary `RgbaImage`, SVG still creates a temporary
-`String`, and codecs can allocate format-specific scratch buffers. Use
-`minimum_render_into_known_rgba_bytes()` only for tightly packed surfaces and
-`render_into_known_rgba_bytes_for()` for an actual declared strided surface.
-`encode_vec_known_base_bytes()` includes the returned vector's initial reserve;
-`encode_writer_known_base_bytes()` does not. Neither encoding estimate includes
-codec scratch space or later output-buffer growth. Enforce aggregate
-concurrency with the helper matching the actual output path.
-
-See [docs/MIGRATION_2.0.md](docs/MIGRATION_2.0.md) for cache migration,
-surface setup, writer failure semantics, and the exact 1.x compatibility
-decision.
-
-## Stable Contract
-
-The `1.x` series keeps the crate's public API shape and documented rendering contract stable.
-Patch releases should not intentionally change output for the same explicit
-rendering tuple except for correctness or security fixes. Minor releases may
-add source-compatible APIs and opt-in capabilities, but the current public
-option enums are exhaustive and their variants remain frozen for 1.x. The 2.0
-line introduces explicitly versioned catalog evolution. `CatalogVersion::LEGACY_V1`
-and `RenderContractId::LEGACY_V1` now name the frozen 1.x mappings and renderer
-behavior directly. Services that need precise visual rollout control should
-continue using namespace `style_version` values deliberately.
-
-See [docs/STABILITY.md](docs/STABILITY.md) for the full semver and rendering
-policy.
-
-## Limits
+## Limits And Resource Policy
 
 | Limit | Value |
 | --- | --- |
-| Minimum width/height | `64` |
-| Maximum width/height | `2048` |
+| Width and height | `64..=2048` pixels |
 | Maximum raster pixels | `4,194,304` |
-| Maximum raw RGBA buffer | `16,777,216` bytes |
+| Maximum raw RGBA8 buffer | `16,777,216` bytes |
 | Maximum identity input | `1024` bytes |
 | Maximum namespace tenant | `128` bytes |
 | Maximum namespace style version | `128` bytes |
 
-These limits are enforced by constructors and render entry points. They are intended to make the safe path the normal path for public web endpoints.
-
-`AvatarSpec::default()` is a fixed deterministic convenience value:
-`256x256` with seed `1`. Public services should normally construct
-`AvatarSpec` from validated request parameters with `AvatarSpec::new(...)`
-rather than treating `Default` as a production policy or source of randomness.
-The `seed` argument is a caller-controlled style variant mixed into the
-identity-derived renderer RNG. Changing it deliberately produces a different
-deterministic visual variant for the same identity; it is not a replacement for
-identity hashing or namespace style-version rollouts.
-
-## Public Option Catalog
-
-All public option enums expose an `ALL` slice, `from_byte`, `as_str`,
-`Display`, and `FromStr` support. With the optional `serde` feature enabled,
-these enums serialize and deserialize as the same lowercase string labels.
-Byte-to-variant mapping remains compatible with the frozen legacy catalog.
-`LEGACY_AVATAR_KINDS` and the corresponding background/accessory/color/
-expression/shape catalogs expose explicit stable IDs and weights. Because the
-public enums are exhaustive, their variants, `ALL` lists, IDs, weights, and
-automatic mapping remain frozen for the rest of 1.x.
-
-| Enum | Controls | Values |
-| --- | --- | --- |
-| `AvatarKind` | Base avatar family | `cat`, `dog`, `robot`, `fox`, `alien`, `monster`, `ghost`, `slime`, `bird`, `wizard`, `skull`, `paws`, `planet`, `rocket`, `mushroom`, `cactus`, `frog`, `panda`, `cupcake`, `pizza`, `icecream`, `octopus`, `knight`, `bear`, `penguin`, `dragon`, `ninja`, `astronaut`, `diamond`, `coffee-cup`, `shield` |
-| `AvatarBackground` | Canvas/background treatment | `themed`, `white`, `black`, `dark`, `light`, `transparent`, `polka-dot`, `striped`, `checkerboard`, `grid`, `sunrise`, `ocean`, `starry` |
-| `AvatarAccessory` | Optional accessory layer | `none`, `glasses`, `hat`, `headphones`, `crown`, `bowtie`, `eyepatch`, `scarf`, `halo`, `horns` |
-| `AvatarColor` | Optional accent palette | `default`, `neon-mint`, `pastel-pink`, `crimson`, `gold`, `deep-sea-blue` |
-| `AvatarExpression` | Optional expression overlay | `default`, `happy`, `grumpy`, `surprised`, `sleepy`, `winking`, `cool`, `crying` |
-| `AvatarShape` | Optional frame shape | `square`, `circle`, `squircle`, `hexagon`, `octagon` |
-| `AvatarOutputFormat` | Raster encoding format | `webp`; optional `png`, `jpg`, and `gif` with matching Cargo features |
-
-`AvatarOptions` is the stable baseline option type for callers that only need
-`kind` and `background`. `AvatarStyleOptions` carries the full visual style
-tuple: `kind`, `background`, `accessory`, `color`, `expression`, and `shape`.
-
-Each style has one accessory slot. For example, a caller can request
-`eyepatch` or `hat`, but not both in the same `AvatarStyleOptions`. Keeping one
-slot avoids ambiguous draw order and collision rules; a future version can add
-typed accessory slots if the project needs combinations such as headwear plus
-facewear.
-
-Accessories and expressions require face anchors. These families currently have
-calibrated face-layer anchors: `cat`, `dog`, `robot`, `fox`, `alien`,
-`monster`, `ghost`, `slime`, `bird`, `wizard`, `skull`, `frog`, `panda`,
-`octopus`, `knight`, `bear`, `penguin`, `dragon`, `ninja`, and `astronaut`.
-Non-face families such as `paws`, `planet`, `rocket`, `diamond`,
-`coffee-cup`, and `shield` skip accessory/expression layers deterministically
-instead of placing them at arbitrary canvas coordinates. Accent colors and
-frame shapes are canvas-level layers and still apply.
-
-Use `AvatarKind::capabilities()` or the `LEGACY_FAMILY_CAPABILITIES` manifest
-when mapping public endpoint query parameters. Legacy rendering accepts
-unsupported accessories and expressions as deterministic no-ops so automatic
-style derivation remains total. For explicit user choices, call
-`AvatarStyleOptions::validate_strict()` or finish the builder with
-`.strict_style_validation()` to reject those combinations before rendering.
-
-Suggested public endpoint query mapping:
-
-| Query parameter | Rust type | Validation |
-| --- | --- | --- |
-| `kind` | `AvatarKind` | Parse with `FromStr`; reject unsupported labels. |
-| `background` | `AvatarBackground` | Parse with `FromStr`; reject unsupported labels. |
-| `accessory` | `AvatarAccessory` | Parse with `FromStr`; use strict style validation to reject unsupported family combinations. |
-| `color` | `AvatarColor` | Parse with `FromStr`; `default` keeps the family palette. |
-| `expression` | `AvatarExpression` | Parse with `FromStr`; use strict style validation to reject unsupported family combinations. |
-| `shape` | `AvatarShape` | Parse with `FromStr`; applied as a raster mask and SVG clip path. |
-| `format` | `AvatarOutputFormat` | Parse with `FromStr`; SVG uses the `render_avatar_svg_*` APIs. |
-| `size` | `AvatarSpec` | Construct with `AvatarSpec::new`; reject invalid dimensions. |
-
-Keep request parsing, rate limiting, authentication, and concurrency limits in
-the API service. This crate intentionally only validates rendering inputs and
-returns typed errors.
-
-## Style Recipes
-
-These are useful starting points for public APIs and examples:
-
-| Use case | Suggested style |
-| --- | --- |
-| Stable classic avatars | `AvatarOptions::new(kind, background)` |
-| Fully automatic variety | `render_avatar_auto_for_id` or `AvatarStyleOptions::from_identity` |
-| Profile pictures with transparent backgrounds | `background = transparent`, `shape = circle` or `squircle` |
-| Dense UI lists | `shape = square`, `background = themed`, `accessory = none` |
-| Playful public profiles | One face accessory, one expression, one accent color, and a frame shape |
-| Security-sensitive services | SHA-512 or BLAKE3 identity derivation, stable namespace, explicit concurrency limits |
-
-For public query parameters, prefer parsing labels with `FromStr` and returning
-a normal validation error for unknown labels. Do not silently map unsupported
-strings to defaults; silent fallback makes cache keys and user expectations
-harder to reason about.
-
-## Example: Encode WebP
+Construct `AvatarSpec` from untrusted dimensions and propagate its typed error:
 
 ```rust
-use hashavatar::{
-    AvatarBackground, AvatarKind, AvatarOptions, AvatarOutputFormat, AvatarSpec,
-    encode_avatar_for_id,
-};
+use hashavatar::AvatarSpec;
 
-let spec = AvatarSpec::new(256, 256, 0)?;
-let bytes = encode_avatar_for_id(
-    spec,
-    "robot@hashavatar.app",
-    AvatarOutputFormat::WebP,
-    AvatarOptions::new(AvatarKind::Robot, AvatarBackground::Transparent),
-)?;
+let spec = AvatarSpec::new(512, 512, 0)?;
+let budget = spec.render_resource_budget(8);
 
-assert!(!bytes.is_empty());
+assert_eq!(budget.raw_rgba_bytes_per_render(), 512 * 512 * 4);
+assert_eq!(budget.raw_rgba_bytes_for_concurrent_renders(), 8 * 512 * 512 * 4);
 
 # Ok::<(), Box<dyn std::error::Error>>(())
 ```
 
-The returned bytes can be sent as an HTTP response, uploaded to object storage, written to a caller-selected path, or cached by a CDN.
+The crate bounds one request, not aggregate process memory or CPU. Services
+must enforce body limits, dimensions, concurrency, rate limits, authentication,
+cache policy, and response headers. Run CPU-heavy rendering away from async
+runtime worker threads and account for codec overhead above the raw RGBA budget.
 
-## Example: Render SVG
+## Sensitive Output Cleanup
 
-```rust
-use hashavatar::{
-    AvatarBackground, AvatarKind, AvatarOptions, AvatarSpec, render_avatar_svg_for_id,
-};
-
-let spec = AvatarSpec::new(256, 256, 0)?;
-let svg = render_avatar_svg_for_id(
-    spec,
-    "alien@hashavatar.app",
-    AvatarOptions::new(AvatarKind::Alien, AvatarBackground::Transparent),
-)?;
-
-assert!(svg.starts_with("<svg "));
-assert!(svg.contains("alien avatar"));
-
-# Ok::<(), Box<dyn std::error::Error>>(())
-```
-
-Use SVG when you need vector output, easy inspection, text storage, or post-processing by application code.
-
-## Example: Namespaced Tenants
+Internal identity preimages, digest owners, renderer seed copies, and temporary
+crate-owned raster/encoder buffers use `sanitization` cleanup boundaries where
+the dependency APIs permit it. Returned images, strings, encoded vectors, and
+caller surfaces belong to the caller.
 
 ```rust
-use hashavatar::{
-    AvatarBackground, AvatarKind, AvatarNamespace, AvatarOptions, AvatarOutputFormat,
-    AvatarSpec, encode_avatar_for_namespace,
-};
-
-let namespace = AvatarNamespace::new("customer-a", "v2")?;
-let spec = AvatarSpec::new(256, 256, 0)?;
-
-let bytes = encode_avatar_for_namespace(
-    spec,
-    namespace,
-    "user-123",
-    AvatarOutputFormat::WebP,
-    AvatarOptions::new(AvatarKind::Cat, AvatarBackground::Themed),
-)?;
-
-assert!(!bytes.is_empty());
-
-# Ok::<(), Box<dyn std::error::Error>>(())
-```
-
-Use namespaces when the same user identifier must not collide visually across tenants, products, or style-version rollouts.
-
-## Example: Deterministic Options From Bytes
-
-```rust
-use hashavatar::{AvatarBackground, AvatarKind, AvatarOptions};
-
-let digest_bytes = [42_u8, 199_u8];
-let options = AvatarOptions::new(
-    AvatarKind::from_byte(digest_bytes[0]),
-    AvatarBackground::from_byte(digest_bytes[1]),
-);
-
-assert!(AvatarKind::ALL.contains(&options.kind));
-assert!(AvatarBackground::ALL.contains(&options.background));
-```
-
-The `from_byte` helpers use each enum's `ALL` slice, so selection does not rely
-on duplicated modulo constants. The current exhaustive variants remain frozen
-for the rest of 1.x.
-
-## Example: Automatic Visual Layers
-
-```rust
-use hashavatar::{AvatarSpec, render_avatar_auto_for_id};
-
-let spec = AvatarSpec::new(256, 256, 0)?;
-let image = render_avatar_auto_for_id(spec, "layered@hashavatar.app")?;
-
-assert_eq!(image.width(), 256);
-
-# Ok::<(), Box<dyn std::error::Error>>(())
-```
-
-Automatic mode derives these top-level choices from distinct SHA-512 digest
-bytes:
-
-| Choice | Digest byte |
-| --- | --- |
-| `AvatarKind` | `AVATAR_STYLE_KIND_BYTE` |
-| `AvatarBackground` | `AVATAR_STYLE_BACKGROUND_BYTE` |
-| `AvatarAccessory` | `AVATAR_STYLE_ACCESSORY_BYTE` |
-| `AvatarColor` | `AVATAR_STYLE_COLOR_BYTE` |
-| `AvatarExpression` | `AVATAR_STYLE_EXPRESSION_BYTE` |
-| `AvatarShape` | `AVATAR_STYLE_SHAPE_BYTE` |
-
-## Example: Manual Visual Layers
-
-```rust
-use hashavatar::{
-    AvatarAccessory, AvatarBackground, AvatarColor, AvatarExpression, AvatarKind,
-    AvatarShape, AvatarSpec, AvatarStyleOptions, render_avatar_svg_style_for_id,
-};
-
-let spec = AvatarSpec::new(256, 256, 0)?;
-let style = AvatarStyleOptions::new(
-    AvatarKind::Robot,
-    AvatarBackground::Themed,
-    AvatarAccessory::Glasses,
-    AvatarColor::Gold,
-    AvatarExpression::Happy,
-    AvatarShape::Circle,
-);
-
-let svg = render_avatar_svg_style_for_id(spec, "robot@hashavatar.app", style)?;
-
-assert!(svg.contains("robot avatar"));
-assert!(svg.contains("accessory-glasses"));
-
-# Ok::<(), Box<dyn std::error::Error>>(())
-```
-
-Existing `AvatarOptions::new(kind, background)` callers keep the old baseline
-visual behavior. Use `AvatarStyleOptions::from_options(options)` when you want
-to pass legacy options through a style-aware API without enabling extra layers.
-Accessories and expressions are rendered only for avatar families with
-calibrated face anchors. Non-face families such as `paws`, `planet`, and
-`rocket` skip those layers deterministically instead of drawing them in
-misleading positions. Color and frame-shape layers still apply.
-
-`AvatarStyleOptions` intentionally has one accessory field. Applications that
-want multiple accessory concepts should model that at the product layer for now
-and choose the single most important `AvatarAccessory` before calling this
-crate.
-
-## Identity Hash Mode
-
-The default build uses SHA-512 identity derivation. Optional hash modes are
-crate-wide Cargo feature choices, not runtime API choices:
-
-- Default features: SHA-512.
-- `blake3`: BLAKE3.
-- `xxh3`: XXH3-128.
-
-The `blake3` and `xxh3` features are mutually exclusive. Enabling both is a
-compile-time error. Changing hash mode changes generated identities, so bump
-your namespace style version when intentionally migrating output.
-
-### BLAKE3 Feature Example
-
-```toml
-[dependencies]
-hashavatar = { version = "1.3.0", features = ["blake3"] }
-```
-
-```rust
-use hashavatar::{
-    AvatarBackground, AvatarKind, AvatarNamespace, AvatarOptions, AvatarSpec,
-    render_avatar_svg_for_namespace,
-};
-
-let namespace = AvatarNamespace::new("customer-a", "v3")?;
-let spec = AvatarSpec::new(256, 256, 0)?;
-
-let svg = render_avatar_svg_for_namespace(
-    spec,
-    namespace,
-    "user-123",
-    AvatarOptions::new(AvatarKind::Alien, AvatarBackground::Themed),
-)?;
-
-assert!(svg.contains("alien avatar"));
-
-# Ok::<(), Box<dyn std::error::Error>>(())
-```
-
-### XXH3-128 Feature Example
-
-```toml
-[dependencies]
-hashavatar = { version = "1.3.0", features = ["xxh3"] }
-```
-
-```rust
-use hashavatar::{
-    AvatarBackground, AvatarKind, AvatarNamespace, AvatarOptions,
-    AvatarOutputFormat, AvatarSpec, encode_avatar_for_namespace,
-};
-
-let namespace = AvatarNamespace::new("public-demo", "v3")?;
-let spec = AvatarSpec::new(256, 256, 0)?;
-
-let bytes = encode_avatar_for_namespace(
-    spec,
-    namespace,
-    "demo-user-123",
-    AvatarOutputFormat::WebP,
-    AvatarOptions::new(AvatarKind::Robot, AvatarBackground::Themed),
-)?;
-
-assert!(!bytes.is_empty());
-
-# Ok::<(), Box<dyn std::error::Error>>(())
-```
-
-XXH3-128 is fast and useful for non-adversarial distribution, but it is not a
-cryptographic hash. Keep SHA-512 or BLAKE3 for adversarial or user-controlled
-identity inputs.
-
-## Example: Raw Image Buffer
-
-```rust
-use hashavatar::{
-    AvatarBackground, AvatarKind, AvatarOptions, AvatarSpec, render_avatar_for_id,
-};
-
-let spec = AvatarSpec::new(128, 128, 0)?;
-let image = render_avatar_for_id(
-    spec,
-    "fox@hashavatar.app",
-    AvatarOptions::new(AvatarKind::Fox, AvatarBackground::Themed),
-)?;
-
-assert_eq!(image.width(), 128);
-assert_eq!(image.height(), 128);
-
-# Ok::<(), Box<dyn std::error::Error>>(())
-```
-
-Use raw buffers when the caller wants to composite, inspect pixels, run custom encoding, or integrate with an existing image pipeline.
-
-## Handling Untrusted Input
-
-```rust
-use hashavatar::{
-    AvatarBackground, AvatarKind, AvatarOptions, AvatarOutputFormat, AvatarSpec,
-    encode_avatar_for_id,
-};
-
-fn avatar_response_bytes(user_id: &str, requested_size: u32) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
-    let spec = AvatarSpec::new(requested_size, requested_size, 0)?;
-    let options = AvatarOptions::new(AvatarKind::Cat, AvatarBackground::Transparent);
-
-    encode_avatar_for_id(spec, user_id, AvatarOutputFormat::WebP, options)
-        .map_err(Into::into)
-}
-```
-
-The crate rejects unsupported sizes and oversized identities. Applications
-should still enforce their own routing, authentication, rate limiting, cache
-policy, response headers, request body limits, and concurrency limits. A single
-maximum-size raster render needs up to `MAX_AVATAR_RGBA_BYTES` raw RGBA bytes
-before encoder overhead, so public services should bound simultaneous large
-renders at the API layer.
-
-### Caller-Owned Output Cleanup
-
-Encode APIs sanitize internal temporary raster buffers after encoding, but the
-returned `Vec<u8>` belongs to the caller. Render APIs return an `RgbaImage`
-owned by the caller. High-assurance applications that treat avatar output as
-sensitive should clear those buffers after use:
-
-```rust
-use hashavatar::{
-    AvatarBackground, AvatarKind, AvatarOptions, AvatarOutputFormat, AvatarSpec,
-    encode_avatar_for_id, render_avatar_for_id,
-};
+use hashavatar::prelude::*;
 use sanitization::wipe;
 
 let spec = AvatarSpec::new(256, 256, 0)?;
 let options = AvatarOptions::new(AvatarKind::Cat, AvatarBackground::Transparent);
-
-let mut bytes = encode_avatar_for_id(
+let mut bytes = hashavatar::encode_avatar_for_id(
     spec,
-    "sensitive-user-id",
+    "sensitive-user",
     AvatarOutputFormat::WebP,
     options,
 )?;
-// Send, store, or otherwise consume `bytes`.
-wipe::vec(&mut bytes);
 
-let mut image = render_avatar_for_id(spec, "sensitive-user-id", options)?;
-// Composite, inspect, or encode `image`.
-wipe::bytes(image.as_mut());
+// Send or otherwise consume the output.
+wipe::vec(&mut bytes);
 
 # Ok::<(), Box<dyn std::error::Error>>(())
 ```
 
-### Concurrent Render Limits
-
-This crate bounds each individual render, not process-wide memory pressure.
-Public services should combine `MAX_AVATAR_RGBA_BYTES` with their own memory
-budget and reject or queue excess work. For example, a Tokio-based API can use
-a semaphore around render work:
-
-```rust
-use std::sync::Arc;
-
-use hashavatar::{
-    AvatarBackground, AvatarKind, AvatarOptions, AvatarRenderResourceBudget, AvatarSpec,
-    render_avatar_for_id,
-};
-use tokio::sync::Semaphore;
-
-fn render_permits_for_budget(memory_budget_bytes: usize) -> usize {
-    let max_spec = AvatarSpec::new(2048, 2048, 0).expect("maximum avatar spec is valid");
-    AvatarRenderResourceBudget::max_concurrent_renders_for_memory_budget(
-        max_spec,
-        memory_budget_bytes,
-    )
-    .max(1)
-}
-
-async fn render_with_limit(
-    semaphore: Arc<Semaphore>,
-    id: &str,
-    requested_size: u32,
-) -> Result<image::RgbaImage, Box<dyn std::error::Error>> {
-    let spec = AvatarSpec::new(requested_size, requested_size, 0)?;
-    let budget = spec.render_resource_budget(1);
-    if budget.raw_rgba_bytes_per_render() > memory_budget_bytes_for_one_request() {
-        return Err("requested avatar exceeds per-request render budget".into());
-    }
-
-    let _permit = semaphore.acquire().await?;
-    let options = AvatarOptions::new(AvatarKind::Cat, AvatarBackground::Transparent);
-
-    Ok(render_avatar_for_id(spec, id, options)?)
-}
-
-fn memory_budget_bytes_for_one_request() -> usize {
-    32 * 1024 * 1024
-}
-```
-
-For async web servers, run CPU-heavy rendering on an appropriate blocking
-worker pool when needed, and keep the semaphore at the service boundary so it
-accounts for all concurrent requests.
-
-## API Reference Summary
-
-Important public entry points:
-
-- `AvatarBuilder::for_id(id)` for fluent SVG, raster, encode, and cache-key workflows
-- `AvatarError` for high-level builder APIs
-- `AvatarSpec::new(width, height, seed) -> Result<AvatarSpec, AvatarSpecError>`
-- `AvatarSpec::render_resource_budget(concurrent_renders) -> AvatarRenderResourceBudget`
-- `AvatarRenderResourceBudget::max_concurrent_renders_for_memory_budget(spec, memory_budget_bytes) -> usize`
-- `AvatarIdentity::new(input) -> Result<AvatarIdentity, AvatarIdentityError>`
-- `AvatarIdentity::new_with_options(options, input) -> Result<AvatarIdentity, AvatarIdentityError>`
-- `AvatarIdentity::cache_key() -> String`
-- `AvatarIdentityOptions::new(namespace)`
-- `AvatarNamespace::new(tenant, style_version) -> Result<AvatarNamespace, AvatarIdentityError>`
-- `AvatarOptions::new(kind, background)`
-- `AvatarKind::supports_face_layers()`
-- `AvatarStyleOptions::new(kind, background, accessory, color, expression, shape)`
-- `AvatarStyleOptions::summary() -> String`
-- `AvatarStyleOptions::from_identity(identity)`
-- `encode_avatar_for_id(...)`
-- `encode_avatar_style_for_id(...)`
-- `encode_avatar_auto_for_id(...)`
-- `encode_avatar_for_namespace(...)`
-- `render_avatar_for_id(...)`
-- `render_avatar_style_for_id(...)`
-- `render_avatar_auto_for_id(...)`
-- `render_avatar_for_namespace(...)`
-- `render_avatar_with_identity_options(...)`
-- `render_avatar_svg_for_id(...)`
-- `render_avatar_svg_style_for_id(...)`
-- `render_avatar_svg_auto_for_id(...)`
-- `render_avatar_svg_for_namespace(...)`
-- `render_avatar_svg_with_identity_options(...)`
-
-Lower-level identity-specific renderers are available for callers that want direct control over a specific avatar family.
-
-## Output Formats
-
-| Format | API value | Notes |
-| --- | --- | --- |
-| WebP | `AvatarOutputFormat::WebP` | Default encoder and recommended format for modern web delivery. |
-| PNG | `AvatarOutputFormat::Png` | Optional `png` feature. Lossless and broadly compatible. |
-| JPEG | `AvatarOutputFormat::Jpeg` | Optional `jpeg` feature. Transparent pixels are composited over white. |
-| GIF | `AvatarOutputFormat::Gif` | Optional `gif` feature. Legacy-compatible single-frame output; the encoder performs internal quantization buffers that `hashavatar` cannot sanitize, so prefer WebP or PNG for high-assurance deployments. |
-| SVG | `render_avatar_svg_*` | Returns a string rather than raster bytes. |
-
-AVIF and JPEG XL are not exposed because they add dependency or encoder maturity tradeoffs that have not cleared the crate's dependency policy.
+Rendering and encoding are not constant-time. Geometry complexity, output size,
+and duration may vary with identity-derived choices. Do not treat avatar timing
+or output length as secret-preserving signals. See
+[Security Controls](https://github.com/valkyoth/hashavatar/blob/main/docs/SECURITY_CONTROLS.md)
+for accepted residuals and high-assurance service guidance.
 
 ## Determinism
 
-For a concrete crate release, the output is deterministic for the tuple:
+For one concrete release, output is deterministic for the effective tuple:
 
 ```text
-crate identity hash mode + namespace tenant + namespace style version + identity bytes + avatar kind + background + dimensions + seed
+identity mode + namespace + identity bytes + catalog/render contract
++ dimensions + seed + family + background + accessory + color
++ expression + shape + output format
 ```
 
-Within the `1.x` series, explicit output for that tuple should remain stable
-except for documented correctness or security fixes. This makes the crate
-suitable for stable CDN-backed avatar URLs and golden regression tests.
-Namespace hashing uses length-prefixed components, so embedded separator bytes
-cannot create tenant/style-version ambiguity. The default SHA-512 path keeps the
-pre-0.7 identity preimage stable; optional crate-wide hash modes are
-domain-separated.
+The 1.x corpus freezes one complete request, style, typed asset key, RGBA
+digest, and SVG digest for every family. The current 1.x renderer still uses
+floating-point family geometry and does not claim bit-identical raster output
+across every architecture and compiler configuration. The 2.0 canonical
+renderer is planned to replace that with fixed-point contracts.
 
-For style-aware rendering, the deterministic tuple also includes
-`accessory`, `color`, `expression`, and `shape`. Existing `AvatarOptions`
-entry points keep those extra layer choices at `none`, `default`, `default`,
-and `square`, so explicitly selected `AvatarOptions` output remains stable
-within a major release unless a documented correctness or security fix requires
-new output. Automatic style rendering derives choices through public `ALL`
-variant lists, which remain frozen with the exhaustive enums for the rest of
-1.x. The 2.0 migration will use explicitly versioned catalogs for future
-evolution. Services that need controlled rollouts should keep their existing
-namespace style version until they intentionally migrate. Some family/layer
-combinations are deterministic no-ops when the layer has no sensible anchor for
-that family.
+Applications requiring exact 1.x pixels should pin the latest `1.3.x` release.
+Read the [stability policy](https://github.com/valkyoth/hashavatar/blob/main/docs/STABILITY.md)
+and [2.0 migration guide](https://github.com/valkyoth/hashavatar/blob/main/docs/MIGRATION_2.0.md)
+before moving a persistent avatar or cache deployment across major versions.
 
-Frame shapes are applied as masks in raster output and as SVG clip paths in SVG
-output. Non-square shapes therefore trim the background, avatar body, color
-accent, accessory layer, and expression layer consistently before drawing the
-frame border.
+## Features
 
-The renderer still uses floating-point geometry in family-specific drawing
-paths. Frame-shape raster hit-testing uses integer arithmetic as of `1.0.0`,
-which reduces one source of platform rounding variance. The project tests
-golden fingerprints on the release platform, but it does not yet claim formal
-bit-identical raster output across every CPU architecture, compiler backend,
-and optimization mode.
+| Feature | Default | Effect |
+| --- | --- | --- |
+| `blake3` | no | Replaces SHA-512 identity derivation with BLAKE3 |
+| `xxh3` | no | Replaces SHA-512 with non-cryptographic XXH3-128 |
+| `png` | no | Adds PNG output |
+| `jpeg` | no | Adds JPEG output |
+| `gif` | no | Adds single-frame GIF output |
+| `all-formats` | no | Enables PNG, JPEG, and GIF |
+| `serde` | no | String serde for public style enums |
+| `kani` | no | Reserved verifier harness feature; no normal runtime API |
+| `fuzzing` | no | Internal fuzz surface; rejected in ordinary release builds |
 
-The procedural cat renderer seeds its internal RNG from bytes `32..64` of the
-identity digest and uses the lower digest bytes for direct visual parameters.
-That keeps RNG state separate from directly observed parameter bytes. The
-change intentionally updates cat-family golden fingerprints in `0.7.0`.
+Do not use `--all-features`: `blake3` and `xxh3` are intentionally mutually
+exclusive. The repository tests every valid hash/format combination.
 
-`AvatarIdentity` equality uses constant-time digest comparison. Rendering and
-encoding are not constant-time: shape counts, geometry, encoded size, and SVG
-length can vary with identity digest bytes. Applications with strict side
-channel requirements should not treat avatar render timing or output size as
-secret-preserving signals.
+## API Map
 
-When identity values are sensitive and an API must reduce render-time
-observability, add the mitigation at the service boundary where request timing
-is controlled:
+- `AvatarIdentity`, `AvatarNamespace`, and `AvatarIdentityOptions`: bounded,
+  domain-separated identity derivation.
+- `AvatarRequest`, `AvatarRequestBuilder`, and `PreparedAvatar`: recommended
+  validated request workflow.
+- `AvatarBuilder` and `StrictAvatarBuilder`: established concise workflow.
+- `AvatarSpec`: dimensions, seed, and raw render resource budget.
+- `AvatarStyleOptions`: family, background, accessory, color, expression, and
+  shape.
+- `ResolvedStyle`, `LayoutReport`, and `ResourceBudget`: prepared metadata and
+  effective behavior.
+- `RasterSurfaceMut`: checked caller-owned RGBA8 storage.
+- `AvatarOutputFormat`: enabled raster encoder selection.
+- `IdentityCacheKey`, `AvatarAssetKey`, `SemanticEncodedAssetKey`, and
+  `BuildEncodedAssetKey`: typed cache layers.
+- `AvatarError`, `AvatarRequestError`, `StrictAvatarError`,
+  `RasterSurfaceError`, and lower-level typed errors: non-panicking untrusted
+  input handling.
 
-```rust
-use std::time::{Duration, Instant};
+Complete signatures and per-item security notes are on
+[docs.rs](https://docs.rs/hashavatar).
 
-use hashavatar::{
-    AvatarBackground, AvatarKind, AvatarOptions, AvatarSpec, render_avatar_for_id,
-};
+## Project Documentation
 
-fn render_with_min_latency(
-    id: &str,
-    target_latency: Duration,
-) -> Result<image::RgbaImage, Box<dyn std::error::Error>> {
-    let started = Instant::now();
-    let spec = AvatarSpec::new(256, 256, 0)?;
-    let result = render_avatar_for_id(
-        spec,
-        id,
-        AvatarOptions::new(AvatarKind::Monster, AvatarBackground::Themed),
-    );
+- [Current status](https://github.com/valkyoth/hashavatar/blob/main/docs/CURRENT_STATUS.md)
+- [Security controls](https://github.com/valkyoth/hashavatar/blob/main/docs/SECURITY_CONTROLS.md)
+- [Dependency policy](https://github.com/valkyoth/hashavatar/blob/main/docs/DEPENDENCIES.md)
+- [Stability and versioning](https://github.com/valkyoth/hashavatar/blob/main/docs/STABILITY.md)
+- [Panic policy](https://github.com/valkyoth/hashavatar/blob/main/docs/PANIC_POLICY.md)
+- [Kani proof scope](https://github.com/valkyoth/hashavatar/blob/main/docs/KANI.md)
+- [Release process](https://github.com/valkyoth/hashavatar/blob/main/docs/RELEASE.md)
+- [2.0 migration](https://github.com/valkyoth/hashavatar/blob/main/docs/MIGRATION_2.0.md)
+- [2.0 implementation plan](https://github.com/valkyoth/hashavatar/blob/main/docs/PLAN_TOWARDS_2.0.md)
+- [Provenance](https://github.com/valkyoth/hashavatar/blob/main/docs/PROVENANCE.md)
+- [Release notes](https://github.com/valkyoth/hashavatar/tree/main/release-notes)
+- [Changelog](https://github.com/valkyoth/hashavatar/blob/main/CHANGELOG.md)
 
-    let elapsed = started.elapsed();
-    if elapsed < target_latency {
-        std::thread::sleep(target_latency - elapsed);
-    }
+## Website
 
-    Ok(result?)
-}
-```
-
-For public web services, prefer CDN caching and stable cache keys so repeated
-requests for the same avatar do not repeatedly expose renderer timing. In async
-servers, use an async timer rather than blocking a runtime worker thread.
-
-Encode APIs clear temporary raster buffers after encoding. Returned `Vec<u8>`
-encoded bytes and `RgbaImage` render outputs are caller-owned; applications
-with strict memory-sanitization requirements should clear those buffers after
-use.
-
-## Testing And Release Evidence
-
-The repository includes:
-
-- same-input stability tests
-- different-input divergence tests
-- raster export round-trip tests
-- SVG safety and compactness tests
-- enum parsing tests
-- automatic visual layer derivation tests
-- style-aware raster and SVG layer tests
-- transparent background checks
-- golden visual fingerprint tests
-- fixed-pixel encoder fingerprints in every valid SHA-512, BLAKE3, and XXH3
-  feature matrix
-- fuzz harness compilation
-- bounded Kani proof run; ordinary check mode reports unavailable tooling as an
-  explicit skip, while stable release mode requires the verifier
-- `cargo deny` policy
-- RustSec advisory scanning
-- byte-identical `.crate` package reproducibility checks
-- SBOM generation, required by stable release mode
-- crates.io publish dry run
-
-Run the standard local gate:
-
-```bash
-scripts/checks.sh
-```
-
-Run the fuller release gate:
-
-```bash
-scripts/stable_release_gate.sh check
-```
-
-## Kani Proofs
-
-`hashavatar` includes a small Kani proof set for bounded arithmetic invariants:
-validated avatar dimensions, render-resource memory math, and rectangle
-intersection bounds. This is scoped release evidence, not a claim that the full
-renderer, encoders, hash functions, or RNG internals are formally verified.
-
-To run the admitted proof set locally, install Kani and use the documented Rust
-`1.90.0` verifier toolchain:
-
-```bash
-cargo kani --version
-scripts/check_kani.sh
-```
-
-If Kani or the verifier toolchain is unavailable, the script prints an explicit
-skip. See [docs/KANI.md](docs/KANI.md) for the full policy.
-
-## Provenance
-
-The repository is intended to remain code-generated and asset-free. For a direct statement of how the visuals are produced, see [PROVENANCE.md](PROVENANCE.md).
-
-## Web API And Demo
-
-The crate is focused on reusable rendering code. The public generator and
-reference website live in the separate
-[`hashavatar-website`](https://github.com/valkyoth/hashavatar-website) project.
-
-## Changelog
-
-See [CHANGELOG.md](CHANGELOG.md) and [docs/release-notes](docs/release-notes)
-for version-by-version details.
+The public generator and integration reference live in
+[`hashavatar-website`](https://github.com/valkyoth/hashavatar-website). HTTP
+routing, response headers, caching, blocking-worker policy, rate limits, and
+abuse controls remain application concerns.
 
 ## License
 
-Licensed under either of:
+Licensed under either:
 
-- Apache License, Version 2.0 ([LICENSE-APACHE](LICENSE-APACHE))
-- MIT license ([LICENSE-MIT](LICENSE-MIT))
+- [Apache License 2.0](https://github.com/valkyoth/hashavatar/blob/main/LICENSE-APACHE)
+- [MIT License](https://github.com/valkyoth/hashavatar/blob/main/LICENSE-MIT)

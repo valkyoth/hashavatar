@@ -1,5 +1,22 @@
 # Changelog
 
+## Unreleased
+
+- Reorganized repository documentation under `docs/`, moved immutable release
+  notes to the root `release-notes/` directory, and added a permanent
+  `security/pentest/` evidence convention for each 2.0 prerelease and stable
+  tag.
+- Rewrote the canonical crate/GitHub README as a technical integration guide
+  centered on prepared requests, strict style validation, caller-owned output,
+  typed cache keys, resource limits, and security boundaries.
+- Added a workspace-aware release manifest and self-tested release script that
+  validates dependency order, packages every workspace crate, prohibits
+  crates.io publication for prereleases, and requires a clean signed stable
+  tag plus permanent pentest evidence before publication.
+- Documented the maintained `release/1.3` branch, source-only 2.0 prerelease
+  policy, future companion-crate README policy, and crate version matrix.
+- No runtime behavior or published 1.3.0 package metadata changed.
+
 ## 1.3.0
 
 - Added the additive `AvatarRequest`/`AvatarRequestBuilder` and immutable
@@ -114,7 +131,7 @@
 - Clarified that all current public option enums are exhaustive and that adding
   variants is a breaking change reserved for 2.0, rather than a 1.x minor
   release.
-- Made `plan-towards-2.0.0.md` the accepted future roadmap and marked
+- Made `docs/PLAN_TOWARDS_2.0.md` the accepted future roadmap and marked
   `docs/VERSION_PLAN.md` as historical context.
 - Documented that the crate remains a single package through `1.3.0` and that
   the workspace split begins at `2.0.0-alpha.1`.

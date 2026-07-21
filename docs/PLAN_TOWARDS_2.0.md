@@ -1,8 +1,8 @@
 # hashavatar Plan Towards 2.0.0
 
-Status: accepted direction, 1.x preparation in progress
+Status: accepted direction, 1.x preparation complete
 
-Current stable line: `1.2.x`
+Current stable line: `1.3.x` on the `release/1.3` maintenance branch
 
 Target: a polished, security-oriented Rust rendering workspace with a canonical
 safe-Rust CPU renderer, SVG generated from the same private fixed-point scene,
@@ -10,11 +10,11 @@ established raster formats plus AVIF, heapless rendering, a bounded schema
 adapter, and an optional GPU backend behind focused crate boundaries.
 
 This plan incorporates the architecture, contracts, and public API recommended
-in `gapanalysis.md`, but supersedes its recommendation to defer GPU, AVIF,
-schema, and heapless storage. Those four components are now explicit 2.0
-requirements. It also supersedes the broader sequence in `2.0-idea.md`; both
-analyses remain useful background, while this document defines release scope
-and finish lines.
+in `docs/archive/GAP_ANALYSIS_2.0.md`, but supersedes its recommendation to
+defer GPU, AVIF, schema, and heapless storage. Those four components are now
+explicit 2.0 requirements. It also supersedes the broader sequence in
+`docs/archive/2.0-idea.md`; both analyses remain useful background, while this
+document defines release scope and finish lines.
 
 The versions below are not a maximum or a demand to combine work. Add a patch
 release or split an alpha/beta before implementation whenever one milestone is
@@ -559,7 +559,7 @@ pixels does not make bytes stable across dependency upgrades.
 - Commit a semantic SPDX SBOM and compare stable package, version, license,
   checksum, reference, and relationship fields against fresh generation.
 - Give every version a version-specific local verification command, release
-  notes under `docs/release-notes/`, explicit known limitations, dependency
+  notes under `release-notes/`, explicit known limitations, dependency
   evidence, and updated threat/security documentation where behavior changes.
 - Use cargo-semver-checks or equivalent API snapshots after beta.1.
 - Test downstream consumers from packaged archives, not only workspace paths.
@@ -671,9 +671,8 @@ identity implementation also receives focused cryptographic review.
 
 ### v1.3.0 - Migration API And Corpus
 
-**Status:** Implementation stop reached. The full local stable release gate
-passed; independent pentest, GitHub validation, and downstream
-`hashavatar-website` testing remain before tagging.
+**Status:** Released as `v1.3.0`. The supported maintenance line lives on
+`release/1.3`; only serious security and correctness fixes are backported.
 
 **Goal:** Let real applications exercise the future workflow before the 2.0
 engine replaces rendering internals.
@@ -702,9 +701,12 @@ real downstream demand justifies maintaining and auditing two renderers.
 
 ## 2.0 Alpha Releases
 
-Alpha APIs and pixels may change. Each alpha must compile examples, publish its
-current limitations, and pass the repository's local and GitHub gates. The
-sequence contains release-critical work only.
+Alpha APIs and pixels may change. Each alpha must compile examples, document
+its current limitations, and pass the repository's local and GitHub gates. The
+sequence contains release-critical work only. Alpha, beta, and release-
+candidate tags are pushed to GitHub for local downstream testing but are not
+published to crates.io; crates.io publication begins with the approved stable
+`2.0.0` workspace.
 
 ### v2.0.0-alpha.1 - Cat Vertical Slice And Workspace
 
@@ -1088,10 +1090,10 @@ another RC is required.
 The following documents provide deeper admission criteria for components with
 explicit alpha milestones in the main sequence:
 
-- `roadmaps/gpu.md`
-- `roadmaps/avif.md`
-- `roadmaps/schema.md`
-- `roadmaps/heapless.md`
+- `docs/roadmaps/gpu.md`
+- `docs/roadmaps/avif.md`
+- `docs/roadmaps/schema.md`
+- `docs/roadmaps/heapless.md`
 
 No component may change the canonical CPU pixel contract silently or add its
 heavy dependencies to `hashavatar-core`. Each companion crate uses an

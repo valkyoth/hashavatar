@@ -1,0 +1,10 @@
+[release]
+version = "1.3.0"
+publish_order = ["hashavatar"]
+
+[crates.hashavatar]
+previous_version = "1.3.0"
+version = "1.3.0"
+change = "unchanged"
+publish = false
+reason = "The already-published 1.3.0 release is the baseline before 2.0 workspace development."

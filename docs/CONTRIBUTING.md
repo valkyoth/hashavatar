@@ -4,7 +4,7 @@ Thanks for helping improve `hashavatar`.
 
 ## Development
 
-Use the stable Rust toolchain.
+Use the pinned development toolchain from `rust-toolchain.toml`.
 
 ```bash
 scripts/checks.sh
@@ -19,6 +19,14 @@ script prints before the failing step.
 - Add or update tests when rendering behavior, encoders, parsing, or public API types change.
 - Do not add bundled avatar art, stock assets, or generated binary assets without prior discussion.
 - Preserve deterministic output unless the change is explicitly a visual-version change.
+
+## Pentest Findings
+
+Root `PENTEST.md` is temporary review input. Resolve each actionable finding,
+add focused regression coverage, record accepted limitations in the relevant
+security document, and delete the scratch report. Release candidates retain a
+sanitized per-tag summary under `security/pentest/` according to
+[`security/pentest/README.md`](../security/pentest/README.md).
 
 ## Visual Stability
 
