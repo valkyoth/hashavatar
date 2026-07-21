@@ -68,12 +68,15 @@ justifies maintaining and auditing two engines.
 ## Dependencies
 
 - Bumped the root crate and fuzz path dependency metadata to `1.3.0`.
-- No third-party dependency versions changed in this release.
+- Refreshed the transitive `libc` lockfile entry from `0.2.186` to `0.2.187`.
+  No direct dependency declarations changed.
 
 The full local stable release gate passed, including the Rust `1.90.0` feature
 checks, all valid hash/format test matrices, strict Clippy/rustdoc, RustSec and
 dependency policy, fuzz harness compilation, all five Kani proofs,
 byte-identical package archives, SBOM generation, and crates.io publish
-dry-run. Manual review against `v1.2.0` confirmed that the public API changes
-are additive. GitHub validation, independent pentesting, and downstream
+dry-run. `cargo-semver-checks` against `v1.2.0` passed for the default,
+BLAKE3, and XXH3 feature sets, confirming that the public API changes are
+additive. Independent pentesting completed cleanly after the reported
+assurance findings were resolved. GitHub validation and downstream
 `hashavatar-website` integration testing remain before tagging.

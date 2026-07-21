@@ -39,8 +39,9 @@
 - Added `docs/MIGRATION_2.0.md` with prepared-workflow examples and the explicit
   decision that applications requiring exact 1.x pixels should pin 1.3; a
   separate compatibility renderer is deferred unless real demand appears.
-- Bumped crate and fuzz path dependency metadata to `1.3.0`. No third-party
-  dependency versions changed.
+- Bumped crate and fuzz path dependency metadata to `1.3.0` and refreshed the
+  transitive `libc` lockfile entry from `0.2.186` to `0.2.187`. No direct
+  dependency declarations changed.
 - Existing raster and SVG rendering behavior remains unchanged.
 
 ## 1.2.0

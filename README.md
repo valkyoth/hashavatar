@@ -137,7 +137,7 @@ The minimum supported Rust version is Rust `1.90.0`, as declared by
 `Cargo.toml`. Local development and release checks use the pinned
 `rust-toolchain.toml` toolchain, currently Rust `1.97.1`. CI also checks back
 to Rust `1.90.0` so the MSRV stays honest. New deployments should prefer the
-latest stable Rust; as of July 20, 2026, that is Rust `1.97.1`.
+latest stable Rust; as of July 21, 2026, that is Rust `1.97.1`.
 
 Compatibility evidence for `1.3.0`:
 
