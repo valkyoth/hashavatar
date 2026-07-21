@@ -1,10 +1,11 @@
 //! Generates a dependency-free PPM contact sheet for alpha.3 visual review.
 
-use std::{env, fs};
+use std::fs;
 
 use hashavatar::{AvatarBackground, AvatarKind, AvatarRequest, AvatarShape, AvatarStyle};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
+    const OUTPUT: &str = "hashavatar-catalog.ppm";
     const AVATAR: usize = 88;
     const TILE: usize = 96;
     const COLUMNS: usize = 6;
@@ -51,10 +52,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let mut ppm = format!("P6\n{width} {height}\n255\n").into_bytes();
     ppm.extend_from_slice(&pixels);
-    let output = env::args()
-        .nth(1)
-        .unwrap_or_else(|| "hashavatar-catalog.ppm".to_owned());
-    fs::write(&output, ppm)?;
-    println!("wrote {output}");
+    fs::write(OUTPUT, ppm)?;
+    println!("wrote {OUTPUT}");
     Ok(())
 }

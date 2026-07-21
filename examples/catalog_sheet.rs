@@ -1,12 +1,13 @@
 //! Generates an SVG contact sheet for alpha.3 catalog review.
 
-use std::{env, fmt::Write, fs};
+use std::{fmt::Write, fs};
 
 use hashavatar::{
     AvatarBackground, AvatarKind, AvatarRequest, AvatarShape, AvatarStyle, SvgOptions,
 };
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
+    const OUTPUT: &str = "hashavatar-catalog.svg";
     const TILE: u32 = 112;
     const COLUMNS: u32 = 6;
     let rows = u32::try_from(AvatarKind::ALL.len())?.div_ceil(COLUMNS);
@@ -39,10 +40,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
     sheet.push_str("</svg>");
 
-    let output = env::args()
-        .nth(1)
-        .unwrap_or_else(|| "hashavatar-catalog.svg".to_owned());
-    fs::write(&output, sheet)?;
-    println!("wrote {output}");
+    fs::write(OUTPUT, sheet)?;
+    println!("wrote {OUTPUT}");
     Ok(())
 }
