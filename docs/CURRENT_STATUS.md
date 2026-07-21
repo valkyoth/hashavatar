@@ -9,8 +9,8 @@ changes belong to 2.0.
 
 ## Development Line
 
-`main` implements `2.0.0-alpha.4`. This source-only prerelease completes
-bounded deterministic layered-style composition on the canonical renderer:
+`main` implements `2.0.0-alpha.5`. This source-only prerelease assembles the
+portable core, established-format provider, and recommended facade workflow:
 
 - stateless, label-separated SHA-512 trait derivation;
 - private checked Q16.16 geometry;
@@ -31,14 +31,21 @@ bounded deterministic layered-style composition on the canonical renderer:
   layout reports;
 - transparent surface clearing and rectangle, ellipse, and path clips shared
   by raster and SVG;
+- owned redacted identities and a transactional request builder;
+- typed identity/avatar asset keys plus catalog and render-contract IDs;
+- conservative `ResourceBudget` and sanitized reusable RGBA storage;
+- isolated `hashavatar-formats` writer and owned-output APIs;
+- default lossless WebP plus explicit PNG, JPEG, GIF, and all-format features;
+- typed format metadata, alpha capabilities, semantic encoded keys, and
+  caller-bound build keys;
 - an exhaustive 2,015 family/background/frame execution matrix;
 - debug/release pixel KATs and parser-backed SVG checks;
-- focused full-catalog and layout-resolution fuzz targets and nine Kani
-  harnesses;
+- focused catalog, layout, surface, SVG-writer, and format/writer fuzz targets
+  plus nine Kani harnesses;
 - source-size enforcement at 500 lines per Rust file;
 - portable core CI for WASM, AArch64 Linux, and 32-bit x86 Linux.
 
-The alpha.4 implementation-stop candidate is ready for exact-commit external pentesting.
+The alpha.5 implementation-stop candidate is ready for exact-commit external pentesting.
 The milestone is not complete until findings are resolved, the permanent
 pentest digest is added, GitHub is green, and `hashavatar-website` passes
 against the final reviewed commit.
@@ -61,9 +68,10 @@ digest under
 | Workspace resolver | Cargo resolver `3` |
 | CodeQL | GitHub default setup |
 | Unsafe Rust | Forbidden in first-party library code |
-| Alpha.4 identity mode | Domain-separated SHA-512 |
-| Alpha.4 outputs | Canonical RGBA8, pixel digest, and semantic SVG |
-| Alpha.4 catalog | 31 families, 13 backgrounds, 5 frames, 9 accessories, 8 expressions, 6 palettes |
+| Alpha.5 identity mode | Domain-separated SHA-512 with owned redacted identity |
+| Alpha.5 core outputs | Canonical RGBA8, pixel digest, and semantic SVG |
+| Alpha.5 formats | Default WebP; optional PNG, JPEG, and GIF through image 0.25.10 |
+| Alpha.5 catalog | 31 families, 13 backgrounds, 5 frames, 9 accessories, 8 expressions, 6 palettes |
 
 Version details live in [release notes](../release-notes/) and the
 [changelog](../CHANGELOG.md).

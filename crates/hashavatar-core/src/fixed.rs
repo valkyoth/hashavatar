@@ -1,6 +1,6 @@
 use core::fmt::{self, Write};
 
-use crate::CatError;
+use crate::AvatarError;
 
 pub(crate) const FRACTION_BITS: u32 = 16;
 const ONE: i64 = 1_i64 << FRACTION_BITS;
@@ -11,75 +11,75 @@ pub(crate) struct Fixed(i32);
 impl Fixed {
     pub(crate) const ZERO: Self = Self(0);
 
-    pub(crate) fn from_integer(value: i32) -> Result<Self, CatError> {
+    pub(crate) fn from_integer(value: i32) -> Result<Self, AvatarError> {
         let raw = i64::from(value)
             .checked_mul(ONE)
-            .ok_or(CatError::NumericRange)?;
+            .ok_or(AvatarError::NumericRange)?;
         Self::from_raw_i64(raw)
     }
 
-    pub(crate) fn from_ratio(numerator: i32, denominator: i32) -> Result<Self, CatError> {
+    pub(crate) fn from_ratio(numerator: i32, denominator: i32) -> Result<Self, AvatarError> {
         if denominator == 0 {
-            return Err(CatError::NumericRange);
+            return Err(AvatarError::NumericRange);
         }
         let raw = i64::from(numerator)
             .checked_mul(ONE)
-            .ok_or(CatError::NumericRange)?
+            .ok_or(AvatarError::NumericRange)?
             .checked_div(i64::from(denominator))
-            .ok_or(CatError::NumericRange)?;
+            .ok_or(AvatarError::NumericRange)?;
         Self::from_raw_i64(raw)
     }
 
-    pub(crate) fn from_unit_u16(value: u16) -> Result<Self, CatError> {
+    pub(crate) fn from_unit_u16(value: u16) -> Result<Self, AvatarError> {
         let raw = i64::from(value)
             .checked_mul(ONE)
-            .ok_or(CatError::NumericRange)?
+            .ok_or(AvatarError::NumericRange)?
             .checked_div(i64::from(u16::MAX))
-            .ok_or(CatError::NumericRange)?;
+            .ok_or(AvatarError::NumericRange)?;
         Self::from_raw_i64(raw)
     }
 
-    pub(crate) fn pixel_center(value: u32) -> Result<Self, CatError> {
+    pub(crate) fn pixel_center(value: u32) -> Result<Self, AvatarError> {
         let doubled = i64::from(value)
             .checked_mul(2)
             .and_then(|number| number.checked_add(1))
-            .ok_or(CatError::NumericRange)?;
+            .ok_or(AvatarError::NumericRange)?;
         let raw = doubled
             .checked_mul(ONE)
             .and_then(|number| number.checked_div(2))
-            .ok_or(CatError::NumericRange)?;
+            .ok_or(AvatarError::NumericRange)?;
         Self::from_raw_i64(raw)
     }
 
-    pub(crate) fn checked_add(self, other: Self) -> Result<Self, CatError> {
+    pub(crate) fn checked_add(self, other: Self) -> Result<Self, AvatarError> {
         self.0
             .checked_add(other.0)
             .map(Self)
-            .ok_or(CatError::NumericRange)
+            .ok_or(AvatarError::NumericRange)
     }
 
-    pub(crate) fn checked_sub(self, other: Self) -> Result<Self, CatError> {
+    pub(crate) fn checked_sub(self, other: Self) -> Result<Self, AvatarError> {
         self.0
             .checked_sub(other.0)
             .map(Self)
-            .ok_or(CatError::NumericRange)
+            .ok_or(AvatarError::NumericRange)
     }
 
-    pub(crate) fn checked_mul(self, other: Self) -> Result<Self, CatError> {
+    pub(crate) fn checked_mul(self, other: Self) -> Result<Self, AvatarError> {
         let product = i64::from(self.0)
             .checked_mul(i64::from(other.0))
-            .ok_or(CatError::NumericRange)?;
+            .ok_or(AvatarError::NumericRange)?;
         let biased = if product < 0 {
             product.checked_sub(ONE / 2)
         } else {
             product.checked_add(ONE / 2)
         }
-        .ok_or(CatError::NumericRange)?;
-        let rounded = biased.checked_div(ONE).ok_or(CatError::NumericRange)?;
+        .ok_or(AvatarError::NumericRange)?;
+        let rounded = biased.checked_div(ONE).ok_or(AvatarError::NumericRange)?;
         Self::from_raw_i64(rounded)
     }
 
-    pub(crate) fn lerp(minimum: Self, maximum: Self, unit: u16) -> Result<Self, CatError> {
+    pub(crate) fn lerp(minimum: Self, maximum: Self, unit: u16) -> Result<Self, AvatarError> {
         let span = maximum.checked_sub(minimum)?;
         minimum.checked_add(span.checked_mul(Self::from_unit_u16(unit)?)?)
     }
@@ -88,21 +88,21 @@ impl Fixed {
         self.0
     }
 
-    pub(crate) fn floor(self) -> Result<i32, CatError> {
-        i32::try_from(i64::from(self.0).div_euclid(ONE)).map_err(|_| CatError::NumericRange)
+    pub(crate) fn floor(self) -> Result<i32, AvatarError> {
+        i32::try_from(i64::from(self.0).div_euclid(ONE)).map_err(|_| AvatarError::NumericRange)
     }
 
-    pub(crate) fn ceil(self) -> Result<i32, CatError> {
+    pub(crate) fn ceil(self) -> Result<i32, AvatarError> {
         let adjusted = i64::from(self.0)
             .checked_add(ONE - 1)
-            .ok_or(CatError::NumericRange)?;
-        i32::try_from(adjusted.div_euclid(ONE)).map_err(|_| CatError::NumericRange)
+            .ok_or(AvatarError::NumericRange)?;
+        i32::try_from(adjusted.div_euclid(ONE)).map_err(|_| AvatarError::NumericRange)
     }
 
-    fn from_raw_i64(raw: i64) -> Result<Self, CatError> {
+    fn from_raw_i64(raw: i64) -> Result<Self, AvatarError> {
         i32::try_from(raw)
             .map(Self)
-            .map_err(|_| CatError::NumericRange)
+            .map_err(|_| AvatarError::NumericRange)
     }
 }
 
@@ -144,7 +144,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn decimal_format_is_exact_for_q16_values() -> Result<(), CatError> {
+    fn decimal_format_is_exact_for_q16_values() -> Result<(), AvatarError> {
         let value = Fixed::from_ratio(1, 8)?;
         let mut output = String::new();
         assert_eq!(write_decimal(&mut output, value), Ok(()));
@@ -154,7 +154,10 @@ mod tests {
 
     #[test]
     fn checked_math_rejects_out_of_range_values() {
-        assert_eq!(Fixed::from_integer(i32::MAX), Err(CatError::NumericRange));
-        assert_eq!(Fixed::from_ratio(1, 0), Err(CatError::NumericRange));
+        assert_eq!(
+            Fixed::from_integer(i32::MAX),
+            Err(AvatarError::NumericRange)
+        );
+        assert_eq!(Fixed::from_ratio(1, 0), Err(AvatarError::NumericRange));
     }
 }

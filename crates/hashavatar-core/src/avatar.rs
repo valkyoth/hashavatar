@@ -1,6 +1,7 @@
 use crate::{
-    AvatarKind, AvatarStyle, CanonicalRgbaImage, CatError, LayoutReport, MAX_IDENTITY_BYTES,
-    MAX_NAMESPACE_COMPONENT_BYTES, ResolvedStyle, RgbaSurfaceMut, SceneReport, SvgOptions,
+    AvatarAssetKey, AvatarError, AvatarIdentity, AvatarKind, AvatarStyle, CanonicalRgbaImage,
+    CatalogVersion, IdentityCacheKey, LayoutReport, RenderContractId, ResolvedStyle,
+    ResourceBudget, ReusableRgbaBuffer, RgbaSurfaceMut, SceneReport, SvgOptions,
     art::compile_avatar_scene,
     identity::TraitDeriver,
     layout::resolve_style,
@@ -9,37 +10,30 @@ use crate::{
     svg::{render_scene_svg, render_scene_svg_with, write_scene_svg},
 };
 
-const DEFAULT_TENANT: &[u8] = b"public";
-const DEFAULT_STYLE_VERSION: &[u8] = b"v2-alpha3";
-
-/// Borrowed inputs for one canonical alpha.4 avatar.
+/// Owned validated inputs for one canonical alpha.5 avatar.
 #[must_use = "prepare and render the validated avatar request"]
-pub struct AvatarRequest<'a> {
+pub struct AvatarRequest {
     width: u32,
     height: u32,
     style_seed: u64,
     style: AvatarStyle,
-    tenant: &'a [u8],
-    style_version: &'a [u8],
-    input: &'a [u8],
+    identity: AvatarIdentity,
 }
 
-impl<'a> AvatarRequest<'a> {
+impl AvatarRequest {
     /// Creates a request in Hashavatar's canonical baseline namespace.
     pub fn new(
         width: u32,
         height: u32,
         style_seed: u64,
-        input: &'a [u8],
+        input: impl AsRef<[u8]>,
         style: AvatarStyle,
-    ) -> Result<Self, CatError> {
-        Self::with_namespace(
+    ) -> Result<Self, AvatarError> {
+        Self::from_identity(
             width,
             height,
             style_seed,
-            DEFAULT_TENANT,
-            DEFAULT_STYLE_VERSION,
-            input,
+            AvatarIdentity::new(input)?,
             style,
         )
     }
@@ -50,33 +44,56 @@ impl<'a> AvatarRequest<'a> {
         width: u32,
         height: u32,
         style_seed: u64,
-        tenant: &'a [u8],
-        style_version: &'a [u8],
-        input: &'a [u8],
+        tenant: impl AsRef<[u8]>,
+        style_version: impl AsRef<[u8]>,
+        input: impl AsRef<[u8]>,
         style: AvatarStyle,
-    ) -> Result<Self, CatError> {
-        validate_request(width, height, tenant, style_version, input)?;
+    ) -> Result<Self, AvatarError> {
+        Self::from_identity(
+            width,
+            height,
+            style_seed,
+            AvatarIdentity::with_namespace(tenant, style_version, input)?,
+            style,
+        )
+    }
+
+    /// Creates a request from an already validated identity.
+    pub fn from_identity(
+        width: u32,
+        height: u32,
+        style_seed: u64,
+        identity: AvatarIdentity,
+        style: AvatarStyle,
+    ) -> Result<Self, AvatarError> {
+        let _ = Scene::new(width, height)?;
         Ok(Self {
             width,
             height,
             style_seed,
             style,
-            tenant,
-            style_version,
-            input,
+            identity,
         })
     }
 
+    /// Starts the recommended request builder from a validated identity.
+    pub fn builder(identity: AvatarIdentity) -> AvatarRequestBuilder {
+        AvatarRequestBuilder::new(identity)
+    }
+
     /// Derives stateless traits and compiles one validated private scene.
-    pub fn prepare(self) -> Result<PreparedAvatar, CatError> {
-        let deriver = TraitDeriver::with_namespace(
-            self.tenant,
-            self.style_version,
-            self.input,
-            self.style_seed,
-        )?;
+    pub fn prepare(self) -> Result<PreparedAvatar, AvatarError> {
+        let deriver = TraitDeriver::new(self.identity, self.style_seed);
         let traits = AvatarTraitVector::derive(&deriver, self.style.kind())?;
         let (resolved_style, layout_report) = resolve_style(self.style, traits)?;
+        let identity_cache_key = deriver.identity().cache_key()?;
+        let asset_key = crate::keys::avatar_asset_key(
+            deriver.identity(),
+            self.width,
+            self.height,
+            self.style_seed,
+            resolved_style,
+        )?;
         let scene = compile_avatar_scene(
             self.width,
             self.height,
@@ -92,11 +109,84 @@ impl<'a> AvatarRequest<'a> {
             layout_report,
             traits,
             report,
+            identity_cache_key,
+            asset_key,
         })
     }
 }
 
-/// Named stateless samples used by all alpha.4 family and style compilers.
+impl core::fmt::Debug for AvatarRequest {
+    fn fmt(&self, formatter: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        formatter
+            .debug_struct("AvatarRequest")
+            .field("width", &self.width)
+            .field("height", &self.height)
+            .field("style_seed", &self.style_seed)
+            .field("style", &self.style)
+            .field("identity", &"[REDACTED]")
+            .finish()
+    }
+}
+
+/// Builder for one validated owned [`AvatarRequest`].
+#[must_use = "call build or prepare"]
+pub struct AvatarRequestBuilder {
+    identity: AvatarIdentity,
+    width: u32,
+    height: u32,
+    style_seed: u64,
+    style: AvatarStyle,
+}
+
+impl AvatarRequestBuilder {
+    /// Starts a 256x256 Cat request in the themed square style.
+    pub fn new(identity: AvatarIdentity) -> Self {
+        Self {
+            identity,
+            width: 256,
+            height: 256,
+            style_seed: 0,
+            style: AvatarStyle::default(),
+        }
+    }
+
+    /// Sets dimensions, validated when the request is built.
+    pub const fn size(mut self, width: u32, height: u32) -> Self {
+        self.width = width;
+        self.height = height;
+        self
+    }
+
+    /// Sets the deterministic style-variant seed.
+    pub const fn style_variant(mut self, style_seed: u64) -> Self {
+        self.style_seed = style_seed;
+        self
+    }
+
+    /// Sets one complete explicit or automatic style.
+    pub const fn style(mut self, style: AvatarStyle) -> Self {
+        self.style = style;
+        self
+    }
+
+    /// Builds the validated owned request.
+    pub fn build(self) -> Result<AvatarRequest, AvatarError> {
+        AvatarRequest::from_identity(
+            self.width,
+            self.height,
+            self.style_seed,
+            self.identity,
+            self.style,
+        )
+    }
+
+    /// Builds, resolves, and compiles the request transactionally.
+    pub fn prepare(self) -> Result<PreparedAvatar, AvatarError> {
+        self.build()?.prepare()
+    }
+}
+
+/// Named stateless samples used by all canonical family and style compilers.
 #[must_use = "trait vectors describe deterministic avatar appearance"]
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct AvatarTraitVector {
@@ -111,7 +201,7 @@ pub struct AvatarTraitVector {
 }
 
 impl AvatarTraitVector {
-    fn derive(deriver: &TraitDeriver, kind: AvatarKind) -> Result<Self, CatError> {
+    fn derive(deriver: &TraitDeriver, kind: AvatarKind) -> Result<Self, AvatarError> {
         let scope = kind.as_str().as_bytes();
         Ok(Self {
             proportion_a: deriver.sample_scoped(scope, b"proportion-a")?,
@@ -159,7 +249,7 @@ impl AvatarTraitVector {
     }
 }
 
-/// Prepared alpha.4 scene shared by CPU and SVG executors.
+/// Prepared alpha.5 scene shared by CPU, SVG, and format executors.
 #[must_use = "render or inspect the prepared avatar scene"]
 pub struct PreparedAvatar {
     scene: Scene,
@@ -168,6 +258,8 @@ pub struct PreparedAvatar {
     layout_report: LayoutReport,
     traits: AvatarTraitVector,
     report: SceneReport,
+    identity_cache_key: IdentityCacheKey,
+    asset_key: AvatarAssetKey,
 }
 
 impl PreparedAvatar {
@@ -202,18 +294,49 @@ impl PreparedAvatar {
         self.report
     }
 
+    /// Returns conservative scene, CPU, scratch, and owned-output limits.
+    pub const fn resource_budget(&self) -> ResourceBudget {
+        ResourceBudget::new(self.report)
+    }
+
+    /// Returns the public correlatable identity cache key bound at preparation.
+    pub const fn identity_cache_key(&self) -> IdentityCacheKey {
+        self.identity_cache_key
+    }
+
+    /// Returns the public key for this complete canonical render tuple.
+    pub const fn asset_key(&self) -> AvatarAssetKey {
+        self.asset_key
+    }
+
+    /// Returns the catalog contract bound into style resolution and asset keys.
+    pub const fn catalog_version(&self) -> CatalogVersion {
+        CatalogVersion::CURRENT
+    }
+
+    /// Returns the canonical renderer contract bound into asset keys.
+    pub const fn render_contract_id(&self) -> RenderContractId {
+        RenderContractId::CURRENT
+    }
+
     /// Executes the canonical safe-Rust CPU rasterizer.
-    pub fn render_rgba(&self) -> Result<CanonicalRgbaImage, CatError> {
+    pub fn render_rgba(&self) -> Result<CanonicalRgbaImage, AvatarError> {
         render_scene(&self.scene)
     }
 
     /// Executes into a validated caller-owned RGBA8 surface.
-    pub fn render_into(&self, surface: &mut RgbaSurfaceMut<'_>) -> Result<(), CatError> {
+    pub fn render_into(&self, surface: &mut RgbaSurfaceMut<'_>) -> Result<(), AvatarError> {
         render_scene_into(&self.scene, surface)
     }
 
+    /// Executes into allocation-reusing Hashavatar-owned RGBA8 storage.
+    pub fn render_reusing(&self, scratch: &mut ReusableRgbaBuffer) -> Result<(), AvatarError> {
+        scratch.prepare(self.width(), self.height())?;
+        self.render_into(&mut scratch.surface_mut()?)
+    }
+
     /// Serializes the canonical scene as deterministic SVG.
-    pub fn render_svg(&self) -> Result<alloc::string::String, CatError> {
+    pub fn render_svg(&self) -> Result<alloc::string::String, AvatarError> {
         render_scene_svg(&self.scene)
     }
 
@@ -221,7 +344,7 @@ impl PreparedAvatar {
     pub fn render_svg_with(
         &self,
         options: SvgOptions<'_>,
-    ) -> Result<alloc::string::String, CatError> {
+    ) -> Result<alloc::string::String, AvatarError> {
         render_scene_svg_with(&self.scene, options)
     }
 
@@ -230,35 +353,7 @@ impl PreparedAvatar {
         &self,
         writer: &mut impl core::fmt::Write,
         options: SvgOptions<'_>,
-    ) -> Result<(), CatError> {
+    ) -> Result<(), AvatarError> {
         write_scene_svg(&self.scene, writer, options)
     }
-}
-
-fn validate_request(
-    width: u32,
-    height: u32,
-    tenant: &[u8],
-    style_version: &[u8],
-    input: &[u8],
-) -> Result<(), CatError> {
-    let _ = Scene::new(width, height)?;
-    for (component, bytes, maximum) in [
-        (crate::IdentityComponent::Input, input, MAX_IDENTITY_BYTES),
-        (
-            crate::IdentityComponent::Tenant,
-            tenant,
-            MAX_NAMESPACE_COMPONENT_BYTES,
-        ),
-        (
-            crate::IdentityComponent::StyleVersion,
-            style_version,
-            MAX_NAMESPACE_COMPONENT_BYTES,
-        ),
-    ] {
-        if bytes.len() > maximum {
-            return Err(CatError::IdentityComponentTooLong { component, maximum });
-        }
-    }
-    Ok(())
 }

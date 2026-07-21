@@ -4,7 +4,7 @@ use super::*;
 use crate::CatRequest;
 
 #[test]
-fn document_and_fragment_are_well_formed() -> Result<(), CatError> {
+fn document_and_fragment_are_well_formed() -> Result<(), AvatarError> {
     let prepared = CatRequest::new(128, 128, 0, b"svg-fixture")?.prepare()?;
     let document = prepared.render_svg_with(SvgOptions::document(
         "fixture",
@@ -24,7 +24,7 @@ fn document_and_fragment_are_well_formed() -> Result<(), CatError> {
 fn invalid_prefix_is_rejected() {
     assert_eq!(
         SvgOptions::fragment("bad prefix"),
-        Err(CatError::InvalidSvgOptions)
+        Err(AvatarError::InvalidSvgOptions)
     );
 }
 
@@ -32,12 +32,12 @@ fn invalid_prefix_is_rejected() {
 fn invalid_xml_control_character_is_rejected() {
     assert_eq!(
         SvgOptions::document("valid", "bad\u{1}", "description"),
-        Err(CatError::InvalidSvgOptions)
+        Err(AvatarError::InvalidSvgOptions)
     );
 }
 
 #[test]
-fn failing_writer_reports_partial_output_contract() -> Result<(), CatError> {
+fn failing_writer_reports_partial_output_contract() -> Result<(), AvatarError> {
     struct ShortWriter(usize);
     impl Write for ShortWriter {
         fn write_str(&mut self, value: &str) -> core::fmt::Result {
@@ -51,7 +51,7 @@ fn failing_writer_reports_partial_output_contract() -> Result<(), CatError> {
     let prepared = CatRequest::new(64, 64, 0, b"writer")?.prepare()?;
     assert_eq!(
         prepared.write_svg(&mut ShortWriter(32), SvgOptions::default()),
-        Err(CatError::SvgWrite)
+        Err(AvatarError::SvgWrite)
     );
     Ok(())
 }

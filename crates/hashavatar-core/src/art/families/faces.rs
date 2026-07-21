@@ -2,12 +2,16 @@ mod characters;
 
 use super::common::{FamilyRig, ellipse, eyes, line, polygon, rect, smile, triangle};
 use crate::{
-    AvatarKind, CatError,
+    AvatarError, AvatarKind,
     geometry::{Point, Rect},
     scene::Scene,
 };
 
-pub(super) fn compile(scene: &mut Scene, kind: AvatarKind, rig: FamilyRig) -> Result<(), CatError> {
+pub(super) fn compile(
+    scene: &mut Scene,
+    kind: AvatarKind,
+    rig: FamilyRig,
+) -> Result<(), AvatarError> {
     match kind {
         AvatarKind::Cat => cat(scene, rig),
         AvatarKind::Dog => dog(scene, rig),
@@ -23,7 +27,7 @@ pub(super) fn compile(scene: &mut Scene, kind: AvatarKind, rig: FamilyRig) -> Re
         AvatarKind::Bear => bear(scene, rig),
         AvatarKind::Dragon => dragon(scene, rig),
         AvatarKind::Ninja | AvatarKind::Astronaut => characters::compile(scene, kind, rig),
-        _ => Err(CatError::InvalidScene),
+        _ => Err(AvatarError::InvalidScene),
     }
 }
 
@@ -31,7 +35,7 @@ fn base_head(
     scene: &mut Scene,
     rig: FamilyRig,
     color: crate::paint::Color,
-) -> Result<(), CatError> {
+) -> Result<(), AvatarError> {
     ellipse(
         scene,
         Point::new(rig.canvas.x(50)?, rig.canvas.y(55)?),
@@ -41,7 +45,7 @@ fn base_head(
     )
 }
 
-fn cat(scene: &mut Scene, rig: FamilyRig) -> Result<(), CatError> {
+fn cat(scene: &mut Scene, rig: FamilyRig) -> Result<(), AvatarError> {
     for x in [31, 69] {
         triangle(
             scene,
@@ -65,7 +69,7 @@ fn cat(scene: &mut Scene, rig: FamilyRig) -> Result<(), CatError> {
     smile(scene, rig, 68)
 }
 
-fn dog(scene: &mut Scene, rig: FamilyRig) -> Result<(), CatError> {
+fn dog(scene: &mut Scene, rig: FamilyRig) -> Result<(), AvatarError> {
     for x in [27, 73] {
         ellipse(
             scene,
@@ -94,7 +98,7 @@ fn dog(scene: &mut Scene, rig: FamilyRig) -> Result<(), CatError> {
     smile(scene, rig, 68)
 }
 
-fn robot(scene: &mut Scene, rig: FamilyRig) -> Result<(), CatError> {
+fn robot(scene: &mut Scene, rig: FamilyRig) -> Result<(), AvatarError> {
     line(
         scene,
         Point::new(rig.canvas.x(50)?, rig.canvas.y(25)?),
@@ -145,7 +149,7 @@ fn robot(scene: &mut Scene, rig: FamilyRig) -> Result<(), CatError> {
     Ok(())
 }
 
-fn fox(scene: &mut Scene, rig: FamilyRig) -> Result<(), CatError> {
+fn fox(scene: &mut Scene, rig: FamilyRig) -> Result<(), AvatarError> {
     for x in [30, 70] {
         triangle(
             scene,
@@ -174,7 +178,7 @@ fn fox(scene: &mut Scene, rig: FamilyRig) -> Result<(), CatError> {
     )
 }
 
-fn alien(scene: &mut Scene, rig: FamilyRig) -> Result<(), CatError> {
+fn alien(scene: &mut Scene, rig: FamilyRig) -> Result<(), AvatarError> {
     ellipse(
         scene,
         Point::new(rig.canvas.x(50)?, rig.canvas.y(52)?),
@@ -200,7 +204,7 @@ fn alien(scene: &mut Scene, rig: FamilyRig) -> Result<(), CatError> {
     )
 }
 
-fn monster(scene: &mut Scene, rig: FamilyRig) -> Result<(), CatError> {
+fn monster(scene: &mut Scene, rig: FamilyRig) -> Result<(), AvatarError> {
     for x in [34, 66] {
         triangle(
             scene,
@@ -232,7 +236,7 @@ fn monster(scene: &mut Scene, rig: FamilyRig) -> Result<(), CatError> {
     smile(scene, rig, 66)
 }
 
-fn wizard(scene: &mut Scene, rig: FamilyRig) -> Result<(), CatError> {
+fn wizard(scene: &mut Scene, rig: FamilyRig) -> Result<(), AvatarError> {
     base_head(scene, rig, rig.secondary)?;
     triangle(
         scene,
@@ -262,7 +266,7 @@ fn wizard(scene: &mut Scene, rig: FamilyRig) -> Result<(), CatError> {
     )
 }
 
-fn skull(scene: &mut Scene, rig: FamilyRig) -> Result<(), CatError> {
+fn skull(scene: &mut Scene, rig: FamilyRig) -> Result<(), AvatarError> {
     base_head(scene, rig, rig.light)?;
     for x in [39, 61] {
         ellipse(
@@ -304,7 +308,7 @@ fn skull(scene: &mut Scene, rig: FamilyRig) -> Result<(), CatError> {
     Ok(())
 }
 
-fn frog(scene: &mut Scene, rig: FamilyRig) -> Result<(), CatError> {
+fn frog(scene: &mut Scene, rig: FamilyRig) -> Result<(), AvatarError> {
     for x in [36, 64] {
         ellipse(
             scene,
@@ -319,7 +323,7 @@ fn frog(scene: &mut Scene, rig: FamilyRig) -> Result<(), CatError> {
     smile(scene, rig, 65)
 }
 
-fn panda(scene: &mut Scene, rig: FamilyRig) -> Result<(), CatError> {
+fn panda(scene: &mut Scene, rig: FamilyRig) -> Result<(), AvatarError> {
     for x in [30, 70] {
         ellipse(
             scene,
@@ -355,7 +359,7 @@ fn panda(scene: &mut Scene, rig: FamilyRig) -> Result<(), CatError> {
     )
 }
 
-fn knight(scene: &mut Scene, rig: FamilyRig) -> Result<(), CatError> {
+fn knight(scene: &mut Scene, rig: FamilyRig) -> Result<(), AvatarError> {
     base_head(scene, rig, ColorChoice::metal(rig))?;
     rect(
         scene,
@@ -397,7 +401,7 @@ impl ColorChoice {
     }
 }
 
-fn bear(scene: &mut Scene, rig: FamilyRig) -> Result<(), CatError> {
+fn bear(scene: &mut Scene, rig: FamilyRig) -> Result<(), AvatarError> {
     for x in [31, 69] {
         ellipse(
             scene,
@@ -425,7 +429,7 @@ fn bear(scene: &mut Scene, rig: FamilyRig) -> Result<(), CatError> {
     )
 }
 
-fn dragon(scene: &mut Scene, rig: FamilyRig) -> Result<(), CatError> {
+fn dragon(scene: &mut Scene, rig: FamilyRig) -> Result<(), AvatarError> {
     for x in [32, 68] {
         triangle(
             scene,

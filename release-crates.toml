@@ -1,17 +1,24 @@
 [release]
-version = "2.0.0-alpha.4"
-publish_order = ["hashavatar-core", "hashavatar"]
+version = "2.0.0-alpha.5"
+publish_order = ["hashavatar-core", "hashavatar-formats", "hashavatar"]
 
 [crates.hashavatar-core]
-previous_version = "0.1.0-alpha.3"
-version = "0.1.0-alpha.4"
+previous_version = "0.1.0-alpha.4"
+version = "0.1.0-alpha.5"
 change = "code"
 publish = false
-reason = "Add bounded typed layered-style resolution and canonical layer compilers; all prerelease packages remain source-only."
+reason = "Add owned identity preparation, public asset keys, resource budgets, and reusable canonical RGBA storage; prerelease publication is prohibited."
+
+[crates.hashavatar-formats]
+previous_version = "0.0.0"
+version = "0.1.0-alpha.5"
+change = "code"
+publish = false
+reason = "Introduce the isolated feature-gated WebP, PNG, JPEG, and GIF provider; prerelease publication is prohibited."
 
 [crates.hashavatar]
-previous_version = "2.0.0-alpha.3"
-version = "2.0.0-alpha.4"
+previous_version = "2.0.0-alpha.4"
+version = "2.0.0-alpha.5"
 change = "code"
 publish = false
-reason = "Expose alpha.4 accessory, expression, palette, resolved-style, and layout-report APIs; prerelease publication is prohibited."
+reason = "Expose the alpha.5 prepared-request and established-format workflow through the recommended facade; prerelease publication is prohibited."

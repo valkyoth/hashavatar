@@ -16,7 +16,9 @@ work begins on the next milestone.
 
 Alpha.2 freezes evidence for one complete canonical renderer. Alpha.3 adds
 evidence for the existing 31-family, 13-background, five-frame catalog.
-Alpha.4 adds typed layered composition, not the final 2.0 public surface. The
+Alpha.4 adds typed layered composition. Alpha.5 adds the prepared-request,
+resource, reusable-raster, key, established-format, and facade boundaries.
+Neither milestone is the final 2.0 public surface. The
 following are intentional current contracts:
 
 - checked request bounds and typed failures;
@@ -28,6 +30,12 @@ following are intentional current contracts:
   strict/automatic compatibility decisions;
 - integer palette roles and per-family integer anchor profiles;
 - deterministic output within the same source revision and contract labels;
+- owned identities that retain no raw identifier or namespace components;
+- explicit public identity, canonical asset, semantic encoded, and
+  deployment-build key domains;
+- lossless WebP by default with explicit PNG, JPEG, GIF, and all-format
+  features isolated outside the portable core;
+- typed writer and allocation failures with documented partial-output rules;
 - no exposure of raw identity digests or scene internals.
 
 Changing current domain labels, catalog order, family compilers, rounding,

@@ -7,7 +7,8 @@ supply-chain scope.
 
 ## Enforced Controls
 
-- Both workspace libraries are `no_std` and forbid first-party `unsafe`.
+- `hashavatar-core` and the facade are `no_std`; all workspace libraries
+  forbid first-party `unsafe`. Only `hashavatar-formats` requires `std`.
 - Public dimensions are validated as `64..=2048` before preparation.
 - Identity input is capped at 1024 bytes; tenant and style-version components
   are capped at 128 bytes each.
@@ -37,6 +38,17 @@ supply-chain scope.
   errors; automatic substitutions and rejections are immutable report data.
 - Family anchors, palette roles, transforms, collision rules, and fallback
   order are integer-only and independent of insertion or hash-map order.
+- `AvatarIdentity` retains only a guarded domain-separated digest, redacts
+  `Debug`, and is consumed by transactional preparation.
+- Identity, canonical asset, semantic encoded, and build-bound encoded keys use
+  independent length-prefixed SHA-512 domains. They are public correlatable
+  cache identifiers, not authentication secrets.
+- Reusable Hashavatar-owned RGBA allocations, failed owned encoding buffers,
+  and JPEG conversion scratch are sanitized on drop. Successful output belongs
+  to the caller.
+- Codec features and dependencies are isolated in `hashavatar-formats`.
+  Disabled formats fail before rendering/writing; codec scratch remains
+  application-budgeted and codec-owned buffers cannot be sanitized here.
 - Pixel fingerprints stream visible rows through fixed-size, clear-on-drop
   SHA-512 state without allocating another image-sized buffer.
 - Caller surfaces are prevalidated and preserve all row-padding bytes.
@@ -57,7 +69,8 @@ supply-chain scope.
 A valid 2048 by 2048 raster returns 16 MiB. Hashavatar bounds one request but
 cannot control process-wide concurrency. Servers must use a semaphore or an
 equivalent admission controller, set request and rate limits, and account for
-the returned buffer plus application/network overhead.
+`ResourceBudget`, `FormatResourceBudget`, returned bytes, codec-owned memory,
+and application/network overhead.
 
 SHA-512 is deterministic hashing, not password hashing. A visible avatar can
 support offline dictionary testing of low-entropy identifiers. Applications
@@ -66,7 +79,7 @@ domain-separated pseudonym with a separately managed secret and pass only that
 pseudonym to Hashavatar. Hashavatar does not own application key storage or
 rotation policy.
 
-Returned `CanonicalRgbaImage` bytes and SVG strings are caller-owned public
+Returned `CanonicalRgbaImage`, SVG, and encoded bytes are caller-owned public
 artifacts. The crate does not wipe them. Callers with an unusual requirement to
 remove rendered output from memory must use a reviewed caller-side cleanup
 container after use.
@@ -96,10 +109,12 @@ exploit path exists.
 ## Assurance
 
 The gate includes strict Clippy, debug/release KATs, parser-backed SVG tests,
-MSRV checks, cross-target core compilation, fuzz-harness compilation, eight
-bounded Kani proofs, RustSec, cargo-deny, package inspection, unsafe/panic
-policy checks, and reproducible archive comparison. Independent pentest
-digests are retained under [`security/pentest`](../security/pentest/README.md).
+MSRV checks, cross-target core compilation, per-format feature isolation,
+codec round trips, fuzz-harness compilation, nine bounded Kani proofs, RustSec,
+cargo-deny, package inspection, unsafe/panic policy checks, and reproducible
+core archive comparison plus companion file-list checks. Independent pentest
+digests are retained under
+[`security/pentest`](../security/pentest/README.md).
 
 These controls improve assurance but are not a claim of formal verification,
 constant-time rendering, or fitness for a specific regulatory classification.

@@ -1,12 +1,12 @@
 //! Public integration tests for the alpha.2 canonical Cat renderer.
 
 use hashavatar::{
-    CatError, CatRequest, IdentityComponent, MAX_DIMENSION, MAX_IDENTITY_BYTES,
+    AvatarError, CatRequest, IdentityComponent, MAX_DIMENSION, MAX_IDENTITY_BYTES,
     MAX_NAMESPACE_COMPONENT_BYTES, MIN_DIMENSION, RgbaSurfaceMut, SvgOptions,
 };
 
 #[test]
-fn one_request_produces_pixels_and_svg_from_one_scene() -> Result<(), CatError> {
+fn one_request_produces_pixels_and_svg_from_one_scene() -> Result<(), AvatarError> {
     let prepared = CatRequest::new(192, 160, 42, b"alpha-one-integration")?.prepare()?;
     let report = prepared.scene_report();
     let image = prepared.render_rgba()?;
@@ -26,7 +26,7 @@ fn one_request_produces_pixels_and_svg_from_one_scene() -> Result<(), CatError> 
 }
 
 #[test]
-fn canonical_outputs_are_repeatable() -> Result<(), CatError> {
+fn canonical_outputs_are_repeatable() -> Result<(), AvatarError> {
     let first = CatRequest::new(128, 128, 9, b"repeatable")?.prepare()?;
     let second = CatRequest::new(128, 128, 9, b"repeatable")?.prepare()?;
 
@@ -43,17 +43,17 @@ fn canonical_outputs_are_repeatable() -> Result<(), CatError> {
 fn invalid_public_bounds_return_errors() {
     assert!(matches!(
         CatRequest::new(MIN_DIMENSION - 1, 128, 0, b"id"),
-        Err(CatError::UnsupportedDimensions { .. })
+        Err(AvatarError::UnsupportedDimensions { .. })
     ));
     assert!(matches!(
         CatRequest::new(128, MAX_DIMENSION + 1, 0, b"id"),
-        Err(CatError::UnsupportedDimensions { .. })
+        Err(AvatarError::UnsupportedDimensions { .. })
     ));
 
     let oversized_identity = vec![0_u8; MAX_IDENTITY_BYTES + 1];
     assert!(matches!(
         CatRequest::new(128, 128, 0, &oversized_identity),
-        Err(CatError::IdentityComponentTooLong {
+        Err(AvatarError::IdentityComponentTooLong {
             component: IdentityComponent::Input,
             ..
         })
@@ -62,7 +62,7 @@ fn invalid_public_bounds_return_errors() {
     let oversized_tenant = vec![0_u8; MAX_NAMESPACE_COMPONENT_BYTES + 1];
     assert!(matches!(
         CatRequest::with_namespace(128, 128, 0, &oversized_tenant, b"style", b"id"),
-        Err(CatError::IdentityComponentTooLong {
+        Err(AvatarError::IdentityComponentTooLong {
             component: IdentityComponent::Tenant,
             ..
         })
@@ -70,7 +70,7 @@ fn invalid_public_bounds_return_errors() {
 }
 
 #[test]
-fn maximum_request_reports_bounded_work_without_rendering() -> Result<(), CatError> {
+fn maximum_request_reports_bounded_work_without_rendering() -> Result<(), AvatarError> {
     let prepared = CatRequest::new(MAX_DIMENSION, MAX_DIMENSION, 0, b"max-budget")?.prepare()?;
     let report = prepared.scene_report();
     assert_eq!(report.rgba_bytes(), 2_048_usize * 2_048 * 4);
@@ -79,7 +79,7 @@ fn maximum_request_reports_bounded_work_without_rendering() -> Result<(), CatErr
 }
 
 #[test]
-fn namespace_and_seed_change_named_traits() -> Result<(), CatError> {
+fn namespace_and_seed_change_named_traits() -> Result<(), AvatarError> {
     let first =
         CatRequest::with_namespace(128, 128, 0, b"tenant-a", b"style-a", b"id")?.prepare()?;
     let second =
@@ -89,7 +89,7 @@ fn namespace_and_seed_change_named_traits() -> Result<(), CatError> {
 }
 
 #[test]
-fn canonical_cat_has_a_stable_pixel_fingerprint() -> Result<(), CatError> {
+fn canonical_cat_has_a_stable_pixel_fingerprint() -> Result<(), AvatarError> {
     let prepared = CatRequest::new(96, 96, 17, b"alpha-one-golden")?.prepare()?;
     let traits = prepared.trait_vector();
     assert_eq!(
@@ -122,7 +122,7 @@ fn canonical_cat_has_a_stable_pixel_fingerprint() -> Result<(), CatError> {
 }
 
 #[test]
-fn caller_surface_matches_owned_output_and_preserves_padding() -> Result<(), CatError> {
+fn caller_surface_matches_owned_output_and_preserves_padding() -> Result<(), AvatarError> {
     let prepared = CatRequest::new(64, 64, 5, b"surface")?.prepare()?;
     let owned = prepared.render_rgba()?;
     let stride = 64 * 4 + 7;
@@ -146,14 +146,14 @@ fn caller_surface_matches_owned_output_and_preserves_padding() -> Result<(), Cat
 }
 
 #[test]
-fn mismatched_surface_fails_before_modification() -> Result<(), CatError> {
+fn mismatched_surface_fails_before_modification() -> Result<(), AvatarError> {
     let prepared = CatRequest::new(64, 64, 0, b"mismatch")?.prepare()?;
     let mut storage = vec![0x5a_u8; 65 * 64 * 4];
     {
         let mut surface = RgbaSurfaceMut::new(&mut storage, 65, 64, 65 * 4)?;
         assert_eq!(
             prepared.render_into(&mut surface),
-            Err(CatError::InvalidSurface)
+            Err(AvatarError::InvalidSurface)
         );
     }
     assert!(storage.iter().all(|byte| *byte == 0x5a));
@@ -161,7 +161,7 @@ fn mismatched_surface_fails_before_modification() -> Result<(), CatError> {
 }
 
 #[test]
-fn svg_fragment_uses_the_caller_prefix() -> Result<(), CatError> {
+fn svg_fragment_uses_the_caller_prefix() -> Result<(), AvatarError> {
     let prepared = CatRequest::new(64, 64, 0, b"fragment")?.prepare()?;
     let first = prepared.render_svg_with(SvgOptions::fragment("avatar-a")?)?;
     let second = prepared.render_svg_with(SvgOptions::fragment("avatar-b")?)?;

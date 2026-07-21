@@ -1,6 +1,6 @@
 use super::CatTraitVector;
 use crate::{
-    CatError,
+    AvatarError,
     fixed::Fixed,
     geometry::{FillRule, Path, Point, Rect},
     paint::{Color, Paint},
@@ -11,9 +11,10 @@ pub(super) fn compile_scene(
     width: u32,
     height: u32,
     traits: CatTraitVector,
-) -> Result<Scene, CatError> {
-    let width = Fixed::from_integer(i32::try_from(width).map_err(|_| CatError::NumericRange)?)?;
-    let height = Fixed::from_integer(i32::try_from(height).map_err(|_| CatError::NumericRange)?)?;
+) -> Result<Scene, AvatarError> {
+    let width = Fixed::from_integer(i32::try_from(width).map_err(|_| AvatarError::NumericRange)?)?;
+    let height =
+        Fixed::from_integer(i32::try_from(height).map_err(|_| AvatarError::NumericRange)?)?;
     let center_x = scale(width, 50, 100)?;
     let center_y = scale(height, 54, 100)?.checked_add(vary(height, 0, 4, traits.head_drop)?)?;
     let head_rx = scale(width, 27, 100)?.checked_add(vary(width, 0, 5, traits.head_width)?)?;
@@ -38,8 +39,8 @@ pub(super) fn compile_scene(
     let ink = Color::rgb(24, 27, 32);
 
     let mut scene = Scene::new(
-        u32::try_from(width.floor()?).map_err(|_| CatError::NumericRange)?,
-        u32::try_from(height.floor()?).map_err(|_| CatError::NumericRange)?,
+        u32::try_from(width.floor()?).map_err(|_| AvatarError::NumericRange)?,
+        u32::try_from(height.floor()?).map_err(|_| AvatarError::NumericRange)?,
     )?;
     scene.push(Command::Fill(Paint::LinearGradient {
         start: Point::new(Fixed::ZERO, Fixed::ZERO),
@@ -110,7 +111,7 @@ fn push_head(
     muzzle: Color,
     iris: Color,
     ink: Color,
-) -> Result<(), CatError> {
+) -> Result<(), AvatarError> {
     for ear_x in [geometry.left_ear_x, geometry.right_ear_x] {
         scene.push(Command::Triangle {
             points: [
@@ -175,7 +176,7 @@ fn push_face_details(
     height: Fixed,
     geometry: HeadGeometry,
     ink: Color,
-) -> Result<(), CatError> {
+) -> Result<(), AvatarError> {
     let center_x = geometry.center_x;
     let nose_y = geometry
         .center_y
@@ -261,7 +262,7 @@ fn push_face_details(
     Ok(())
 }
 
-fn signed_unit(direction: i32) -> Result<Fixed, CatError> {
+fn signed_unit(direction: i32) -> Result<Fixed, AvatarError> {
     if direction < 0 {
         Fixed::ZERO.checked_sub(Fixed::from_integer(1)?)
     } else {
@@ -269,11 +270,11 @@ fn signed_unit(direction: i32) -> Result<Fixed, CatError> {
     }
 }
 
-fn scale(value: Fixed, numerator: i32, denominator: i32) -> Result<Fixed, CatError> {
+fn scale(value: Fixed, numerator: i32, denominator: i32) -> Result<Fixed, AvatarError> {
     value.checked_mul(Fixed::from_ratio(numerator, denominator)?)
 }
 
-fn vary(value: Fixed, minimum: i32, maximum: i32, sample: u16) -> Result<Fixed, CatError> {
+fn vary(value: Fixed, minimum: i32, maximum: i32, sample: u16) -> Result<Fixed, AvatarError> {
     Fixed::lerp(
         scale(value, minimum, 100)?,
         scale(value, maximum, 100)?,

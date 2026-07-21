@@ -28,14 +28,15 @@
 # hashavatar
 
 `hashavatar` is the recommended facade for deterministic avatar generation.
-The `2.0.0-alpha.4` source tree adds bounded typed palettes, expressions, and
-multi-accessory composition to all 31 families, 13 backgrounds, and five frame
-shapes. Canonical straight-alpha RGBA8, caller-provided surfaces, complete SVG
-documents, and SVG fragments all execute one private validated Q16.16 scene.
+The `2.0.0-alpha.5` source tree combines the portable canonical renderer with
+an isolated established-format provider. All 31 families, 13 backgrounds, five
+frames, typed palettes, expressions, and multi-accessory stacks compile to one
+private validated Q16.16 scene used by CPU RGBA8 and SVG.
 
-Alpha.4 has no codecs, image-library types, mutable rendering RNG, filesystem
-API, CLI, server, or user-supplied SVG. Optional formats and service-oriented
-packages remain later milestones.
+Lossless WebP is enabled by default. PNG, JPEG, and GIF are explicit features
+owned by `hashavatar-formats`; `hashavatar-core` remains codec-free
+`no_std + alloc`. Hashavatar has no filesystem API, CLI, server, async runtime,
+user-supplied SVG, or HTTP policy.
 
 ## Release Status
 
@@ -45,18 +46,19 @@ The latest crates.io release is `1.3.0`, maintained on
 are tested through GitHub and `hashavatar-website`; prereleases are neither
 tagged nor uploaded to crates.io.
 
-To test alpha.4 from a local checkout:
+To test alpha.5 from a local checkout:
 
 ```toml
 [dependencies]
 hashavatar = { path = "../hashavatar" }
 ```
 
-## Catalog Request
+## Prepared Request
 
 ```rust
 use hashavatar::{
-    AvatarBackground, AvatarKind, AvatarRequest, AvatarShape, AvatarStyle,
+    AvatarBackground, AvatarIdentity, AvatarKind, AvatarRequest, AvatarShape,
+    AvatarStyle,
 };
 
 let style = AvatarStyle::new(
@@ -64,16 +66,15 @@ let style = AvatarStyle::new(
     AvatarBackground::Ocean,
     AvatarShape::Circle,
 );
-let prepared = AvatarRequest::with_namespace(
-    256,
-    256,
-    0,
+let identity = AvatarIdentity::with_namespace(
     b"tenant-a",
-    b"website-v2-alpha4",
+    b"website-v2-alpha5",
     b"user-123",
-    style,
-)?
-.prepare()?;
+)?;
+let prepared = AvatarRequest::builder(identity)
+    .size(256, 256)
+    .style(style)
+    .prepare()?;
 
 let report = prepared.scene_report();
 let rgba = prepared.render_rgba()?;
@@ -83,7 +84,7 @@ assert_eq!(rgba.dimensions(), (256, 256));
 assert_eq!(rgba.pixels().len(), report.rgba_bytes());
 assert!(svg.starts_with("<svg"));
 
-# Ok::<(), hashavatar::CatError>(())
+# Ok::<(), hashavatar::AvatarError>(())
 ```
 
 Render into a padded caller-owned surface without modifying padding:
@@ -108,7 +109,7 @@ let digest = surface.pixel_digest()?;
 
 assert_eq!(surface.visible_row_bytes(), 128 * 4);
 assert_eq!(digest, prepared.render_rgba()?.pixel_digest()?);
-# Ok::<(), hashavatar::CatError>(())
+# Ok::<(), hashavatar::AvatarError>(())
 ```
 
 Embed multiple deterministic fragments safely by choosing distinct prefixes:
@@ -127,7 +128,7 @@ let style = AvatarStyle::new(
 let prepared = AvatarRequest::new(128, 128, 0, b"user-123", style)?.prepare()?;
 let fragment = prepared.render_svg_with(SvgOptions::fragment("profile-avatar")?)?;
 assert!(fragment.starts_with("<g id=\"profile-avatar-scene\">"));
-# Ok::<(), hashavatar::CatError>(())
+# Ok::<(), hashavatar::AvatarError>(())
 ```
 
 ## Layered Style
@@ -167,13 +168,58 @@ same behavior with `StyleResolutionPolicy::AutomaticFallback`. Every adjusted,
 substituted, or rejected request is visible through `LayoutReport`; no layer is
 silently skipped. See the [layered style contract](docs/LAYERED_STYLE_CONTRACT.md).
 
-`AvatarRequest` borrows input only until `prepare()`. `PreparedAvatar` retains
-the private scene, requested and resolved styles, layout decisions, public
-named trait samples, and validated resource report, but not the raw identifier,
-tenant, style-version, or identity digest. `AvatarKind::ALL`,
+`AvatarIdentity` hashes bounded input immediately, redacts `Debug`, and owns a
+clear-on-drop digest. `PreparedAvatar` retains the private scene, requested and
+resolved styles, layout decisions, resource budget, public named trait samples,
+and public correlatable asset keys, but not the raw identifier, tenant,
+style-version, or identity digest. `AvatarKind::ALL`,
 `AvatarBackground::ALL`, and `AvatarShape::ALL`
 provide the frozen catalog order; family capability declarations are available
 through `AvatarKind::capabilities()` and `AVATAR_FAMILY_CAPABILITIES`.
+
+## Encoded Formats
+
+The default facade encodes lossless WebP without exposing image-library types:
+
+```rust
+use hashavatar::{
+    AvatarBackground, AvatarKind, AvatarRequest, AvatarShape, AvatarStyle,
+    formats::{AvatarOutputFormat, encode},
+};
+
+let style = AvatarStyle::new(
+    AvatarKind::Dragon,
+    AvatarBackground::Starry,
+    AvatarShape::Octagon,
+);
+let prepared = AvatarRequest::new(256, 256, 0, b"user-123", style)?.prepare()?;
+let encoded = encode(&prepared, AvatarOutputFormat::WebP)?;
+
+assert_eq!(encoded.metadata().media_type(), "image/webp");
+assert_eq!(encoded.metadata().encoded_len(), encoded.bytes().len());
+# Ok::<(), Box<dyn std::error::Error>>(())
+```
+
+Feature selection is explicit:
+
+```toml
+[dependencies]
+hashavatar = { path = "../hashavatar", default-features = false, features = ["png"] }
+```
+
+| Feature | Default | Contract |
+| --- | --- | --- |
+| `webp` | Yes | Lossless RGBA WebP |
+| `png` | No | Lossless RGBA, best/adaptive settings |
+| `jpeg` | No | Quality 92, alpha flattened over white |
+| `gif` | No | Single-frame speed-1 palette quantization |
+| `all-formats` | No | All four established formats |
+
+`encode_to_writer` and `encode_to_writer_with_scratch` support streaming and
+allocation reuse. Writer errors may leave a partial prefix. Semantic keys bind
+the canonical asset and encoder settings; build keys additionally bind a
+caller-supplied encoder build ID. See the
+[format contract](docs/FORMAT_CONTRACT.md).
 
 ## Contracts
 
@@ -181,6 +227,8 @@ through `AvatarKind::capabilities()` and `AVATAR_FAMILY_CAPABILITIES`.
 - Identity input is restricted to 1024 bytes.
 - Tenant and style-version components are restricted to 128 bytes each.
 - Components are length-prefixed and SHA-512 domain separated.
+- Prepared requests bind identity, resolved style, dimensions, seed, catalog,
+  render contract, resource budget, and public asset keys transactionally.
 - Catalog IDs and capability behavior follow the documented
   [catalog contract](docs/CATALOG_CONTRACT.md).
 - Accessory stacks contain at most four entries and are canonicalized by
@@ -204,6 +252,9 @@ through `AvatarKind::capabilities()` and `AVATAR_FAMILY_CAPABILITIES`.
 - SVG numeric values are exact decimal representations of the same Q16.16
   scene values and are parser-tested as XML.
 - First-party Rust code forbids `unsafe` and production panic-like paths.
+- Disabled formats fail before canonical rendering or writer modification.
+- Codec settings, alpha behavior, partial output, key semantics, scratch
+  accounting, and cleanup limits are documented per format.
 
 `SceneReport::rgba_bytes()` gives the exact returned raster allocation.
 `estimated_pixel_tests()` gives a conservative CPU-work value for application
@@ -212,13 +263,14 @@ still enforce process-wide concurrency and rate limits.
 
 ## Crates
 
-| Package | Alpha.4 role |
+| Package | Alpha.5 role |
 | --- | --- |
-| `hashavatar` | Recommended thin facade and stable import path |
-| `hashavatar-core` | `no_std + alloc` catalog, identity, scene, CPU RGBA8, and SVG core |
+| `hashavatar` | Recommended facade, default WebP workflow, and common import path |
+| `hashavatar-core` | `no_std + alloc` identity, catalog, keys, scene, CPU RGBA8, and SVG |
+| `hashavatar-formats` | `std` writer/owned WebP, PNG, JPEG, and GIF encoding boundary |
 
-The private scene representation is not a general graphics API. Future format,
-schema, heapless, and GPU packages will consume narrow reviewed boundaries
+The private scene representation is not a general graphics API. Future schema,
+heapless, AVIF, and GPU packages will consume narrow reviewed boundaries
 without making internal scene layout a compatibility promise.
 
 ## Security Boundaries
@@ -229,27 +281,32 @@ components but does not stop offline guessing of low-entropy identifiers.
 Applications handling sensitive email addresses, usernames, or internal IDs
 should pass a domain-separated keyed pseudonym rather than the original value.
 
-`sanitization` guards temporary preimages and derived digest storage. Returned
-RGBA bytes and SVG strings are caller-owned public output and are not wiped by
-the crate. Allocation timing can reveal bounded input length, and render time
-can reveal visual complexity. See [Security Controls](docs/SECURITY_CONTROLS.md)
-for the exact guarantees and accepted limitations.
+`sanitization` guards temporary preimages, derived digest storage, reusable
+Hashavatar-owned RGBA storage, failed owned-encoding buffers, and JPEG
+conversion scratch. Successful RGBA, SVG, and encoded bytes are caller-owned
+public output. Codec-owned buffers cannot be wiped by Hashavatar. Allocation
+timing can reveal bounded input length, and render time can reveal visual
+complexity. See [Security Controls](docs/SECURITY_CONTROLS.md) for exact
+guarantees and accepted limitations.
 
 ## Verification
 
 ```bash
 scripts/checks.sh
+scripts/check_format_features.sh
 scripts/check_kani.sh
 cargo test --workspace --release
 cargo run --example catalog_sheet
 cargo run --example catalog_raster_sheet
 cargo run --example layered_raster_sheet
+cargo run --example encoded_webp
 ```
 
 The standard gate checks formatting, strict Clippy, debug and release KATs,
 rustdoc, MSRV `1.90.0`, package metadata, dependency and license policy,
 RustSec, fuzz harness compilation, source size, unsafe boundaries, and
-production panic policy. CI additionally compiles `hashavatar-core` for WASM,
+production panic policy, format feature isolation, and codec round trips. CI
+additionally compiles `hashavatar-core` for WASM,
 AArch64 Linux, and 32-bit x86 Linux.
 
 ## License

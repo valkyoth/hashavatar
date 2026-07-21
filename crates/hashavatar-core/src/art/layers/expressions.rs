@@ -1,6 +1,6 @@
 use super::common::{LayerRig, curved_line, ellipse, line, rect};
 use crate::{
-    AvatarAnchorSet, AvatarColorRoles, AvatarExpression, CatError, geometry::Point, scene::Scene,
+    AvatarAnchorSet, AvatarColorRoles, AvatarError, AvatarExpression, geometry::Point, scene::Scene,
 };
 
 pub(super) fn compile(
@@ -8,7 +8,7 @@ pub(super) fn compile(
     anchors: AvatarAnchorSet,
     colors: AvatarColorRoles,
     expression: AvatarExpression,
-) -> Result<(), CatError> {
+) -> Result<(), AvatarError> {
     if matches!(expression, AvatarExpression::Default) {
         return Ok(());
     }
@@ -75,7 +75,7 @@ fn mouth_curve(
     rig: LayerRig,
     mouth: Point,
     inverted: bool,
-) -> Result<(), CatError> {
+) -> Result<(), AvatarError> {
     let half = rig.size(1_200)?;
     let bend = rig.size(700)?;
     curved_line(

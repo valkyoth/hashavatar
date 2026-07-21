@@ -1,5 +1,5 @@
 use crate::{
-    AvatarColorRoles, AvatarTraitVector, CatError,
+    AvatarColorRoles, AvatarError, AvatarTraitVector,
     art::util::{Canvas, role_color, vary},
     fixed::Fixed,
     geometry::{FillRule, Path, Point, Rect},
@@ -23,7 +23,7 @@ impl FamilyRig {
         scene: &Scene,
         traits: AvatarTraitVector,
         colors: AvatarColorRoles,
-    ) -> Result<Self, CatError> {
+    ) -> Result<Self, AvatarError> {
         Ok(Self {
             canvas: Canvas::new(scene)?,
             traits,
@@ -35,11 +35,11 @@ impl FamilyRig {
         })
     }
 
-    pub(super) fn head_rx(self) -> Result<Fixed, CatError> {
+    pub(super) fn head_rx(self) -> Result<Fixed, AvatarError> {
         vary(self.canvas.minimum, 24, 30, self.traits.proportion_a())
     }
 
-    pub(super) fn head_ry(self) -> Result<Fixed, CatError> {
+    pub(super) fn head_ry(self) -> Result<Fixed, AvatarError> {
         vary(self.canvas.minimum, 23, 30, self.traits.proportion_b())
     }
 }
@@ -50,7 +50,7 @@ pub(super) fn ellipse(
     radius_x: Fixed,
     radius_y: Fixed,
     color: Color,
-) -> Result<(), CatError> {
+) -> Result<(), AvatarError> {
     scene.push(Command::Ellipse {
         center,
         radius_x,
@@ -59,7 +59,7 @@ pub(super) fn ellipse(
     })
 }
 
-pub(super) fn rect(scene: &mut Scene, rect: Rect, color: Color) -> Result<(), CatError> {
+pub(super) fn rect(scene: &mut Scene, rect: Rect, color: Color) -> Result<(), AvatarError> {
     scene.push(Command::Rect {
         rect,
         paint: Paint::solid(color),
@@ -70,7 +70,7 @@ pub(super) fn triangle(
     scene: &mut Scene,
     points: [Point; 3],
     color: Color,
-) -> Result<(), CatError> {
+) -> Result<(), AvatarError> {
     scene.push(Command::Triangle {
         points,
         paint: Paint::solid(color),
@@ -83,7 +83,7 @@ pub(super) fn line(
     end: Point,
     width: Fixed,
     color: Color,
-) -> Result<(), CatError> {
+) -> Result<(), AvatarError> {
     scene.push(Command::Line {
         start,
         end,
@@ -99,8 +99,8 @@ pub(super) fn polygon(
     rig: FamilyRig,
     points: &[(i32, i32)],
     color: Color,
-) -> Result<(), CatError> {
-    let first = points.first().ok_or(CatError::InvalidScene)?;
+) -> Result<(), AvatarError> {
+    let first = points.first().ok_or(AvatarError::InvalidScene)?;
     let mut path = Path::builder(Point::new(rig.canvas.x(first.0)?, rig.canvas.y(first.1)?))?;
     for point in points.iter().skip(1) {
         path.line_to(Point::new(rig.canvas.x(point.0)?, rig.canvas.y(point.1)?))?;
@@ -120,7 +120,7 @@ pub(super) fn eyes(
     y: i32,
     spacing: i32,
     size: i32,
-) -> Result<(), CatError> {
+) -> Result<(), AvatarError> {
     for x in [50 - spacing, 50 + spacing] {
         ellipse(
             scene,
@@ -140,7 +140,7 @@ pub(super) fn eyes(
     Ok(())
 }
 
-pub(super) fn smile(scene: &mut Scene, rig: FamilyRig, y: i32) -> Result<(), CatError> {
+pub(super) fn smile(scene: &mut Scene, rig: FamilyRig, y: i32) -> Result<(), AvatarError> {
     let mut path = Path::builder(Point::new(rig.canvas.x(43)?, rig.canvas.y(y)?))?;
     path.quad_to(
         Point::new(rig.canvas.x(50)?, rig.canvas.y(y + 7)?),

@@ -1,20 +1,24 @@
 use crate::{
-    AvatarKind, CatError,
+    AvatarError, AvatarKind,
     geometry::{Point, Rect},
     scene::Scene,
 };
 
 use super::super::common::{FamilyRig, ellipse, eyes, line, rect};
 
-pub(super) fn compile(scene: &mut Scene, kind: AvatarKind, rig: FamilyRig) -> Result<(), CatError> {
+pub(super) fn compile(
+    scene: &mut Scene,
+    kind: AvatarKind,
+    rig: FamilyRig,
+) -> Result<(), AvatarError> {
     match kind {
         AvatarKind::Ninja => ninja(scene, rig),
         AvatarKind::Astronaut => astronaut(scene, rig),
-        _ => Err(CatError::InvalidScene),
+        _ => Err(AvatarError::InvalidScene),
     }
 }
 
-fn ninja(scene: &mut Scene, rig: FamilyRig) -> Result<(), CatError> {
+fn ninja(scene: &mut Scene, rig: FamilyRig) -> Result<(), AvatarError> {
     ellipse(
         scene,
         Point::new(rig.canvas.x(50)?, rig.canvas.y(55)?),
@@ -42,7 +46,7 @@ fn ninja(scene: &mut Scene, rig: FamilyRig) -> Result<(), CatError> {
     )
 }
 
-fn astronaut(scene: &mut Scene, rig: FamilyRig) -> Result<(), CatError> {
+fn astronaut(scene: &mut Scene, rig: FamilyRig) -> Result<(), AvatarError> {
     for (radius, color) in [(31, rig.light), (25, rig.ink), (19, rig.primary)] {
         ellipse(
             scene,

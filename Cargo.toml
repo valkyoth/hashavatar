@@ -1,5 +1,5 @@
 [workspace]
-members = [".", "crates/hashavatar-core"]
+members = [".", "crates/hashavatar-core", "crates/hashavatar-formats"]
 default-members = ["."]
 exclude = ["fuzz"]
 resolver = "3"
@@ -38,7 +38,7 @@ panic = "abort"
 
 [package]
 name = "hashavatar"
-version = "2.0.0-alpha.4"
+version = "2.0.0-alpha.5"
 edition.workspace = true
 rust-version.workspace = true
 description = "Security-oriented deterministic procedural avatar rendering facade"
@@ -58,11 +58,24 @@ exclude = [
 ]
 
 [dependencies]
-hashavatar-core = { path = "crates/hashavatar-core", version = "0.1.0-alpha.4" }
+hashavatar-core = { path = "crates/hashavatar-core", version = "0.1.0-alpha.5" }
+hashavatar-formats = { path = "crates/hashavatar-formats", version = "0.1.0-alpha.5", default-features = false, optional = true }
+
+[features]
+default = ["webp"]
+webp = ["dep:hashavatar-formats", "hashavatar-formats/webp"]
+png = ["dep:hashavatar-formats", "hashavatar-formats/png"]
+jpeg = ["dep:hashavatar-formats", "hashavatar-formats/jpeg"]
+gif = ["dep:hashavatar-formats", "hashavatar-formats/gif"]
+all-formats = ["webp", "png", "jpeg", "gif"]
 
 [dev-dependencies]
 roxmltree.workspace = true
 sanitization-crypto-interop.workspace = true
+
+[[example]]
+name = "encoded_webp"
+required-features = ["webp"]
 
 [lints]
 workspace = true

@@ -1,4 +1,4 @@
-use crate::{CatError, geometry::Point};
+use crate::{AvatarError, geometry::Point};
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(crate) struct Color {
@@ -53,15 +53,15 @@ impl Paint {
         Self::Solid(color)
     }
 
-    pub(crate) fn validate(self) -> Result<(), CatError> {
+    pub(crate) fn validate(self) -> Result<(), AvatarError> {
         match self {
             Self::Solid(_) => Ok(()),
             Self::LinearGradient { start, end, .. } if start != end => Ok(()),
-            Self::LinearGradient { .. } => Err(CatError::InvalidScene),
+            Self::LinearGradient { .. } => Err(AvatarError::InvalidScene),
         }
     }
 
-    pub(crate) fn sample(self, point: Point) -> Result<Color, CatError> {
+    pub(crate) fn sample(self, point: Point) -> Result<Color, AvatarError> {
         match self {
             Self::Solid(color) => Ok(color),
             Self::LinearGradient {
@@ -77,14 +77,14 @@ impl Paint {
                 let denominator = dx
                     .checked_mul(dx)
                     .and_then(|value| value.checked_add(dy.checked_mul(dy)?))
-                    .ok_or(CatError::NumericRange)?;
+                    .ok_or(AvatarError::NumericRange)?;
                 if denominator <= 0 {
-                    return Err(CatError::InvalidScene);
+                    return Err(AvatarError::InvalidScene);
                 }
                 let numerator = px
                     .checked_mul(dx)
                     .and_then(|value| value.checked_add(py.checked_mul(dy)?))
-                    .ok_or(CatError::NumericRange)?
+                    .ok_or(AvatarError::NumericRange)?
                     .clamp(0, denominator);
                 Ok(interpolate_color(
                     start_color,

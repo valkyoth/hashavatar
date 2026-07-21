@@ -71,11 +71,11 @@ fn pixel_center_is_inside_its_pixel() {
     if let Ok(center) = Fixed::pixel_center(pixel) {
         assert_eq!(
             center.floor(),
-            i32::try_from(pixel).map_err(|_| crate::CatError::NumericRange)
+            i32::try_from(pixel).map_err(|_| crate::AvatarError::NumericRange)
         );
         assert_eq!(
             center.ceil(),
-            i32::try_from(pixel.saturating_add(1)).map_err(|_| crate::CatError::NumericRange)
+            i32::try_from(pixel.saturating_add(1)).map_err(|_| crate::AvatarError::NumericRange)
         );
     }
 }

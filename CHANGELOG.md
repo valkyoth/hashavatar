@@ -1,5 +1,18 @@
 # Changelog
 
+## 2.0.0-alpha.5
+
+- Added owned redacted identities, the recommended request builder, public
+  canonical asset keys, contract IDs, resource budgets, and reusable RGBA
+  storage to `hashavatar-core`.
+- Added the isolated `hashavatar-formats` package with default lossless WebP
+  and explicit PNG, JPEG, GIF, and `all-formats` features.
+- Added allocating and writer encoding APIs, exact alpha capability metadata,
+  semantic/build-bound encoded keys, and typed format-owned errors.
+- Added exact WebP/PNG round trips, bounded JPEG/GIF evidence, writer and
+  scratch tests, format fuzzing, feature/dependency isolation, and reproducible
+  core archive/package-list checks while preserving canonical alpha.3 pixels.
+
 ## 2.0.0-alpha.4
 
 - Added fixed-capacity `AccessoryStack` composition with typed aura, headwear,

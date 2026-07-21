@@ -7,23 +7,23 @@ use self::clip::write_clip;
 pub use self::options::{SvgMode, SvgOptions};
 
 use crate::{
-    CatError,
+    AvatarError,
     fixed::{Fixed, write_decimal},
     geometry::{FillRule, Path, Point, Rect},
     paint::{Color, Paint, div_255_round},
     scene::{Command, MAX_STACK_DEPTH, Scene, Stroke},
 };
 
-const SVG_CAPACITY: usize = 64 * 1024;
+const SVG_CAPACITY: usize = crate::MAX_SVG_OUTPUT_BYTES;
 
-pub(crate) fn render_scene_svg(scene: &Scene) -> Result<String, CatError> {
+pub(crate) fn render_scene_svg(scene: &Scene) -> Result<String, AvatarError> {
     render_scene_svg_with(scene, SvgOptions::default())
 }
 
 pub(crate) fn render_scene_svg_with(
     scene: &Scene,
     options: SvgOptions<'_>,
-) -> Result<String, CatError> {
+) -> Result<String, AvatarError> {
     let mut output = SvgBuffer::new()?;
     write_scene_svg(scene, &mut output, options)?;
     Ok(output.finish())
@@ -33,7 +33,7 @@ pub(crate) fn write_scene_svg(
     scene: &Scene,
     output: &mut impl Write,
     options: SvgOptions<'_>,
-) -> Result<(), CatError> {
+) -> Result<(), AvatarError> {
     let _ = scene.validate()?;
     options.validate()?;
     write_opening(output, scene, options)?;
@@ -45,17 +45,21 @@ pub(crate) fn write_scene_svg(
             Command::PushOpacity(value) => {
                 let slot = opacity_stack
                     .get_mut(opacity_depth)
-                    .ok_or(CatError::InvalidScene)?;
+                    .ok_or(AvatarError::InvalidScene)?;
                 *slot = opacity;
-                opacity_depth = opacity_depth.checked_add(1).ok_or(CatError::NumericRange)?;
+                opacity_depth = opacity_depth
+                    .checked_add(1)
+                    .ok_or(AvatarError::NumericRange)?;
                 opacity = u8::try_from(div_255_round(u32::from(opacity) * u32::from(value)))
-                    .map_err(|_| CatError::NumericRange)?;
+                    .map_err(|_| AvatarError::NumericRange)?;
             }
             Command::PopOpacity => {
-                opacity_depth = opacity_depth.checked_sub(1).ok_or(CatError::InvalidScene)?;
+                opacity_depth = opacity_depth
+                    .checked_sub(1)
+                    .ok_or(AvatarError::InvalidScene)?;
                 opacity = *opacity_stack
                     .get(opacity_depth)
-                    .ok_or(CatError::InvalidScene)?;
+                    .ok_or(AvatarError::InvalidScene)?;
             }
             _ => write_command(output, scene, options.id_prefix, index, *command, opacity)?,
         }
@@ -70,7 +74,7 @@ fn write_opening(
     output: &mut impl Write,
     scene: &Scene,
     options: SvgOptions<'_>,
-) -> Result<(), CatError> {
+) -> Result<(), AvatarError> {
     match options.mode {
         SvgMode::Document => {
             write!(
@@ -81,19 +85,18 @@ fn write_opening(
                 scene.width(),
                 scene.height()
             )
-            .map_err(|_| CatError::SvgWrite)?;
+            .map_err(|_| AvatarError::SvgWrite)?;
             write_text(output, "<title>")?;
-            write_escaped(output, options.title.ok_or(CatError::InvalidSvgOptions)?)?;
+            write_escaped(output, options.title.ok_or(AvatarError::InvalidSvgOptions)?)?;
             write_text(output, "</title><desc>")?;
             write_escaped(
                 output,
-                options.description.ok_or(CatError::InvalidSvgOptions)?,
+                options.description.ok_or(AvatarError::InvalidSvgOptions)?,
             )?;
             write_text(output, "</desc>")
         }
-        SvgMode::Fragment => {
-            write!(output, "<g id=\"{}-scene\">", options.id_prefix).map_err(|_| CatError::SvgWrite)
-        }
+        SvgMode::Fragment => write!(output, "<g id=\"{}-scene\">", options.id_prefix)
+            .map_err(|_| AvatarError::SvgWrite),
     }
 }
 
@@ -104,9 +107,9 @@ fn write_command(
     index: usize,
     command: Command,
     opacity: u8,
-) -> Result<(), CatError> {
+) -> Result<(), AvatarError> {
     match command {
-        Command::Empty => Err(CatError::InvalidScene),
+        Command::Empty => Err(AvatarError::InvalidScene),
         Command::Fill(paint) => {
             let paint = paint.with_opacity(opacity);
             write_paint_definition(output, prefix, index, "fill", paint)?;
@@ -116,7 +119,7 @@ fn write_command(
                 scene.width(),
                 scene.height()
             )
-            .map_err(|_| CatError::SvgWrite)?;
+            .map_err(|_| AvatarError::SvgWrite)?;
             write_paint_attribute(output, prefix, index, "fill", "fill", paint)?;
             write_text(output, "/>")
         }
@@ -201,7 +204,7 @@ fn write_command(
         ),
         Command::PushClip(clip) => write_clip(output, scene, prefix, index, clip),
         Command::PopClip => write_text(output, "</g>"),
-        Command::PushOpacity(_) | Command::PopOpacity => Err(CatError::InvalidScene),
+        Command::PushOpacity(_) | Command::PopOpacity => Err(AvatarError::InvalidScene),
     }
 }
 
@@ -213,7 +216,7 @@ fn write_path(
     fill_rule: FillRule,
     fill: Option<Paint>,
     stroke: Option<Stroke>,
-) -> Result<(), CatError> {
+) -> Result<(), AvatarError> {
     if let Some(paint) = fill {
         write_paint_definition(output, prefix, index, "fill", paint)?;
     }
@@ -228,16 +231,16 @@ fn write_path(
         None => write_text(output, " fill=\"none\"")?,
     }
     write!(output, " fill-rule=\"{}\"", fill_rule_name(fill_rule))
-        .map_err(|_| CatError::SvgWrite)?;
+        .map_err(|_| AvatarError::SvgWrite)?;
     if let Some(stroke) = stroke {
         write_stroke(output, prefix, index, stroke)?;
     }
     write_text(output, "/>")
 }
 
-pub(super) fn write_path_data(output: &mut impl Write, path: &Path) -> Result<(), CatError> {
+pub(super) fn write_path_data(output: &mut impl Write, path: &Path) -> Result<(), AvatarError> {
     let mut points = path.points()?.iter();
-    let first = points.next().ok_or(CatError::InvalidScene)?;
+    let first = points.next().ok_or(AvatarError::InvalidScene)?;
     write_text(output, "M")?;
     write_point(output, *first)?;
     for point in points {
@@ -262,7 +265,7 @@ fn write_stroke(
     prefix: &str,
     index: usize,
     stroke: Stroke,
-) -> Result<(), CatError> {
+) -> Result<(), AvatarError> {
     write_paint_attribute(output, prefix, index, "stroke", "stroke", stroke.paint)?;
     write_text(output, " stroke-width=\"")?;
     write_number(output, stroke.width)?;
@@ -278,7 +281,7 @@ fn write_paint_definition(
     index: usize,
     role: &str,
     paint: Paint,
-) -> Result<(), CatError> {
+) -> Result<(), AvatarError> {
     let Paint::LinearGradient {
         start,
         end,
@@ -289,7 +292,7 @@ fn write_paint_definition(
         return Ok(());
     };
     write!(output, "<defs><linearGradient id=\"{prefix}-{role}-{index}\" gradientUnits=\"userSpaceOnUse\" x1=\"")
-        .map_err(|_| CatError::SvgWrite)?;
+        .map_err(|_| AvatarError::SvgWrite)?;
     write_point_axis(output, start, true)?;
     write_text(output, "\" x2=\"")?;
     write_point_axis(output, end, true)?;
@@ -311,12 +314,12 @@ fn write_paint_attribute(
     role: &str,
     attribute: &str,
     paint: Paint,
-) -> Result<(), CatError> {
+) -> Result<(), AvatarError> {
     match paint {
         Paint::Solid(color) => write_color_attribute(output, attribute, color),
         Paint::LinearGradient { .. } => {
             write!(output, " {attribute}=\"url(#{prefix}-{role}-{index})\"")
-                .map_err(|_| CatError::SvgWrite)
+                .map_err(|_| AvatarError::SvgWrite)
         }
     }
 }
@@ -325,27 +328,27 @@ fn write_color_attribute(
     output: &mut impl Write,
     attribute: &str,
     color: Color,
-) -> Result<(), CatError> {
+) -> Result<(), AvatarError> {
     write!(
         output,
         " {attribute}=\"#{:02x}{:02x}{:02x}\"",
         color.red, color.green, color.blue
     )
-    .map_err(|_| CatError::SvgWrite)?;
+    .map_err(|_| AvatarError::SvgWrite)?;
     if color.alpha != u8::MAX {
         let opacity_attribute = match attribute {
             "stop-color" => "stop-opacity",
             "stroke" => "stroke-opacity",
             _ => "fill-opacity",
         };
-        write!(output, " {opacity_attribute}=\"").map_err(|_| CatError::SvgWrite)?;
+        write!(output, " {opacity_attribute}=\"").map_err(|_| AvatarError::SvgWrite)?;
         write_opacity(output, color.alpha)?;
         write_text(output, "\"")?;
     }
     Ok(())
 }
 
-fn write_opacity(output: &mut impl Write, opacity: u8) -> Result<(), CatError> {
+fn write_opacity(output: &mut impl Write, opacity: u8) -> Result<(), AvatarError> {
     if opacity == 0 {
         return write_text(output, "0");
     }
@@ -357,16 +360,16 @@ fn write_opacity(output: &mut impl Write, opacity: u8) -> Result<(), CatError> {
         .checked_mul(scale)
         .and_then(|value| value.checked_add(127))
         .and_then(|value| value.checked_div(255))
-        .ok_or(CatError::NumericRange)?;
+        .ok_or(AvatarError::NumericRange)?;
     let mut digits = 16_usize;
     while fraction % 10 == 0 {
         fraction /= 10;
-        digits = digits.checked_sub(1).ok_or(CatError::NumericRange)?;
+        digits = digits.checked_sub(1).ok_or(AvatarError::NumericRange)?;
     }
-    write!(output, "0.{fraction:0digits$}").map_err(|_| CatError::SvgWrite)
+    write!(output, "0.{fraction:0digits$}").map_err(|_| AvatarError::SvgWrite)
 }
 
-pub(super) fn write_rect_values(output: &mut impl Write, rect: Rect) -> Result<(), CatError> {
+pub(super) fn write_rect_values(output: &mut impl Write, rect: Rect) -> Result<(), AvatarError> {
     write_number(output, rect.left)?;
     write_text(output, "\" y=\"")?;
     write_number(output, rect.top)?;
@@ -376,7 +379,7 @@ pub(super) fn write_rect_values(output: &mut impl Write, rect: Rect) -> Result<(
     write_number(output, rect.bottom.checked_sub(rect.top)?)
 }
 
-fn write_points(output: &mut impl Write, points: &[Point]) -> Result<(), CatError> {
+fn write_points(output: &mut impl Write, points: &[Point]) -> Result<(), AvatarError> {
     for (index, point) in points.iter().enumerate() {
         if index > 0 {
             write_text(output, " ")?;
@@ -386,25 +389,29 @@ fn write_points(output: &mut impl Write, points: &[Point]) -> Result<(), CatErro
     Ok(())
 }
 
-fn write_point(output: &mut impl Write, point: Point) -> Result<(), CatError> {
+fn write_point(output: &mut impl Write, point: Point) -> Result<(), AvatarError> {
     write_number(output, point.x)?;
     write_text(output, ",")?;
     write_number(output, point.y)
 }
 
-fn write_point_axis(output: &mut impl Write, point: Point, x_axis: bool) -> Result<(), CatError> {
+fn write_point_axis(
+    output: &mut impl Write,
+    point: Point,
+    x_axis: bool,
+) -> Result<(), AvatarError> {
     write_number(output, if x_axis { point.x } else { point.y })
 }
 
-pub(super) fn write_number(output: &mut impl Write, value: Fixed) -> Result<(), CatError> {
-    write_decimal(output, value).map_err(|_| CatError::SvgWrite)
+pub(super) fn write_number(output: &mut impl Write, value: Fixed) -> Result<(), AvatarError> {
+    write_decimal(output, value).map_err(|_| AvatarError::SvgWrite)
 }
 
-pub(super) fn write_text(output: &mut impl Write, value: &str) -> Result<(), CatError> {
-    output.write_str(value).map_err(|_| CatError::SvgWrite)
+pub(super) fn write_text(output: &mut impl Write, value: &str) -> Result<(), AvatarError> {
+    output.write_str(value).map_err(|_| AvatarError::SvgWrite)
 }
 
-fn write_escaped(output: &mut impl Write, value: &str) -> Result<(), CatError> {
+fn write_escaped(output: &mut impl Write, value: &str) -> Result<(), AvatarError> {
     for character in value.chars() {
         write_text(
             output,
@@ -417,7 +424,7 @@ fn write_escaped(output: &mut impl Write, value: &str) -> Result<(), CatError> {
                 _ => {
                     output
                         .write_char(character)
-                        .map_err(|_| CatError::SvgWrite)?;
+                        .map_err(|_| AvatarError::SvgWrite)?;
                     continue;
                 }
             },
@@ -431,11 +438,11 @@ struct SvgBuffer {
 }
 
 impl SvgBuffer {
-    fn new() -> Result<Self, CatError> {
+    fn new() -> Result<Self, AvatarError> {
         let mut inner = String::new();
         inner
             .try_reserve_exact(SVG_CAPACITY)
-            .map_err(|_| CatError::Allocation)?;
+            .map_err(|_| AvatarError::Allocation)?;
         Ok(Self { inner })
     }
 

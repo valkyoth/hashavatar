@@ -2,7 +2,7 @@
 
 use hashavatar::CatRequest;
 
-fn main() -> Result<(), hashavatar::CatError> {
+fn main() -> Result<(), hashavatar::AvatarError> {
     let prepared = CatRequest::new(256, 256, 0, b"example-user")?.prepare()?;
     let image = prepared.render_rgba()?;
     let svg = prepared.render_svg()?;

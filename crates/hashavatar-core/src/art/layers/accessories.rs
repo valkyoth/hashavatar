@@ -1,6 +1,6 @@
 use super::common::{LayerRig, ellipse, line, rect, triangle};
 use crate::{
-    AvatarAccessory, AvatarAnchorSet, AvatarColorRoles, CatError, geometry::Point, paint::Color,
+    AvatarAccessory, AvatarAnchorSet, AvatarColorRoles, AvatarError, geometry::Point, paint::Color,
     scene::Scene,
 };
 
@@ -10,7 +10,7 @@ pub(super) fn compile(
     colors: AvatarColorRoles,
     accessory: AvatarAccessory,
     adjustment: i16,
-) -> Result<(), CatError> {
+) -> Result<(), AvatarError> {
     let rig = LayerRig::new(scene, anchors, colors)?;
     match accessory {
         AvatarAccessory::Glasses => glasses(scene, rig, adjustment),
@@ -25,7 +25,7 @@ pub(super) fn compile(
     }
 }
 
-fn glasses(scene: &mut Scene, rig: LayerRig, adjustment: i16) -> Result<(), CatError> {
+fn glasses(scene: &mut Scene, rig: LayerRig, adjustment: i16) -> Result<(), AvatarError> {
     let left = rig.point(rig.anchors.left_eye(), adjustment)?;
     let right = rig.point(rig.anchors.right_eye(), adjustment)?;
     let outer = rig
@@ -45,7 +45,7 @@ fn glasses(scene: &mut Scene, rig: LayerRig, adjustment: i16) -> Result<(), CatE
     line(scene, left, right, rig.size(100)?, rig.ink)
 }
 
-fn hat(scene: &mut Scene, rig: LayerRig, adjustment: i16) -> Result<(), CatError> {
+fn hat(scene: &mut Scene, rig: LayerRig, adjustment: i16) -> Result<(), AvatarError> {
     let top = rig.point(rig.anchors.crown(), adjustment)?;
     let half = rig.face_half()?;
     let body_half = half.checked_mul(crate::fixed::Fixed::from_ratio(7, 10)?)?;
@@ -69,7 +69,7 @@ fn hat(scene: &mut Scene, rig: LayerRig, adjustment: i16) -> Result<(), CatError
     )
 }
 
-fn headphones(scene: &mut Scene, rig: LayerRig, adjustment: i16) -> Result<(), CatError> {
+fn headphones(scene: &mut Scene, rig: LayerRig, adjustment: i16) -> Result<(), AvatarError> {
     let left_eye = rig.point(rig.anchors.left_eye(), adjustment)?;
     let right_eye = rig.point(rig.anchors.right_eye(), adjustment)?;
     let crown = rig.point(rig.anchors.crown(), adjustment)?;
@@ -84,7 +84,7 @@ fn headphones(scene: &mut Scene, rig: LayerRig, adjustment: i16) -> Result<(), C
     Ok(())
 }
 
-fn crown(scene: &mut Scene, rig: LayerRig, adjustment: i16) -> Result<(), CatError> {
+fn crown(scene: &mut Scene, rig: LayerRig, adjustment: i16) -> Result<(), AvatarError> {
     let top = rig.point(rig.anchors.crown(), adjustment)?;
     let half = rig
         .face_half()?
@@ -123,7 +123,7 @@ fn crown(scene: &mut Scene, rig: LayerRig, adjustment: i16) -> Result<(), CatErr
     )
 }
 
-fn bowtie(scene: &mut Scene, rig: LayerRig, adjustment: i16) -> Result<(), CatError> {
+fn bowtie(scene: &mut Scene, rig: LayerRig, adjustment: i16) -> Result<(), AvatarError> {
     let neck = rig.point(rig.anchors.neck(), adjustment)?;
     let width = rig.size(1_250)?;
     let height = rig.size(850)?;
@@ -148,7 +148,7 @@ fn bowtie(scene: &mut Scene, rig: LayerRig, adjustment: i16) -> Result<(), CatEr
     ellipse(scene, neck, rig.size(350)?, rig.size(350)?, rig.ink)
 }
 
-fn eyepatch(scene: &mut Scene, rig: LayerRig, adjustment: i16) -> Result<(), CatError> {
+fn eyepatch(scene: &mut Scene, rig: LayerRig, adjustment: i16) -> Result<(), AvatarError> {
     let left = rig.point(rig.anchors.left_eye(), adjustment)?;
     let right = rig.point(rig.anchors.right_eye(), adjustment)?;
     let crown = rig.point(rig.anchors.crown(), adjustment)?;
@@ -170,7 +170,7 @@ fn eyepatch(scene: &mut Scene, rig: LayerRig, adjustment: i16) -> Result<(), Cat
     )
 }
 
-fn scarf(scene: &mut Scene, rig: LayerRig, adjustment: i16) -> Result<(), CatError> {
+fn scarf(scene: &mut Scene, rig: LayerRig, adjustment: i16) -> Result<(), AvatarError> {
     let neck = rig.point(rig.anchors.neck(), adjustment)?;
     let half = rig
         .face_half()?
@@ -194,7 +194,7 @@ fn scarf(scene: &mut Scene, rig: LayerRig, adjustment: i16) -> Result<(), CatErr
     )
 }
 
-fn halo(scene: &mut Scene, rig: LayerRig, adjustment: i16) -> Result<(), CatError> {
+fn halo(scene: &mut Scene, rig: LayerRig, adjustment: i16) -> Result<(), AvatarError> {
     let crown = rig.point(rig.anchors.crown(), adjustment)?;
     ellipse(
         scene,
@@ -206,7 +206,7 @@ fn halo(scene: &mut Scene, rig: LayerRig, adjustment: i16) -> Result<(), CatErro
     )
 }
 
-fn horns(scene: &mut Scene, rig: LayerRig, adjustment: i16) -> Result<(), CatError> {
+fn horns(scene: &mut Scene, rig: LayerRig, adjustment: i16) -> Result<(), AvatarError> {
     let crown = rig.point(rig.anchors.crown(), adjustment)?;
     let half = rig.face_half()?;
     let rise = rig.size(1_800)?;

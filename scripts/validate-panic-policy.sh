@@ -32,6 +32,7 @@ check_file() {
 }
 
 find src crates -type f -name '*.rs' \
+    ! -path '*/tests/*' \
     ! -name 'tests.rs' \
     ! -name 'kani_proofs.rs' \
     -print |

@@ -2,7 +2,7 @@ use core::fmt::Write;
 
 use super::{fill_rule_name, write_number, write_path_data, write_rect_values, write_text};
 use crate::{
-    CatError,
+    AvatarError,
     scene::{Clip, Scene},
 };
 
@@ -12,9 +12,9 @@ pub(super) fn write_clip(
     prefix: &str,
     index: usize,
     clip: Clip,
-) -> Result<(), CatError> {
+) -> Result<(), AvatarError> {
     write!(output, "<defs><clipPath id=\"{prefix}-clip-{index}\">")
-        .map_err(|_| CatError::SvgWrite)?;
+        .map_err(|_| AvatarError::SvgWrite)?;
     match clip {
         Clip::Rect(rect) => {
             write_text(output, "<rect x=\"")?;
@@ -43,12 +43,12 @@ pub(super) fn write_clip(
             write_text(output, "<path d=\"")?;
             write_path_data(output, scene.path(path_index)?)?;
             write!(output, "\" clip-rule=\"{}\"/>", fill_rule_name(fill_rule))
-                .map_err(|_| CatError::SvgWrite)?;
+                .map_err(|_| AvatarError::SvgWrite)?;
         }
     }
     write!(
         output,
         "</clipPath></defs><g clip-path=\"url(#{prefix}-clip-{index})\">"
     )
-    .map_err(|_| CatError::SvgWrite)
+    .map_err(|_| AvatarError::SvgWrite)
 }

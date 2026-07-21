@@ -2,14 +2,14 @@ mod accessories;
 mod common;
 mod expressions;
 
-use crate::{AvatarZBand, CatError, LayoutReport, ResolvedStyle, scene::Scene};
+use crate::{AvatarError, AvatarZBand, LayoutReport, ResolvedStyle, scene::Scene};
 
 pub(super) fn compile_accessories(
     scene: &mut Scene,
     style: ResolvedStyle,
     layout: &LayoutReport,
     band: AvatarZBand,
-) -> Result<(), CatError> {
+) -> Result<(), AvatarError> {
     let Some(anchors) = layout.anchors() else {
         return Ok(());
     };
@@ -33,7 +33,7 @@ pub(super) fn compile_expression(
     scene: &mut Scene,
     style: ResolvedStyle,
     layout: &LayoutReport,
-) -> Result<(), CatError> {
+) -> Result<(), AvatarError> {
     let Some(anchors) = layout.anchors() else {
         return Ok(());
     };

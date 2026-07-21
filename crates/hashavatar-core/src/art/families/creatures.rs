@@ -1,18 +1,22 @@
 use super::common::{FamilyRig, ellipse, eyes, line, polygon, smile, triangle};
-use crate::{AvatarKind, CatError, geometry::Point, scene::Scene};
+use crate::{AvatarError, AvatarKind, geometry::Point, scene::Scene};
 
-pub(super) fn compile(scene: &mut Scene, kind: AvatarKind, rig: FamilyRig) -> Result<(), CatError> {
+pub(super) fn compile(
+    scene: &mut Scene,
+    kind: AvatarKind,
+    rig: FamilyRig,
+) -> Result<(), AvatarError> {
     match kind {
         AvatarKind::Ghost => ghost(scene, rig),
         AvatarKind::Slime => slime(scene, rig),
         AvatarKind::Bird => bird(scene, rig),
         AvatarKind::Octopus => octopus(scene, rig),
         AvatarKind::Penguin => penguin(scene, rig),
-        _ => Err(CatError::InvalidScene),
+        _ => Err(AvatarError::InvalidScene),
     }
 }
 
-fn ghost(scene: &mut Scene, rig: FamilyRig) -> Result<(), CatError> {
+fn ghost(scene: &mut Scene, rig: FamilyRig) -> Result<(), AvatarError> {
     polygon(
         scene,
         rig,
@@ -42,7 +46,7 @@ fn ghost(scene: &mut Scene, rig: FamilyRig) -> Result<(), CatError> {
     )
 }
 
-fn slime(scene: &mut Scene, rig: FamilyRig) -> Result<(), CatError> {
+fn slime(scene: &mut Scene, rig: FamilyRig) -> Result<(), AvatarError> {
     polygon(
         scene,
         rig,
@@ -66,7 +70,7 @@ fn slime(scene: &mut Scene, rig: FamilyRig) -> Result<(), CatError> {
     smile(scene, rig, 65)
 }
 
-fn bird(scene: &mut Scene, rig: FamilyRig) -> Result<(), CatError> {
+fn bird(scene: &mut Scene, rig: FamilyRig) -> Result<(), AvatarError> {
     ellipse(
         scene,
         Point::new(rig.canvas.x(50)?, rig.canvas.y(57)?),
@@ -106,7 +110,7 @@ fn bird(scene: &mut Scene, rig: FamilyRig) -> Result<(), CatError> {
     )
 }
 
-fn octopus(scene: &mut Scene, rig: FamilyRig) -> Result<(), CatError> {
+fn octopus(scene: &mut Scene, rig: FamilyRig) -> Result<(), AvatarError> {
     ellipse(
         scene,
         Point::new(rig.canvas.x(50)?, rig.canvas.y(47)?),
@@ -127,7 +131,7 @@ fn octopus(scene: &mut Scene, rig: FamilyRig) -> Result<(), CatError> {
     smile(scene, rig, 60)
 }
 
-fn penguin(scene: &mut Scene, rig: FamilyRig) -> Result<(), CatError> {
+fn penguin(scene: &mut Scene, rig: FamilyRig) -> Result<(), AvatarError> {
     ellipse(
         scene,
         Point::new(rig.canvas.x(50)?, rig.canvas.y(55)?),

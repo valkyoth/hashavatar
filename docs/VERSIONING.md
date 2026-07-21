@@ -51,6 +51,19 @@ order, family anchor profiles, and complete decision reporting. Layer-free
 alpha.3 KATs remain unchanged; layered pixels remain prerelease evidence rather
 than a stable compatibility promise.
 
+## Alpha.5 Contract
+
+Alpha.5 records deterministic evidence for the prepared-request and
+established-format boundaries. It adds owned redacted identities, resource
+budgets, reusable RGBA storage, independent public key domains, and an isolated
+format provider. The semantic WebP, PNG, JPEG, and GIF settings and alpha
+behavior are named contracts; only WebP and PNG decode exactly to canonical
+RGBA. Encoded byte identity across dependency builds is not promised unless an
+application also binds an `EncoderBuildId` or hashes the final bytes.
+
+These APIs, key domains, settings, and package boundaries remain prerelease
+evidence and may change before stable 2.0 with explicit migration notes.
+
 ## Exact 1.x Output
 
 Applications requiring exact 1.x output should pin `=1.3.0` or a later

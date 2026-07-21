@@ -1,4 +1,4 @@
-use crate::CatError;
+use crate::AvatarError;
 
 const MAX_ID_PREFIX_BYTES: usize = 64;
 const MAX_TITLE_BYTES: usize = 256;
@@ -28,7 +28,7 @@ impl<'a> SvgOptions<'a> {
         id_prefix: &'a str,
         title: &'a str,
         description: &'a str,
-    ) -> Result<Self, CatError> {
+    ) -> Result<Self, AvatarError> {
         let options = Self {
             mode: SvgMode::Document,
             id_prefix,
@@ -40,7 +40,7 @@ impl<'a> SvgOptions<'a> {
     }
 
     /// Creates an embeddable fragment. Accessibility belongs to its host.
-    pub fn fragment(id_prefix: &'a str) -> Result<Self, CatError> {
+    pub fn fragment(id_prefix: &'a str) -> Result<Self, AvatarError> {
         let options = Self {
             mode: SvgMode::Fragment,
             id_prefix,
@@ -61,7 +61,7 @@ impl<'a> SvgOptions<'a> {
         self.id_prefix
     }
 
-    pub(super) fn validate(self) -> Result<(), CatError> {
+    pub(super) fn validate(self) -> Result<(), AvatarError> {
         let mut chars = self.id_prefix.chars();
         let valid_first = chars
             .next()
@@ -70,22 +70,22 @@ impl<'a> SvgOptions<'a> {
             || self.id_prefix.len() > MAX_ID_PREFIX_BYTES
             || !chars.all(|value| value.is_ascii_alphanumeric() || matches!(value, '-' | '_'))
         {
-            return Err(CatError::InvalidSvgOptions);
+            return Err(AvatarError::InvalidSvgOptions);
         }
         match self.mode {
             SvgMode::Document => {
-                let title = self.title.ok_or(CatError::InvalidSvgOptions)?;
-                let description = self.description.ok_or(CatError::InvalidSvgOptions)?;
+                let title = self.title.ok_or(AvatarError::InvalidSvgOptions)?;
+                let description = self.description.ok_or(AvatarError::InvalidSvgOptions)?;
                 if title.len() > MAX_TITLE_BYTES
                     || description.len() > MAX_DESCRIPTION_BYTES
                     || !title.chars().all(valid_xml_character)
                     || !description.chars().all(valid_xml_character)
                 {
-                    return Err(CatError::InvalidSvgOptions);
+                    return Err(AvatarError::InvalidSvgOptions);
                 }
             }
             SvgMode::Fragment if self.title.is_some() || self.description.is_some() => {
-                return Err(CatError::InvalidSvgOptions);
+                return Err(AvatarError::InvalidSvgOptions);
             }
             SvgMode::Fragment => {}
         }

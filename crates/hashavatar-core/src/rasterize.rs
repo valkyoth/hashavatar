@@ -1,5 +1,5 @@
 use crate::{
-    CatError,
+    AvatarError,
     fixed::Fixed,
     geometry::{FillRule, Path, Point, Rect},
     paint::Paint,
@@ -11,7 +11,7 @@ pub(crate) fn draw_rect(
     writer: &mut SurfaceWriter<'_, '_, '_>,
     rect: Rect,
     paint: Paint,
-) -> Result<(), CatError> {
+) -> Result<(), AvatarError> {
     let bounds = Bounds::new(rect.left, rect.top, rect.right, rect.bottom, writer)?;
     visit_bounds(
         writer,
@@ -32,7 +32,7 @@ pub(crate) fn draw_ellipse(
     radius_x: Fixed,
     radius_y: Fixed,
     paint: Paint,
-) -> Result<(), CatError> {
+) -> Result<(), AvatarError> {
     let bounds = Bounds::new(
         center.x.checked_sub(radius_x)?,
         center.y.checked_sub(radius_y)?,
@@ -42,9 +42,9 @@ pub(crate) fn draw_ellipse(
     )?;
     let rx = i128::from(radius_x.raw());
     let ry = i128::from(radius_y.raw());
-    let rx2 = rx.checked_mul(rx).ok_or(CatError::NumericRange)?;
-    let ry2 = ry.checked_mul(ry).ok_or(CatError::NumericRange)?;
-    let limit = rx2.checked_mul(ry2).ok_or(CatError::NumericRange)?;
+    let rx2 = rx.checked_mul(rx).ok_or(AvatarError::NumericRange)?;
+    let ry2 = ry.checked_mul(ry).ok_or(AvatarError::NumericRange)?;
+    let limit = rx2.checked_mul(ry2).ok_or(AvatarError::NumericRange)?;
     visit_bounds(
         writer,
         bounds,
@@ -59,7 +59,7 @@ pub(crate) fn draw_ellipse(
                         .and_then(|term| term.checked_mul(rx2))
                         .and_then(|term| number.checked_add(term))
                 })
-                .ok_or(CatError::NumericRange)?;
+                .ok_or(AvatarError::NumericRange)?;
             Ok(value <= limit)
         },
         paint,
@@ -70,16 +70,16 @@ pub(crate) fn draw_triangle(
     writer: &mut SurfaceWriter<'_, '_, '_>,
     points: [Point; 3],
     paint: Paint,
-) -> Result<(), CatError> {
+) -> Result<(), AvatarError> {
     let bounds = Bounds::for_points(&points, writer)?;
     let winding = triangle_area(points);
     visit_bounds(
         writer,
         bounds,
         |sample| {
-            let a = *points.first().ok_or(CatError::InvalidScene)?;
-            let b = *points.get(1).ok_or(CatError::InvalidScene)?;
-            let c = *points.get(2).ok_or(CatError::InvalidScene)?;
+            let a = *points.first().ok_or(AvatarError::InvalidScene)?;
+            let b = *points.get(1).ok_or(AvatarError::InvalidScene)?;
+            let c = *points.get(2).ok_or(AvatarError::InvalidScene)?;
             let edges = [edge(a, b, sample), edge(b, c, sample), edge(c, a, sample)];
             Ok(if winding > 0 {
                 edges.iter().all(|value| *value >= 0)
@@ -96,7 +96,7 @@ pub(crate) fn draw_line(
     start: Point,
     end: Point,
     stroke: Stroke,
-) -> Result<(), CatError> {
+) -> Result<(), AvatarError> {
     let half = stroke.width.checked_mul(Fixed::from_ratio(1, 2)?)?;
     let bounds = Bounds::new(
         start.x.min(end.x).checked_sub(half)?,
@@ -119,7 +119,7 @@ pub(crate) fn draw_path(
     fill_rule: FillRule,
     fill: Option<Paint>,
     stroke: Option<Stroke>,
-) -> Result<(), CatError> {
+) -> Result<(), AvatarError> {
     let points = path.points()?;
     if let Some(paint) = fill {
         let bounds = Bounds::for_points(points, writer)?;
@@ -132,13 +132,13 @@ pub(crate) fn draw_path(
     }
     if let Some(stroke) = stroke {
         for pair in points.windows(2) {
-            let start = *pair.first().ok_or(CatError::InvalidScene)?;
-            let end = *pair.get(1).ok_or(CatError::InvalidScene)?;
+            let start = *pair.first().ok_or(AvatarError::InvalidScene)?;
+            let end = *pair.get(1).ok_or(AvatarError::InvalidScene)?;
             draw_line(writer, start, end, stroke)?;
         }
         if path.is_closed() {
-            let start = *points.last().ok_or(CatError::InvalidScene)?;
-            let end = *points.first().ok_or(CatError::InvalidScene)?;
+            let start = *points.last().ok_or(AvatarError::InvalidScene)?;
+            let end = *points.first().ok_or(AvatarError::InvalidScene)?;
             draw_line(writer, start, end, stroke)?;
         }
     }
@@ -148,9 +148,9 @@ pub(crate) fn draw_path(
 fn visit_bounds(
     writer: &mut SurfaceWriter<'_, '_, '_>,
     bounds: Bounds,
-    mut contains: impl FnMut(Point) -> Result<bool, CatError>,
+    mut contains: impl FnMut(Point) -> Result<bool, AvatarError>,
     paint: Paint,
-) -> Result<(), CatError> {
+) -> Result<(), AvatarError> {
     for y in bounds.min_y..bounds.max_y {
         let sample_y = Fixed::pixel_center(y)?;
         for x in bounds.min_x..bounds.max_x {
@@ -163,7 +163,12 @@ fn visit_bounds(
     Ok(())
 }
 
-fn line_contains(start: Point, end: Point, radius: Fixed, sample: Point) -> Result<bool, CatError> {
+fn line_contains(
+    start: Point,
+    end: Point,
+    radius: Fixed,
+    sample: Point,
+) -> Result<bool, AvatarError> {
     let vx = i128::from(end.x.raw()) - i128::from(start.x.raw());
     let vy = i128::from(end.y.raw()) - i128::from(start.y.raw());
     let wx = i128::from(sample.x.raw()) - i128::from(start.x.raw());
@@ -171,17 +176,17 @@ fn line_contains(start: Point, end: Point, radius: Fixed, sample: Point) -> Resu
     let length_squared = vx
         .checked_mul(vx)
         .and_then(|value| value.checked_add(vy.checked_mul(vy)?))
-        .ok_or(CatError::NumericRange)?;
+        .ok_or(AvatarError::NumericRange)?;
     if length_squared == 0 {
-        return Err(CatError::InvalidScene);
+        return Err(AvatarError::InvalidScene);
     }
     let projection = wx
         .checked_mul(vx)
         .and_then(|value| value.checked_add(wy.checked_mul(vy)?))
-        .ok_or(CatError::NumericRange)?;
+        .ok_or(AvatarError::NumericRange)?;
     let radius_squared = i128::from(radius.raw())
         .checked_mul(i128::from(radius.raw()))
-        .ok_or(CatError::NumericRange)?;
+        .ok_or(AvatarError::NumericRange)?;
     if projection <= 0 {
         return point_distance_squared(sample, start).map(|value| value <= radius_squared);
     }
@@ -191,7 +196,7 @@ fn line_contains(start: Point, end: Point, radius: Fixed, sample: Point) -> Resu
     let cross = vx
         .checked_mul(wy)
         .and_then(|value| value.checked_sub(vy.checked_mul(wx)?))
-        .ok_or(CatError::NumericRange)?;
+        .ok_or(AvatarError::NumericRange)?;
     cross
         .checked_mul(cross)
         .and_then(|value| {
@@ -199,18 +204,18 @@ fn line_contains(start: Point, end: Point, radius: Fixed, sample: Point) -> Resu
                 .checked_mul(length_squared)
                 .map(|limit| value <= limit)
         })
-        .ok_or(CatError::NumericRange)
+        .ok_or(AvatarError::NumericRange)
 }
 
-fn point_distance_squared(first: Point, second: Point) -> Result<i128, CatError> {
+fn point_distance_squared(first: Point, second: Point) -> Result<i128, AvatarError> {
     let dx = i128::from(first.x.raw()) - i128::from(second.x.raw());
     let dy = i128::from(first.y.raw()) - i128::from(second.y.raw());
     dx.checked_mul(dx)
         .and_then(|value| value.checked_add(dy.checked_mul(dy)?))
-        .ok_or(CatError::NumericRange)
+        .ok_or(AvatarError::NumericRange)
 }
 
-pub(crate) fn clip_contains(scene: &Scene, clip: Clip, sample: Point) -> Result<bool, CatError> {
+pub(crate) fn clip_contains(scene: &Scene, clip: Clip, sample: Point) -> Result<bool, AvatarError> {
     match clip {
         Clip::Rect(rect) => Ok(sample.x >= rect.left
             && sample.x < rect.right
@@ -237,11 +242,11 @@ fn ellipse_contains(
     radius_x: Fixed,
     radius_y: Fixed,
     sample: Point,
-) -> Result<bool, CatError> {
+) -> Result<bool, AvatarError> {
     let rx = i128::from(radius_x.raw());
     let ry = i128::from(radius_y.raw());
-    let rx2 = rx.checked_mul(rx).ok_or(CatError::NumericRange)?;
-    let ry2 = ry.checked_mul(ry).ok_or(CatError::NumericRange)?;
+    let rx2 = rx.checked_mul(rx).ok_or(AvatarError::NumericRange)?;
+    let ry2 = ry.checked_mul(ry).ok_or(AvatarError::NumericRange)?;
     let dx = i128::from(sample.x.raw()) - i128::from(center.x.raw());
     let dy = i128::from(sample.y.raw()) - i128::from(center.y.raw());
     let value = dx
@@ -252,8 +257,8 @@ fn ellipse_contains(
                 .and_then(|term| term.checked_mul(rx2))
                 .and_then(|term| number.checked_add(term))
         })
-        .ok_or(CatError::NumericRange)?;
-    Ok(value <= rx2.checked_mul(ry2).ok_or(CatError::NumericRange)?)
+        .ok_or(AvatarError::NumericRange)?;
+    Ok(value <= rx2.checked_mul(ry2).ok_or(AvatarError::NumericRange)?)
 }
 
 fn path_contains(points: &[Point], sample: Point, fill_rule: FillRule) -> bool {
@@ -297,8 +302,11 @@ struct Bounds {
 }
 
 impl Bounds {
-    fn for_points(points: &[Point], writer: &SurfaceWriter<'_, '_, '_>) -> Result<Self, CatError> {
-        let first = points.first().ok_or(CatError::InvalidScene)?;
+    fn for_points(
+        points: &[Point],
+        writer: &SurfaceWriter<'_, '_, '_>,
+    ) -> Result<Self, AvatarError> {
+        let first = points.first().ok_or(AvatarError::InvalidScene)?;
         let mut min_x = first.x;
         let mut max_x = first.x;
         let mut min_y = first.y;
@@ -318,18 +326,18 @@ impl Bounds {
         max_x: Fixed,
         max_y: Fixed,
         writer: &SurfaceWriter<'_, '_, '_>,
-    ) -> Result<Self, CatError> {
-        let width = i32::try_from(writer.width()).map_err(|_| CatError::NumericRange)?;
-        let height = i32::try_from(writer.height()).map_err(|_| CatError::NumericRange)?;
+    ) -> Result<Self, AvatarError> {
+        let width = i32::try_from(writer.width()).map_err(|_| AvatarError::NumericRange)?;
+        let height = i32::try_from(writer.height()).map_err(|_| AvatarError::NumericRange)?;
         Ok(Self {
             min_x: u32::try_from(min_x.floor()?.clamp(0, width))
-                .map_err(|_| CatError::NumericRange)?,
+                .map_err(|_| AvatarError::NumericRange)?,
             max_x: u32::try_from(max_x.ceil()?.clamp(0, width))
-                .map_err(|_| CatError::NumericRange)?,
+                .map_err(|_| AvatarError::NumericRange)?,
             min_y: u32::try_from(min_y.floor()?.clamp(0, height))
-                .map_err(|_| CatError::NumericRange)?,
+                .map_err(|_| AvatarError::NumericRange)?,
             max_y: u32::try_from(max_y.ceil()?.clamp(0, height))
-                .map_err(|_| CatError::NumericRange)?,
+                .map_err(|_| AvatarError::NumericRange)?,
         })
     }
 }
@@ -339,11 +347,11 @@ mod tests {
     use super::*;
 
     #[test]
-    fn zero_length_line_is_rejected_without_division() -> Result<(), CatError> {
+    fn zero_length_line_is_rejected_without_division() -> Result<(), AvatarError> {
         let point = Point::new(Fixed::ZERO, Fixed::ZERO);
         assert_eq!(
             line_contains(point, point, Fixed::from_integer(1)?, point),
-            Err(CatError::InvalidScene)
+            Err(AvatarError::InvalidScene)
         );
         Ok(())
     }

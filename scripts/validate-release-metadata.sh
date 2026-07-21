@@ -14,14 +14,19 @@ print(next(package["version"] for package in data["packages"] if package["name"]
 
 facade_version="$(package_version hashavatar)"
 core_version="$(package_version hashavatar-core)"
+formats_version="$(package_version hashavatar-formats)"
 toolchain_version="$(sed -n 's/^channel = "\([^"]*\)"/\1/p' rust-toolchain.toml | sed -n '1p')"
 
-if [ "$facade_version" != "2.0.0-alpha.4" ]; then
-    echo "release metadata: facade must be 2.0.0-alpha.4, got $facade_version" >&2
+if [ "$facade_version" != "2.0.0-alpha.5" ]; then
+    echo "release metadata: facade must be 2.0.0-alpha.5, got $facade_version" >&2
     exit 1
 fi
-if [ "$core_version" != "0.1.0-alpha.4" ]; then
-    echo "release metadata: core must be 0.1.0-alpha.4, got $core_version" >&2
+if [ "$core_version" != "0.1.0-alpha.5" ]; then
+    echo "release metadata: core must be 0.1.0-alpha.5, got $core_version" >&2
+    exit 1
+fi
+if [ "$formats_version" != "0.1.0-alpha.5" ]; then
+    echo "release metadata: formats must be 0.1.0-alpha.5, got $formats_version" >&2
     exit 1
 fi
 if [ "$toolchain_version" != "1.97.1" ]; then
@@ -51,6 +56,8 @@ for required_file in \
     SECURITY.md \
     crates/hashavatar-core/Cargo.toml \
     crates/hashavatar-core/README.md \
+    crates/hashavatar-formats/Cargo.toml \
+    crates/hashavatar-formats/README.md \
     deny.toml \
     docs/CONTRIBUTING.md \
     docs/CRATE_VERSION_MATRIX.md \
@@ -75,7 +82,8 @@ for required_file in \
     docs/THIRD_PARTY_NOTICES.md \
     docs/VERSIONING.md \
     release-crates.toml \
-    release-notes/RELEASE_NOTES_2.0.0-alpha.4.md \
+    docs/FORMAT_CONTRACT.md \
+    release-notes/RELEASE_NOTES_2.0.0-alpha.5.md \
     rust-toolchain.toml \
     security/pentest/README.md
 do
@@ -86,12 +94,12 @@ if [ -e PENTEST.md ]; then
     echo "release metadata: root PENTEST.md is temporary and must be removed" >&2
     exit 1
 fi
-if ! grep -q '^## 2.0.0-alpha.4$' CHANGELOG.md; then
-    echo "release metadata: changelog is missing alpha.4" >&2
+if ! grep -q '^## 2.0.0-alpha.5$' CHANGELOG.md; then
+    echo "release metadata: changelog is missing alpha.5" >&2
     exit 1
 fi
-if ! grep -q 'version = "2.0.0-alpha.4"' release-crates.toml; then
-    echo "release metadata: release plan is not alpha.4" >&2
+if ! grep -q 'version = "2.0.0-alpha.5"' release-crates.toml; then
+    echo "release metadata: release plan is not alpha.5" >&2
     exit 1
 fi
 if grep -q '^publish = true$' release-crates.toml; then
@@ -111,6 +119,7 @@ fi
 for script in \
     scripts/check_doc_links.sh \
     scripts/check_fuzz.sh \
+    scripts/check_format_features.sh \
     scripts/check_kani.sh \
     scripts/checks.sh \
     scripts/generate-sbom.sh \
@@ -144,19 +153,26 @@ fi
 
 facade_files="$(cargo package -p hashavatar --locked --allow-dirty --list)"
 core_files="$(cargo package -p hashavatar-core --locked --allow-dirty --list)"
+formats_files="$(cargo package -p hashavatar-formats --locked --allow-dirty --list)"
 for file in Cargo.toml README.md src/lib.rs; do
     if ! printf '%s\n' "$facade_files" | grep -qx "$file"; then
         echo "release metadata: facade archive is missing $file" >&2
         exit 1
     fi
 done
-for file in Cargo.toml README.md src/lib.rs src/cat.rs src/raster.rs src/scene.rs src/svg.rs; do
+for file in Cargo.toml LICENSE-APACHE LICENSE-MIT README.md src/lib.rs src/cat.rs src/raster.rs src/scene.rs src/svg.rs; do
     if ! printf '%s\n' "$core_files" | grep -qx "$file"; then
         echo "release metadata: core archive is missing $file" >&2
         exit 1
     fi
 done
-if printf '%s\n%s\n' "$facade_files" "$core_files" | grep -q '^fuzz/'; then
+for file in Cargo.toml LICENSE-APACHE LICENSE-MIT README.md src/lib.rs src/encode.rs src/format.rs; do
+    if ! printf '%s\n' "$formats_files" | grep -qx "$file"; then
+        echo "release metadata: formats archive is missing $file" >&2
+        exit 1
+    fi
+done
+if printf '%s\n%s\n%s\n' "$facade_files" "$core_files" "$formats_files" | grep -q '^fuzz/'; then
     echo "release metadata: fuzz files must not ship in crate archives" >&2
     exit 1
 fi

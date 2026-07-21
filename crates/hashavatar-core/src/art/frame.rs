@@ -1,6 +1,6 @@
 use super::util::Canvas;
 use crate::{
-    AvatarShape, CatError,
+    AvatarError, AvatarShape,
     geometry::{FillRule, Path, Point},
     paint::{Color, Paint},
     scene::{Clip, Command, Scene},
@@ -8,7 +8,7 @@ use crate::{
 
 pub(super) struct Frame(bool);
 
-pub(super) fn begin(scene: &mut Scene, shape: AvatarShape) -> Result<Frame, CatError> {
+pub(super) fn begin(scene: &mut Scene, shape: AvatarShape) -> Result<Frame, AvatarError> {
     let canvas = Canvas::new(scene)?;
     scene.push(Command::Fill(Paint::solid(Color::TRANSPARENT)))?;
     let clip = match shape {
@@ -52,14 +52,14 @@ pub(super) fn begin(scene: &mut Scene, shape: AvatarShape) -> Result<Frame, CatE
     Ok(Frame(true))
 }
 
-pub(super) fn finish(scene: &mut Scene, frame: Frame) -> Result<(), CatError> {
+pub(super) fn finish(scene: &mut Scene, frame: Frame) -> Result<(), AvatarError> {
     if frame.0 {
         scene.push(Command::PopClip)?;
     }
     Ok(())
 }
 
-fn push_squircle(scene: &mut Scene, canvas: Canvas) -> Result<u8, CatError> {
+fn push_squircle(scene: &mut Scene, canvas: Canvas) -> Result<u8, AvatarError> {
     let left = canvas.x(3)?;
     let right = canvas.x(97)?;
     let top = canvas.y(3)?;
@@ -90,8 +90,12 @@ fn push_squircle(scene: &mut Scene, canvas: Canvas) -> Result<u8, CatError> {
     scene.push_path(path.finish(true)?)
 }
 
-fn push_polygon(scene: &mut Scene, canvas: Canvas, points: &[(i32, i32)]) -> Result<u8, CatError> {
-    let first = points.first().ok_or(CatError::InvalidScene)?;
+fn push_polygon(
+    scene: &mut Scene,
+    canvas: Canvas,
+    points: &[(i32, i32)],
+) -> Result<u8, AvatarError> {
+    let first = points.first().ok_or(AvatarError::InvalidScene)?;
     let mut path = Path::builder(Point::new(canvas.x(first.0)?, canvas.y(first.1)?))?;
     for point in points.iter().skip(1) {
         path.line_to(Point::new(canvas.x(point.0)?, canvas.y(point.1)?))?;

@@ -2,34 +2,34 @@ use super::*;
 use crate::paint::Color;
 
 #[test]
-fn malformed_commands_fail_before_execution() -> Result<(), CatError> {
+fn malformed_commands_fail_before_execution() -> Result<(), AvatarError> {
     let mut scene = Scene::new(64, 64)?;
     scene.push(Command::Fill(Paint::solid(Color::rgb(1, 2, 3))))?;
     scene.corrupt_first_command();
-    assert_eq!(scene.validate(), Err(CatError::InvalidScene));
+    assert_eq!(scene.validate(), Err(AvatarError::InvalidScene));
     Ok(())
 }
 
 #[test]
-fn stacks_must_balance() -> Result<(), CatError> {
+fn stacks_must_balance() -> Result<(), AvatarError> {
     let mut scene = Scene::new(64, 64)?;
     scene.push(Command::Fill(Paint::solid(Color::rgb(1, 2, 3))))?;
     scene.push(Command::PushOpacity(128))?;
-    assert_eq!(scene.validate(), Err(CatError::InvalidScene));
+    assert_eq!(scene.validate(), Err(AvatarError::InvalidScene));
     Ok(())
 }
 
 #[test]
-fn stack_underflow_is_rejected() -> Result<(), CatError> {
+fn stack_underflow_is_rejected() -> Result<(), AvatarError> {
     let mut scene = Scene::new(64, 64)?;
     scene.push(Command::Fill(Paint::solid(Color::rgb(1, 2, 3))))?;
     scene.push(Command::PopClip)?;
-    assert_eq!(scene.validate(), Err(CatError::InvalidScene));
+    assert_eq!(scene.validate(), Err(AvatarError::InvalidScene));
     Ok(())
 }
 
 #[test]
-fn transparent_background_is_valid_canonical_clear() -> Result<(), CatError> {
+fn transparent_background_is_valid_canonical_clear() -> Result<(), AvatarError> {
     let mut scene = Scene::new(64, 64)?;
     scene.push(Command::Fill(Paint::solid(Color::TRANSPARENT)))?;
     assert!(scene.validate().is_ok());
@@ -37,7 +37,7 @@ fn transparent_background_is_valid_canonical_clear() -> Result<(), CatError> {
 }
 
 #[test]
-fn clip_predicates_are_charged_for_every_enclosed_candidate_pixel() -> Result<(), CatError> {
+fn clip_predicates_are_charged_for_every_enclosed_candidate_pixel() -> Result<(), AvatarError> {
     let mut scene = Scene::new(64, 64)?;
     let paint = Paint::solid(Color::rgb(1, 2, 3));
     let zero = Fixed::ZERO;
@@ -72,7 +72,7 @@ fn clip_predicates_are_charged_for_every_enclosed_candidate_pixel() -> Result<()
 }
 
 #[test]
-fn path_clip_edges_are_charged_for_each_enclosed_command() -> Result<(), CatError> {
+fn path_clip_edges_are_charged_for_each_enclosed_command() -> Result<(), AvatarError> {
     let mut scene = Scene::new(64, 64)?;
     let paint = Paint::solid(Color::rgb(1, 2, 3));
     let zero = Fixed::ZERO;

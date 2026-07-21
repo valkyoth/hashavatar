@@ -1,6 +1,6 @@
 use super::util::{Canvas, themed_color};
 use crate::{
-    AvatarBackground, AvatarPalette, AvatarTraitVector, CatError, ResolvedStyle,
+    AvatarBackground, AvatarError, AvatarPalette, AvatarTraitVector, ResolvedStyle,
     geometry::Point,
     paint::{Color, Paint},
     scene::{Command, Scene, Stroke},
@@ -10,7 +10,7 @@ pub(super) fn compile(
     scene: &mut Scene,
     style: ResolvedStyle,
     traits: AvatarTraitVector,
-) -> Result<(), CatError> {
+) -> Result<(), AvatarError> {
     let canvas = Canvas::new(scene)?;
     match style.background() {
         AvatarBackground::Transparent => Ok(()),
@@ -52,7 +52,7 @@ pub(super) fn compile(
     }
 }
 
-fn push_solid(scene: &mut Scene, canvas: Canvas, color: Color) -> Result<(), CatError> {
+fn push_solid(scene: &mut Scene, canvas: Canvas, color: Color) -> Result<(), AvatarError> {
     scene.push(Command::Rect {
         rect: canvas.rect(),
         paint: Paint::solid(color),
@@ -64,7 +64,7 @@ fn push_gradient(
     canvas: Canvas,
     top: Color,
     bottom: Color,
-) -> Result<(), CatError> {
+) -> Result<(), AvatarError> {
     scene.push(Command::Rect {
         rect: canvas.rect(),
         paint: Paint::LinearGradient {
@@ -80,7 +80,7 @@ fn push_polka(
     scene: &mut Scene,
     canvas: Canvas,
     traits: AvatarTraitVector,
-) -> Result<(), CatError> {
+) -> Result<(), AvatarError> {
     push_solid(scene, canvas, Color::rgb(248, 250, 247))?;
     let dot = themed_color(traits.accent_hue(), 80, 210, 5).with_opacity(82);
     for row in 0_i32..5 {
@@ -100,7 +100,7 @@ fn push_stripes(
     scene: &mut Scene,
     canvas: Canvas,
     traits: AvatarTraitVector,
-) -> Result<(), CatError> {
+) -> Result<(), AvatarError> {
     push_solid(scene, canvas, Color::rgb(248, 250, 247))?;
     let stroke = Stroke {
         width: canvas.s(6)?,
@@ -116,7 +116,7 @@ fn push_stripes(
     Ok(())
 }
 
-fn push_checkerboard(scene: &mut Scene, canvas: Canvas) -> Result<(), CatError> {
+fn push_checkerboard(scene: &mut Scene, canvas: Canvas) -> Result<(), AvatarError> {
     push_solid(scene, canvas, Color::rgb(248, 250, 247))?;
     for row in 0_i32..6 {
         for column in 0_i32..6 {
@@ -136,7 +136,7 @@ fn push_checkerboard(scene: &mut Scene, canvas: Canvas) -> Result<(), CatError> 
     Ok(())
 }
 
-fn push_grid(scene: &mut Scene, canvas: Canvas) -> Result<(), CatError> {
+fn push_grid(scene: &mut Scene, canvas: Canvas) -> Result<(), AvatarError> {
     push_solid(scene, canvas, Color::rgb(248, 250, 247))?;
     let stroke = Stroke {
         width: canvas.s(1)?,
@@ -159,14 +159,14 @@ fn push_grid(scene: &mut Scene, canvas: Canvas) -> Result<(), CatError> {
     Ok(())
 }
 
-fn push_stars(scene: &mut Scene, canvas: Canvas, seed: u16) -> Result<(), CatError> {
+fn push_stars(scene: &mut Scene, canvas: Canvas, seed: u16) -> Result<(), AvatarError> {
     push_solid(scene, canvas, Color::rgb(17, 24, 39))?;
     let mut state = u32::from(seed) ^ 0x9e37_79b9;
     for index in 0_u32..16 {
         state = state.wrapping_mul(1_664_525).wrapping_add(1_013_904_223);
-        let x = i32::try_from(5 + state % 91).map_err(|_| CatError::NumericRange)?;
+        let x = i32::try_from(5 + state % 91).map_err(|_| AvatarError::NumericRange)?;
         state = state.wrapping_mul(1_664_525).wrapping_add(1_013_904_223);
-        let y = i32::try_from(5 + state % 91).map_err(|_| CatError::NumericRange)?;
+        let y = i32::try_from(5 + state % 91).map_err(|_| AvatarError::NumericRange)?;
         let radius = if index % 5 == 0 { 2 } else { 1 };
         scene.push(Command::Ellipse {
             center: Point::new(canvas.x(x)?, canvas.y(y)?),

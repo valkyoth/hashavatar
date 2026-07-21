@@ -15,7 +15,7 @@ fi
 export SOURCE_DATE_EPOCH
 
 package_name="hashavatar-core"
-version="0.1.0-alpha.4"
+version="0.1.0-alpha.5"
 CARGO_TARGET_DIR="$first_target" cargo package -p "$package_name" --locked --allow-dirty --no-verify
 CARGO_TARGET_DIR="$second_target" cargo package -p "$package_name" --locked --allow-dirty --no-verify
 
@@ -26,10 +26,16 @@ test -s "$second_crate"
 cmp "$first_crate" "$second_crate"
 sha256sum "$first_crate" "$second_crate"
 
-# The facade's source-only core dependency is intentionally absent from
-# crates.io during prereleases, so Cargo cannot assemble its registry archive.
-# File-list evidence plus the compiled workspace covers it until stable publish.
-cargo package -p hashavatar --locked --allow-dirty --list >/dev/null
-echo "reproducible package check: facade file list validated; registry archive deferred"
+# Source-only companion dependencies are intentionally absent from crates.io,
+# so Cargo cannot assemble their registry archives during prereleases. File-list
+# evidence plus compiled workspace/package checks cover them until stable publish.
+for package_name in hashavatar-formats hashavatar; do
+    first_list="$work_root/$package_name-a.list"
+    second_list="$work_root/$package_name-b.list"
+    cargo package -p "$package_name" --locked --allow-dirty --list >"$first_list"
+    cargo package -p "$package_name" --locked --allow-dirty --list >"$second_list"
+    cmp "$first_list" "$second_list"
+done
 
-echo "reproducible package check: byte-identical archives"
+echo "reproducible package check: core archive is byte-identical"
+echo "reproducible package check: formats/facade file lists validated; archives deferred"

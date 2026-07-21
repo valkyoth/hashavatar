@@ -1,11 +1,15 @@
 use super::common::{FamilyRig, ellipse, line, polygon, rect, triangle};
 use crate::{
-    AvatarKind, CatError,
+    AvatarError, AvatarKind,
     geometry::{Point, Rect},
     scene::Scene,
 };
 
-pub(super) fn compile(scene: &mut Scene, kind: AvatarKind, rig: FamilyRig) -> Result<(), CatError> {
+pub(super) fn compile(
+    scene: &mut Scene,
+    kind: AvatarKind,
+    rig: FamilyRig,
+) -> Result<(), AvatarError> {
     match kind {
         AvatarKind::Paws => paws(scene, rig),
         AvatarKind::Planet => planet(scene, rig),
@@ -18,11 +22,11 @@ pub(super) fn compile(scene: &mut Scene, kind: AvatarKind, rig: FamilyRig) -> Re
         AvatarKind::Diamond => diamond(scene, rig),
         AvatarKind::CoffeeCup => coffee(scene, rig),
         AvatarKind::Shield => shield(scene, rig),
-        _ => Err(CatError::InvalidScene),
+        _ => Err(AvatarError::InvalidScene),
     }
 }
 
-fn paws(scene: &mut Scene, rig: FamilyRig) -> Result<(), CatError> {
+fn paws(scene: &mut Scene, rig: FamilyRig) -> Result<(), AvatarError> {
     ellipse(
         scene,
         Point::new(rig.canvas.x(50)?, rig.canvas.y(64)?),
@@ -42,7 +46,7 @@ fn paws(scene: &mut Scene, rig: FamilyRig) -> Result<(), CatError> {
     Ok(())
 }
 
-fn planet(scene: &mut Scene, rig: FamilyRig) -> Result<(), CatError> {
+fn planet(scene: &mut Scene, rig: FamilyRig) -> Result<(), AvatarError> {
     line(
         scene,
         Point::new(rig.canvas.x(20)?, rig.canvas.y(68)?),
@@ -73,7 +77,7 @@ fn planet(scene: &mut Scene, rig: FamilyRig) -> Result<(), CatError> {
     )
 }
 
-fn rocket(scene: &mut Scene, rig: FamilyRig) -> Result<(), CatError> {
+fn rocket(scene: &mut Scene, rig: FamilyRig) -> Result<(), AvatarError> {
     ellipse(
         scene,
         Point::new(rig.canvas.x(50)?, rig.canvas.y(50)?),
@@ -117,7 +121,7 @@ fn rocket(scene: &mut Scene, rig: FamilyRig) -> Result<(), CatError> {
     )
 }
 
-fn mushroom(scene: &mut Scene, rig: FamilyRig) -> Result<(), CatError> {
+fn mushroom(scene: &mut Scene, rig: FamilyRig) -> Result<(), AvatarError> {
     rect(
         scene,
         Rect::new(
@@ -147,7 +151,7 @@ fn mushroom(scene: &mut Scene, rig: FamilyRig) -> Result<(), CatError> {
     Ok(())
 }
 
-fn cactus(scene: &mut Scene, rig: FamilyRig) -> Result<(), CatError> {
+fn cactus(scene: &mut Scene, rig: FamilyRig) -> Result<(), AvatarError> {
     rect(
         scene,
         Rect::new(
@@ -187,7 +191,7 @@ fn cactus(scene: &mut Scene, rig: FamilyRig) -> Result<(), CatError> {
     )
 }
 
-fn cupcake(scene: &mut Scene, rig: FamilyRig) -> Result<(), CatError> {
+fn cupcake(scene: &mut Scene, rig: FamilyRig) -> Result<(), AvatarError> {
     polygon(
         scene,
         rig,
@@ -212,7 +216,7 @@ fn cupcake(scene: &mut Scene, rig: FamilyRig) -> Result<(), CatError> {
     )
 }
 
-fn pizza(scene: &mut Scene, rig: FamilyRig) -> Result<(), CatError> {
+fn pizza(scene: &mut Scene, rig: FamilyRig) -> Result<(), AvatarError> {
     triangle(
         scene,
         [
@@ -241,7 +245,7 @@ fn pizza(scene: &mut Scene, rig: FamilyRig) -> Result<(), CatError> {
     Ok(())
 }
 
-fn icecream(scene: &mut Scene, rig: FamilyRig) -> Result<(), CatError> {
+fn icecream(scene: &mut Scene, rig: FamilyRig) -> Result<(), AvatarError> {
     triangle(
         scene,
         [
@@ -267,7 +271,7 @@ fn icecream(scene: &mut Scene, rig: FamilyRig) -> Result<(), CatError> {
     )
 }
 
-fn diamond(scene: &mut Scene, rig: FamilyRig) -> Result<(), CatError> {
+fn diamond(scene: &mut Scene, rig: FamilyRig) -> Result<(), AvatarError> {
     polygon(
         scene,
         rig,
@@ -297,7 +301,7 @@ fn diamond(scene: &mut Scene, rig: FamilyRig) -> Result<(), CatError> {
     )
 }
 
-fn coffee(scene: &mut Scene, rig: FamilyRig) -> Result<(), CatError> {
+fn coffee(scene: &mut Scene, rig: FamilyRig) -> Result<(), AvatarError> {
     rect(
         scene,
         Rect::new(
@@ -334,7 +338,7 @@ fn coffee(scene: &mut Scene, rig: FamilyRig) -> Result<(), CatError> {
     Ok(())
 }
 
-fn shield(scene: &mut Scene, rig: FamilyRig) -> Result<(), CatError> {
+fn shield(scene: &mut Scene, rig: FamilyRig) -> Result<(), AvatarError> {
     polygon(
         scene,
         rig,

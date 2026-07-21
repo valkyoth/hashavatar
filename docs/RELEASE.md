@@ -69,3 +69,8 @@ Published packages contain reusable libraries, their own technical README,
 licenses, relevant policy documents, and examples. They exclude the website,
 fuzz targets, generated output, temporary pentest input, repository
 administration files, and archived design drafts.
+
+The planned stable 2.0 publication order begins with `hashavatar-core`, then
+`hashavatar-formats`, then the `hashavatar` facade. Later companion packages
+must be inserted only after their dependency edges are represented in
+`release-crates.toml` and validated by `scripts/release_crates.py --check`.

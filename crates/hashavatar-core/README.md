@@ -24,20 +24,26 @@
 # hashavatar-core
 
 `hashavatar-core` contains the canonical safe-Rust renderer used by the
-Hashavatar 2.0 work. Alpha.4 adds bounded typed palettes, expressions, and
-multi-accessory layout to all 31 existing families, 13 backgrounds, and five
-frame shapes. Every layer compiles to validated fixed-point primitives and
-paths shared by exact CPU compositing and SVG documents/fragments.
+Hashavatar 2.0 work. Alpha.5 finalizes the portable prepared-request boundary:
+owned redacted identities, public typed asset keys, resource budgets, reusable
+RGBA storage, bounded layered styles, and all 31 existing families. Every
+family and layer compiles to validated fixed-point primitives shared by exact
+CPU compositing and SVG documents/fragments.
 
 Most applications should use the `hashavatar` facade. This companion crate is
 not published during the 2.0 alpha, beta, or release-candidate cycle.
+
+```toml
+[dependencies]
+hashavatar-core = { path = "../hashavatar/crates/hashavatar-core" }
+```
 
 ## Example
 
 ```rust
 use hashavatar_core::{
-    AvatarAccessory, AvatarBackground, AvatarExpression, AvatarKind,
-    AvatarPalette, AvatarRequest, AvatarShape, AvatarStyle,
+    AvatarAccessory, AvatarBackground, AvatarExpression, AvatarIdentity,
+    AvatarKind, AvatarPalette, AvatarRequest, AvatarShape, AvatarStyle,
 };
 
 let style = AvatarStyle::new(
@@ -48,7 +54,11 @@ let style = AvatarStyle::new(
 .with_palette(AvatarPalette::DeepSeaBlue)
 .with_expression(AvatarExpression::Happy)
 .with_accessory(AvatarAccessory::Halo)?;
-let prepared = AvatarRequest::new(256, 256, 0, b"user-123", style)?.prepare()?;
+let identity = AvatarIdentity::new(b"user-123")?;
+let prepared = AvatarRequest::builder(identity)
+    .size(256, 256)
+    .style(style)
+    .prepare()?;
 let image = prepared.render_rgba()?;
 let svg = prepared.render_svg()?;
 
@@ -56,7 +66,7 @@ assert_eq!(image.dimensions(), (256, 256));
 assert_eq!(image.pixels().len(), 256 * 256 * 4);
 assert!(svg.starts_with("<svg "));
 assert_eq!(prepared.style(), style);
-# Ok::<(), hashavatar_core::CatError>(())
+# Ok::<(), hashavatar_core::AvatarError>(())
 ```
 
 ## Current Boundary
@@ -64,6 +74,8 @@ assert_eq!(prepared.style(), style);
 - `no_std` with `alloc`; no `image`, codec, filesystem, clock, entropy, thread,
   network, web, or async dependency.
 - Input dimensions and identity/namespace lengths are bounded before work.
+- Raw identity and namespace bytes are not retained by owned requests or
+  prepared avatars; identity `Debug` output is redacted.
 - Trait values are independently derived with labeled SHA-512 calls rather
   than a mutable RNG stream.
 - Scene commands and fixed-point layouts are private and validated before
@@ -76,7 +88,21 @@ assert_eq!(prepared.style(), style);
   rejections are deterministic and visible through `LayoutReport`.
 - Caller-provided strided surfaces preserve padding and share the owned-image
   executor.
+- `ReusableRgbaBuffer` provides fallible allocation reuse and sanitizes its
+  Hashavatar-owned allocation on drop.
 - Pixel digests exclude padding and bind the dimensions and pixel contract ID.
+- Typed identity/avatar keys bind the validated identity, dimensions, seed,
+  resolved style, catalog, render contract, and pixel contract.
 - Returned pixels and SVG belong to the caller and are not secret containers.
 
-Alpha.4 APIs and pixels remain explicitly unstable until the 2.0 beta freeze.
+Codecs and `std::io::Write` live only in `hashavatar-formats`; this crate has no
+`image` dependency. Alpha.5 APIs and pixels remain explicitly unstable until
+the 2.0 beta freeze.
+
+See the workspace [security controls](https://github.com/valkyoth/hashavatar/blob/main/docs/SECURITY_CONTROLS.md),
+[current status](https://github.com/valkyoth/hashavatar/blob/main/docs/CURRENT_STATUS.md),
+and [stability policy](https://github.com/valkyoth/hashavatar/blob/main/docs/STABILITY.md).
+
+## License
+
+Licensed under either Apache-2.0 or MIT, at your option.

@@ -2,8 +2,8 @@ mod compiler;
 
 use self::compiler::compile_scene;
 use crate::{
-    CanonicalRgbaImage, CatError, MAX_IDENTITY_BYTES, MAX_NAMESPACE_COMPONENT_BYTES,
-    RgbaSurfaceMut, SceneReport, SvgOptions,
+    AvatarError, AvatarIdentity, CanonicalRgbaImage, MAX_IDENTITY_BYTES,
+    MAX_NAMESPACE_COMPONENT_BYTES, RgbaSurfaceMut, SceneReport, SvgOptions,
     identity::TraitDeriver,
     raster::{render_scene, render_scene_into},
     scene::Scene,
@@ -35,7 +35,7 @@ impl<'a> CatRequest<'a> {
         height: u32,
         style_seed: u64,
         input: &'a [u8],
-    ) -> Result<Self, CatError> {
+    ) -> Result<Self, AvatarError> {
         Self::with_namespace(
             width,
             height,
@@ -54,7 +54,7 @@ impl<'a> CatRequest<'a> {
         tenant: &'a [u8],
         style_version: &'a [u8],
         input: &'a [u8],
-    ) -> Result<Self, CatError> {
+    ) -> Result<Self, AvatarError> {
         validate_request(width, height, tenant, style_version, input)?;
         Ok(Self {
             width,
@@ -67,13 +67,9 @@ impl<'a> CatRequest<'a> {
     }
 
     /// Derives stateless traits and compiles one validated Cat scene.
-    pub fn prepare(self) -> Result<PreparedCat, CatError> {
-        let deriver = TraitDeriver::with_namespace(
-            self.tenant,
-            self.style_version,
-            self.input,
-            self.style_seed,
-        )?;
+    pub fn prepare(self) -> Result<PreparedCat, AvatarError> {
+        let identity = AvatarIdentity::with_namespace(self.tenant, self.style_version, self.input)?;
+        let deriver = TraitDeriver::new(identity, self.style_seed);
         let traits = CatTraitVector::derive(&deriver)?;
         let scene = compile_scene(self.width, self.height, traits)?;
         let report = scene.validate()?;
@@ -107,7 +103,7 @@ pub struct CatTraitVector {
 }
 
 impl CatTraitVector {
-    fn derive(deriver: &TraitDeriver) -> Result<Self, CatError> {
+    fn derive(deriver: &TraitDeriver) -> Result<Self, AvatarError> {
         Ok(Self {
             head_width: deriver.sample(b"cat/head-width")?,
             head_height: deriver.sample(b"cat/head-height")?,
@@ -215,7 +211,7 @@ impl PreparedCat {
     }
 
     /// Executes the canonical safe-Rust CPU rasterizer as straight-alpha RGBA8.
-    pub fn render_rgba(&self) -> Result<CanonicalRgbaImage, CatError> {
+    pub fn render_rgba(&self) -> Result<CanonicalRgbaImage, AvatarError> {
         render_scene(&self.scene)
     }
 
@@ -223,12 +219,12 @@ impl PreparedCat {
     ///
     /// Validation occurs before visible bytes are changed. An execution error
     /// may leave visible pixels partially modified; row padding is preserved.
-    pub fn render_into(&self, surface: &mut RgbaSurfaceMut<'_>) -> Result<(), CatError> {
+    pub fn render_into(&self, surface: &mut RgbaSurfaceMut<'_>) -> Result<(), AvatarError> {
         render_scene_into(&self.scene, surface)
     }
 
     /// Serializes the same canonical scene as deterministic SVG.
-    pub fn render_svg(&self) -> Result<alloc::string::String, CatError> {
+    pub fn render_svg(&self) -> Result<alloc::string::String, AvatarError> {
         render_scene_svg(&self.scene)
     }
 
@@ -236,7 +232,7 @@ impl PreparedCat {
     pub fn render_svg_with(
         &self,
         options: SvgOptions<'_>,
-    ) -> Result<alloc::string::String, CatError> {
+    ) -> Result<alloc::string::String, AvatarError> {
         render_scene_svg_with(&self.scene, options)
     }
 
@@ -248,7 +244,7 @@ impl PreparedCat {
         &self,
         writer: &mut impl core::fmt::Write,
         options: SvgOptions<'_>,
-    ) -> Result<(), CatError> {
+    ) -> Result<(), AvatarError> {
         write_scene_svg(&self.scene, writer, options)
     }
 }
@@ -259,10 +255,10 @@ fn validate_request(
     tenant: &[u8],
     style_version: &[u8],
     input: &[u8],
-) -> Result<(), CatError> {
+) -> Result<(), AvatarError> {
     let _ = Scene::new(width, height)?;
     if input.len() > MAX_IDENTITY_BYTES {
-        return Err(CatError::IdentityComponentTooLong {
+        return Err(AvatarError::IdentityComponentTooLong {
             component: crate::IdentityComponent::Input,
             maximum: MAX_IDENTITY_BYTES,
         });
@@ -272,7 +268,7 @@ fn validate_request(
         (crate::IdentityComponent::StyleVersion, style_version),
     ] {
         if bytes.len() > MAX_NAMESPACE_COMPONENT_BYTES {
-            return Err(CatError::IdentityComponentTooLong {
+            return Err(AvatarError::IdentityComponentTooLong {
                 component,
                 maximum: MAX_NAMESPACE_COMPONENT_BYTES,
             });

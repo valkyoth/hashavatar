@@ -4,7 +4,9 @@ mod frame;
 mod layers;
 pub(crate) mod util;
 
-use crate::{AvatarTraitVector, AvatarZBand, CatError, LayoutReport, ResolvedStyle, scene::Scene};
+use crate::{
+    AvatarError, AvatarTraitVector, AvatarZBand, LayoutReport, ResolvedStyle, scene::Scene,
+};
 
 pub(crate) fn compile_avatar_scene(
     width: u32,
@@ -12,7 +14,7 @@ pub(crate) fn compile_avatar_scene(
     style: ResolvedStyle,
     layout: &LayoutReport,
     traits: AvatarTraitVector,
-) -> Result<Scene, CatError> {
+) -> Result<Scene, AvatarError> {
     let mut scene = Scene::new(width, height)?;
     let frame = frame::begin(&mut scene, style.shape())?;
     background::compile(&mut scene, style, traits)?;

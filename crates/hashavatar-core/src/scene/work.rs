@@ -1,13 +1,13 @@
 use super::{Command, Scene};
 use crate::{
-    CatError,
+    AvatarError,
     fixed::Fixed,
     geometry::{Point, Rect},
 };
 
-pub(super) fn command_work(command: Command, scene: &Scene) -> Result<u64, CatError> {
+pub(super) fn command_work(command: Command, scene: &Scene) -> Result<u64, AvatarError> {
     match command {
-        Command::Empty => Err(CatError::InvalidScene),
+        Command::Empty => Err(AvatarError::InvalidScene),
         Command::Fill(_) => full_work(scene),
         Command::Rect { rect, .. } => rect_work(rect, scene),
         Command::Ellipse {
@@ -31,10 +31,10 @@ pub(super) fn command_work(command: Command, scene: &Scene) -> Result<u64, CatEr
             full_work(scene)?
                 .checked_mul(
                     u64::try_from(path.point_count())
-                        .map_err(|_| CatError::NumericRange)?
+                        .map_err(|_| AvatarError::NumericRange)?
                         .saturating_add(1),
                 )
-                .ok_or(CatError::NumericRange)
+                .ok_or(AvatarError::NumericRange)
         }
         Command::PushClip(_) | Command::PopClip | Command::PushOpacity(_) | Command::PopOpacity => {
             Ok(0)
@@ -42,14 +42,14 @@ pub(super) fn command_work(command: Command, scene: &Scene) -> Result<u64, CatEr
     }
 }
 
-fn full_work(scene: &Scene) -> Result<u64, CatError> {
+fn full_work(scene: &Scene) -> Result<u64, AvatarError> {
     u64::from(scene.width)
         .checked_mul(u64::from(scene.height))
-        .ok_or(CatError::NumericRange)
+        .ok_or(AvatarError::NumericRange)
 }
 
-fn points_work(points: &[Point], scene: &Scene) -> Result<u64, CatError> {
-    let first = points.first().ok_or(CatError::InvalidScene)?;
+fn points_work(points: &[Point], scene: &Scene) -> Result<u64, AvatarError> {
+    let first = points.first().ok_or(AvatarError::InvalidScene)?;
     let mut rect = Rect::new(first.x, first.y, first.x, first.y);
     for point in points.iter().skip(1) {
         rect.left = rect.left.min(point.x);
@@ -66,9 +66,9 @@ fn points_work(points: &[Point], scene: &Scene) -> Result<u64, CatError> {
     rect_work(rect, scene)
 }
 
-fn rect_work(rect: Rect, scene: &Scene) -> Result<u64, CatError> {
-    let width = i32::try_from(scene.width).map_err(|_| CatError::NumericRange)?;
-    let height = i32::try_from(scene.height).map_err(|_| CatError::NumericRange)?;
+fn rect_work(rect: Rect, scene: &Scene) -> Result<u64, AvatarError> {
+    let width = i32::try_from(scene.width).map_err(|_| AvatarError::NumericRange)?;
+    let height = i32::try_from(scene.height).map_err(|_| AvatarError::NumericRange)?;
     let span_x = rect
         .right
         .ceil()?
@@ -82,5 +82,5 @@ fn rect_work(rect: Rect, scene: &Scene) -> Result<u64, CatError> {
     u64::try_from(span_x)
         .ok()
         .and_then(|x| u64::try_from(span_y).ok().and_then(|y| x.checked_mul(y)))
-        .ok_or(CatError::NumericRange)
+        .ok_or(AvatarError::NumericRange)
 }

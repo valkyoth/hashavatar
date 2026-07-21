@@ -1,5 +1,5 @@
 use crate::{
-    AvatarRgb, CatError,
+    AvatarError, AvatarRgb,
     fixed::Fixed,
     geometry::{Point, Rect},
     paint::Color,
@@ -15,11 +15,12 @@ pub(super) struct Canvas {
 }
 
 impl Canvas {
-    pub(super) fn new(scene: &Scene) -> Result<Self, CatError> {
-        let width =
-            Fixed::from_integer(i32::try_from(scene.width()).map_err(|_| CatError::NumericRange)?)?;
+    pub(super) fn new(scene: &Scene) -> Result<Self, AvatarError> {
+        let width = Fixed::from_integer(
+            i32::try_from(scene.width()).map_err(|_| AvatarError::NumericRange)?,
+        )?;
         let height = Fixed::from_integer(
-            i32::try_from(scene.height()).map_err(|_| CatError::NumericRange)?,
+            i32::try_from(scene.height()).map_err(|_| AvatarError::NumericRange)?,
         )?;
         Ok(Self {
             width,
@@ -29,15 +30,15 @@ impl Canvas {
         })
     }
 
-    pub(super) fn x(self, percent: i32) -> Result<Fixed, CatError> {
+    pub(super) fn x(self, percent: i32) -> Result<Fixed, AvatarError> {
         scale(self.width, percent, 100)
     }
 
-    pub(super) fn y(self, percent: i32) -> Result<Fixed, CatError> {
+    pub(super) fn y(self, percent: i32) -> Result<Fixed, AvatarError> {
         scale(self.height, percent, 100)
     }
 
-    pub(super) fn s(self, percent: i32) -> Result<Fixed, CatError> {
+    pub(super) fn s(self, percent: i32) -> Result<Fixed, AvatarError> {
         scale(self.minimum, percent, 100)
     }
 
@@ -46,7 +47,7 @@ impl Canvas {
     }
 }
 
-pub(super) fn scale(value: Fixed, numerator: i32, denominator: i32) -> Result<Fixed, CatError> {
+pub(super) fn scale(value: Fixed, numerator: i32, denominator: i32) -> Result<Fixed, AvatarError> {
     value.checked_mul(Fixed::from_ratio(numerator, denominator)?)
 }
 
@@ -55,7 +56,7 @@ pub(super) fn vary(
     minimum: i32,
     maximum: i32,
     sample: u16,
-) -> Result<Fixed, CatError> {
+) -> Result<Fixed, AvatarError> {
     Fixed::lerp(
         scale(value, minimum, 100)?,
         scale(value, maximum, 100)?,

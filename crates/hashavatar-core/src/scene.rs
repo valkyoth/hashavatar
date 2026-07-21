@@ -6,7 +6,7 @@ use self::{
     work::command_work,
 };
 use crate::{
-    CatError, MAX_DIMENSION, MIN_DIMENSION, RGBA8_BYTES_PER_PIXEL,
+    AvatarError, MAX_DIMENSION, MIN_DIMENSION, RGBA8_BYTES_PER_PIXEL,
     fixed::Fixed,
     geometry::{FillRule, MAX_PATHS, Path, Point, Rect},
     paint::Paint,
@@ -81,7 +81,7 @@ pub(crate) struct Scene {
 }
 
 impl Scene {
-    pub(crate) fn new(width: u32, height: u32) -> Result<Self, CatError> {
+    pub(crate) fn new(width: u32, height: u32) -> Result<Self, AvatarError> {
         validate_dimensions(width, height)?;
         Ok(Self {
             width,
@@ -93,34 +93,34 @@ impl Scene {
         })
     }
 
-    pub(crate) fn push(&mut self, command: Command) -> Result<(), CatError> {
+    pub(crate) fn push(&mut self, command: Command) -> Result<(), AvatarError> {
         let slot = self
             .commands
             .get_mut(self.command_count)
-            .ok_or(CatError::InvalidScene)?;
+            .ok_or(AvatarError::InvalidScene)?;
         *slot = command;
         self.command_count = self
             .command_count
             .checked_add(1)
-            .ok_or(CatError::NumericRange)?;
+            .ok_or(AvatarError::NumericRange)?;
         Ok(())
     }
 
-    pub(crate) fn push_path(&mut self, path: Path) -> Result<u8, CatError> {
+    pub(crate) fn push_path(&mut self, path: Path) -> Result<u8, AvatarError> {
         let index = self.path_count;
-        let slot = self.paths.get_mut(index).ok_or(CatError::InvalidScene)?;
+        let slot = self.paths.get_mut(index).ok_or(AvatarError::InvalidScene)?;
         *slot = path;
         self.path_count = self
             .path_count
             .checked_add(1)
-            .ok_or(CatError::NumericRange)?;
-        u8::try_from(index).map_err(|_| CatError::NumericRange)
+            .ok_or(AvatarError::NumericRange)?;
+        u8::try_from(index).map_err(|_| AvatarError::NumericRange)
     }
 
-    pub(crate) fn validate(&self) -> Result<SceneReport, CatError> {
+    pub(crate) fn validate(&self) -> Result<SceneReport, AvatarError> {
         validate_dimensions(self.width, self.height)?;
         if self.command_count == 0 || self.command_count > MAX_SCENE_COMMANDS {
-            return Err(CatError::InvalidScene);
+            return Err(AvatarError::InvalidScene);
         }
         let commands = self.commands()?;
         if !matches!(commands.first(), Some(Command::Fill(_)))
@@ -129,7 +129,7 @@ impl Scene {
                 .skip(1)
                 .any(|command| matches!(command, Command::Fill(_)))
         {
-            return Err(CatError::InvalidScene);
+            return Err(AvatarError::InvalidScene);
         }
 
         let limit = coordinate_limit()?;
@@ -147,11 +147,11 @@ impl Scene {
                 Command::PushClip(clip) => {
                     let slot = clip_cost_stack
                         .get_mut(clip_depth)
-                        .ok_or(CatError::InvalidScene)?;
+                        .ok_or(AvatarError::InvalidScene)?;
                     *slot = active_clip_cost;
                     active_clip_cost = active_clip_cost
                         .checked_add(clip_test_cost(clip, self)?)
-                        .ok_or(CatError::NumericRange)?;
+                        .ok_or(AvatarError::NumericRange)?;
                     clip_depth = push_depth(clip_depth)?;
                     maximum_clip_depth = maximum_clip_depth.max(clip_depth);
                 }
@@ -159,7 +159,7 @@ impl Scene {
                     clip_depth = pop_depth(clip_depth)?;
                     active_clip_cost = *clip_cost_stack
                         .get(clip_depth)
-                        .ok_or(CatError::InvalidScene)?;
+                        .ok_or(AvatarError::InvalidScene)?;
                 }
                 Command::PushOpacity(_) => {
                     opacity_depth = push_depth(opacity_depth)?;
@@ -169,18 +169,18 @@ impl Scene {
                 _ => {
                     let multiplier = active_clip_cost
                         .checked_add(1)
-                        .ok_or(CatError::NumericRange)?;
+                        .ok_or(AvatarError::NumericRange)?;
                     let work = command_work(*command, self)?
                         .checked_mul(multiplier)
-                        .ok_or(CatError::NumericRange)?;
+                        .ok_or(AvatarError::NumericRange)?;
                     estimated_pixel_tests = estimated_pixel_tests
                         .checked_add(work)
-                        .ok_or(CatError::NumericRange)?;
+                        .ok_or(AvatarError::NumericRange)?;
                 }
             }
         }
         if clip_depth != 0 || opacity_depth != 0 {
-            return Err(CatError::InvalidScene);
+            return Err(AvatarError::InvalidScene);
         }
 
         Ok(SceneReport {
@@ -190,7 +190,7 @@ impl Scene {
                 .paths()?
                 .iter()
                 .try_fold(0_usize, |total, path| total.checked_add(path.point_count()))
-                .ok_or(CatError::NumericRange)?,
+                .ok_or(AvatarError::NumericRange)?,
             maximum_clip_depth,
             maximum_opacity_depth,
             estimated_pixel_tests,
@@ -206,22 +206,22 @@ impl Scene {
         self.height
     }
 
-    pub(crate) fn commands(&self) -> Result<&[Command], CatError> {
+    pub(crate) fn commands(&self) -> Result<&[Command], AvatarError> {
         self.commands
             .get(..self.command_count)
-            .ok_or(CatError::InvalidScene)
+            .ok_or(AvatarError::InvalidScene)
     }
 
-    pub(crate) fn paths(&self) -> Result<&[Path], CatError> {
+    pub(crate) fn paths(&self) -> Result<&[Path], AvatarError> {
         self.paths
             .get(..self.path_count)
-            .ok_or(CatError::InvalidScene)
+            .ok_or(AvatarError::InvalidScene)
     }
 
-    pub(crate) fn path(&self, index: u8) -> Result<&Path, CatError> {
+    pub(crate) fn path(&self, index: u8) -> Result<&Path, AvatarError> {
         self.paths()?
             .get(usize::from(index))
-            .ok_or(CatError::InvalidScene)
+            .ok_or(AvatarError::InvalidScene)
     }
 
     #[cfg(test)]
@@ -282,13 +282,13 @@ impl SceneReport {
     }
 }
 
-pub(crate) fn validate_dimensions(width: u32, height: u32) -> Result<(), CatError> {
+pub(crate) fn validate_dimensions(width: u32, height: u32) -> Result<(), AvatarError> {
     if (MIN_DIMENSION..=MAX_DIMENSION).contains(&width)
         && (MIN_DIMENSION..=MAX_DIMENSION).contains(&height)
     {
         Ok(())
     } else {
-        Err(CatError::UnsupportedDimensions { width, height })
+        Err(AvatarError::UnsupportedDimensions { width, height })
     }
 }
 
@@ -297,7 +297,7 @@ fn validate_command(
     scene: &Scene,
     minimum: Fixed,
     maximum: Fixed,
-) -> Result<(), CatError> {
+) -> Result<(), AvatarError> {
     match command {
         Command::Empty | Command::PopClip | Command::PopOpacity => Ok(()),
         Command::Fill(paint) => validate_paint(paint, minimum, maximum),
@@ -312,7 +312,7 @@ fn validate_command(
             paint,
         } => {
             if radius_x <= Fixed::ZERO || radius_y <= Fixed::ZERO {
-                return Err(CatError::InvalidScene);
+                return Err(AvatarError::InvalidScene);
             }
             validate_rect(
                 Rect::new(
@@ -331,13 +331,13 @@ fn validate_command(
                 validate_point(point, minimum, maximum)?;
             }
             if triangle_area(points) == 0 {
-                return Err(CatError::InvalidScene);
+                return Err(AvatarError::InvalidScene);
             }
             validate_paint(paint, minimum, maximum)
         }
         Command::Line { start, end, stroke } => {
             if start == end {
-                return Err(CatError::InvalidScene);
+                return Err(AvatarError::InvalidScene);
             }
             validate_point(start, minimum, maximum)?;
             validate_point(end, minimum, maximum)?;
@@ -351,10 +351,10 @@ fn validate_command(
         } => {
             let path = scene.path(path_index)?;
             if fill.is_none() && stroke.is_none() {
-                return Err(CatError::InvalidScene);
+                return Err(AvatarError::InvalidScene);
             }
             if fill.is_some() && !path.is_closed() {
-                return Err(CatError::InvalidScene);
+                return Err(AvatarError::InvalidScene);
             }
             for point in path.points()? {
                 validate_point(*point, minimum, maximum)?;
@@ -372,7 +372,7 @@ fn validate_command(
     }
 }
 
-fn validate_paint(paint: Paint, minimum: Fixed, maximum: Fixed) -> Result<(), CatError> {
+fn validate_paint(paint: Paint, minimum: Fixed, maximum: Fixed) -> Result<(), AvatarError> {
     paint.validate()?;
     if let Paint::LinearGradient { start, end, .. } = paint {
         validate_point(start, minimum, maximum)?;
@@ -381,40 +381,40 @@ fn validate_paint(paint: Paint, minimum: Fixed, maximum: Fixed) -> Result<(), Ca
     Ok(())
 }
 
-fn validate_stroke(stroke: Stroke, minimum: Fixed, maximum: Fixed) -> Result<(), CatError> {
+fn validate_stroke(stroke: Stroke, minimum: Fixed, maximum: Fixed) -> Result<(), AvatarError> {
     if stroke.width <= Fixed::ZERO || stroke.width > maximum {
-        return Err(CatError::InvalidScene);
+        return Err(AvatarError::InvalidScene);
     }
     validate_paint(stroke.paint, minimum, maximum)
 }
 
-fn validate_rect(rect: Rect, minimum: Fixed, maximum: Fixed) -> Result<(), CatError> {
+fn validate_rect(rect: Rect, minimum: Fixed, maximum: Fixed) -> Result<(), AvatarError> {
     if !rect.is_valid() {
-        return Err(CatError::InvalidScene);
+        return Err(AvatarError::InvalidScene);
     }
     validate_point(Point::new(rect.left, rect.top), minimum, maximum)?;
     validate_point(Point::new(rect.right, rect.bottom), minimum, maximum)
 }
 
-fn validate_point(point: Point, minimum: Fixed, maximum: Fixed) -> Result<(), CatError> {
+fn validate_point(point: Point, minimum: Fixed, maximum: Fixed) -> Result<(), AvatarError> {
     if point.x >= minimum && point.x <= maximum && point.y >= minimum && point.y <= maximum {
         Ok(())
     } else {
-        Err(CatError::InvalidScene)
+        Err(AvatarError::InvalidScene)
     }
 }
 
-fn push_depth(depth: usize) -> Result<usize, CatError> {
-    let next = depth.checked_add(1).ok_or(CatError::NumericRange)?;
+fn push_depth(depth: usize) -> Result<usize, AvatarError> {
+    let next = depth.checked_add(1).ok_or(AvatarError::NumericRange)?;
     if next > MAX_STACK_DEPTH {
-        Err(CatError::InvalidScene)
+        Err(AvatarError::InvalidScene)
     } else {
         Ok(next)
     }
 }
 
-fn pop_depth(depth: usize) -> Result<usize, CatError> {
-    depth.checked_sub(1).ok_or(CatError::InvalidScene)
+fn pop_depth(depth: usize) -> Result<usize, AvatarError> {
+    depth.checked_sub(1).ok_or(AvatarError::InvalidScene)
 }
 
 pub(crate) fn triangle_area(points: [Point; 3]) -> i128 {
@@ -428,17 +428,17 @@ pub(crate) fn triangle_area(points: [Point; 3]) -> i128 {
     ab_x * ac_y - ab_y * ac_x
 }
 
-fn coordinate_limit() -> Result<Fixed, CatError> {
-    let dimension = i32::try_from(MAX_DIMENSION).map_err(|_| CatError::NumericRange)?;
-    Fixed::from_integer(dimension.checked_mul(2).ok_or(CatError::NumericRange)?)
+fn coordinate_limit() -> Result<Fixed, AvatarError> {
+    let dimension = i32::try_from(MAX_DIMENSION).map_err(|_| AvatarError::NumericRange)?;
+    Fixed::from_integer(dimension.checked_mul(2).ok_or(AvatarError::NumericRange)?)
 }
 
-pub(crate) fn rgba_len(width: u32, height: u32) -> Result<usize, CatError> {
+pub(crate) fn rgba_len(width: u32, height: u32) -> Result<usize, AvatarError> {
     usize::try_from(width)
         .ok()
         .and_then(|value| value.checked_mul(usize::try_from(height).ok()?))
         .and_then(|value| value.checked_mul(RGBA8_BYTES_PER_PIXEL))
-        .ok_or(CatError::NumericRange)
+        .ok_or(AvatarError::NumericRange)
 }
 
 #[cfg(test)]

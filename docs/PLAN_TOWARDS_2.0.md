@@ -781,8 +781,9 @@ the prior compatibility decision.
 
 ### v2.0.0-alpha.4 - Layered Style And Layout
 
-**Status:** Implementation complete; pending exact-commit pentest, downstream
-website validation, and green GitHub checks before beginning alpha.5.
+**Status:** Complete. Exact-commit pentest, downstream website validation, and
+GitHub checks passed; permanent evidence is recorded in
+`security/pentest/v2.0.0-alpha.4.md`.
 
 **Goal:** Complete secure, deterministic style composition.
 
@@ -803,7 +804,8 @@ reported.
 
 ### v2.0.0-alpha.5 - Portable Core, Formats Baseline, And Facade
 
-**Status:** Planned.
+**Status:** Implementation complete; pending exact-commit pentest, downstream
+website validation, and green GitHub checks before beginning alpha.6.
 
 **Goal:** Assemble the portable core, established formats baseline, and facade
 before adding the remaining isolated 2.0 components.

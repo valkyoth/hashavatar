@@ -26,7 +26,7 @@ impl IdentityComponent {
 /// Error returned by canonical avatar preparation or execution.
 #[non_exhaustive]
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub enum CatError {
+pub enum AvatarError {
     /// Width or height is outside the supported range.
     UnsupportedDimensions {
         /// Rejected width.
@@ -85,7 +85,7 @@ pub enum CatError {
     },
 }
 
-impl fmt::Display for CatError {
+impl fmt::Display for AvatarError {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::UnsupportedDimensions { width, height } => write!(
@@ -138,4 +138,7 @@ impl fmt::Display for CatError {
     }
 }
 
-impl core::error::Error for CatError {}
+impl core::error::Error for AvatarError {}
+
+/// Transitional alias retained while the Cat vertical-slice API remains public.
+pub type CatError = AvatarError;

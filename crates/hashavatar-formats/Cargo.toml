@@ -1,0 +1,30 @@
+[package]
+name = "hashavatar-formats"
+version = "0.1.0-alpha.5"
+edition.workspace = true
+rust-version.workspace = true
+description = "Feature-gated established image format encoders for Hashavatar"
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+documentation = "https://docs.rs/hashavatar-formats/latest/hashavatar_formats/"
+readme = "README.md"
+keywords = ["avatar", "webp", "png", "jpeg", "gif"]
+categories = ["multimedia::images", "encoding"]
+
+[features]
+default = ["webp"]
+webp = ["dep:image", "image/webp"]
+png = ["dep:image", "image/png"]
+jpeg = ["dep:image", "image/jpeg"]
+gif = ["dep:image", "image/gif"]
+all-formats = ["webp", "png", "jpeg", "gif"]
+
+[dependencies]
+hashavatar-core = { path = "../hashavatar-core", version = "0.1.0-alpha.5" }
+image = { version = "0.25.10", default-features = false, optional = true }
+sanitization.workspace = true
+sanitization-crypto-interop.workspace = true
+
+[lints]
+workspace = true
