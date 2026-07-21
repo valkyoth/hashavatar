@@ -39,34 +39,36 @@ fn base_head(
 }
 
 fn cat(scene: &mut Scene, rig: FamilyRig) -> Result<(), AvatarError> {
-    for x in [31, 69] {
+    for x in [36, 64] {
         triangle(
             scene,
             [
-                Point::new(rig.canvas.x(x - 11)?, rig.canvas.y(39)?),
-                Point::new(rig.canvas.x(x)?, rig.canvas.y(16)?),
-                Point::new(rig.canvas.x(x + 11)?, rig.canvas.y(40)?),
+                Point::new(rig.canvas.x(x - 9)?, rig.canvas.y(41)?),
+                Point::new(rig.canvas.x(x)?, rig.canvas.y(9)?),
+                Point::new(rig.canvas.x(x + 9)?, rig.canvas.y(41)?),
             ],
             rig.primary,
         )?;
         triangle(
             scene,
             [
-                Point::new(rig.canvas.x(x - 6)?, rig.canvas.y(36)?),
-                Point::new(rig.canvas.x(x)?, rig.canvas.y(22)?),
-                Point::new(rig.canvas.x(x + 6)?, rig.canvas.y(37)?),
+                Point::new(rig.canvas.x(x - 5)?, rig.canvas.y(37)?),
+                Point::new(rig.canvas.x(x)?, rig.canvas.y(18)?),
+                Point::new(rig.canvas.x(x + 5)?, rig.canvas.y(37)?),
             ],
             crate::paint::Color::rgb(219, 143, 151),
         )?;
     }
     base_head(scene, rig, rig.primary)?;
-    ellipse(
-        scene,
-        Point::new(rig.canvas.x(50)?, rig.canvas.y(65)?),
-        rig.canvas.s(12)?,
-        rig.canvas.s(7)?,
-        rig.secondary,
-    )?;
+    for x in [45, 55] {
+        ellipse(
+            scene,
+            Point::new(rig.canvas.x(x)?, rig.canvas.y(65)?),
+            rig.canvas.s(8)?,
+            rig.canvas.s(6)?,
+            rig.secondary,
+        )?;
+    }
     for x in [39, 61] {
         ellipse(
             scene,
@@ -86,15 +88,19 @@ fn cat(scene: &mut Scene, rig: FamilyRig) -> Result<(), AvatarError> {
     triangle(
         scene,
         [
-            Point::new(rig.canvas.x(46)?, rig.canvas.y(63)?),
-            Point::new(rig.canvas.x(54)?, rig.canvas.y(63)?),
+            Point::new(rig.canvas.x(47)?, rig.canvas.y(63)?),
+            Point::new(rig.canvas.x(53)?, rig.canvas.y(63)?),
             Point::new(rig.canvas.x(50)?, rig.canvas.y(68)?),
         ],
         crate::paint::Color::rgb(210, 112, 127),
     )?;
-    split_smile(scene, rig, 50, 67)?;
-    for (start_x, end_x, y) in [(44, 23, 66), (44, 21, 71), (56, 77, 66), (56, 79, 71)] {
-        let end_y = if y < 70 { y - 2 } else { y + 2 };
+    split_smile(scene, rig, 50, 70)?;
+    for (start_x, end_x, y, end_y) in [
+        (43, 20, 64, 60),
+        (43, 20, 71, 75),
+        (57, 80, 64, 60),
+        (57, 80, 71, 75),
+    ] {
         line(
             scene,
             Point::new(rig.canvas.x(start_x)?, rig.canvas.y(y)?),
@@ -103,6 +109,13 @@ fn cat(scene: &mut Scene, rig: FamilyRig) -> Result<(), AvatarError> {
             rig.ink,
         )?;
     }
+    line(
+        scene,
+        Point::new(rig.canvas.x(50)?, rig.canvas.y(37)?),
+        Point::new(rig.canvas.x(50)?, rig.canvas.y(46)?),
+        rig.canvas.s(1)?,
+        rig.ink.with_opacity(120),
+    )?;
     Ok(())
 }
 

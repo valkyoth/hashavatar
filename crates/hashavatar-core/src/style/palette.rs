@@ -157,7 +157,7 @@ fn default_family_colors(
     traits: AvatarTraitVector,
 ) -> (AvatarRgb, AvatarRgb, AvatarRgb) {
     let colors = match kind {
-        AvatarKind::Cat => ([194, 139, 82], [239, 215, 184], [219, 143, 151]),
+        AvatarKind::Cat => ([202, 121, 50], [241, 218, 187], [219, 143, 151]),
         AvatarKind::Dog => ([187, 132, 75], [117, 73, 45], [219, 151, 62]),
         AvatarKind::Robot => ([180, 195, 203], [79, 99, 113], [154, 205, 67]),
         AvatarKind::Fox => ([225, 111, 42], [248, 234, 205], [119, 67, 37]),
