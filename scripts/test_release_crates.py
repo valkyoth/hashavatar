@@ -127,7 +127,7 @@ def test_dependency_order_is_enforced() -> None:
 
 
 def test_current_release_plan_matches_workspace() -> None:
-    plan = release_crates.load_release_plan(ROOT / "release-crates.toml")
+    plan = release_crates.load_release_plan()
     packages = release_crates.workspace_packages(release_crates.cargo_metadata())
     release_crates.verify_workspace(packages, plan)
 

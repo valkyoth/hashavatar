@@ -30,6 +30,8 @@ tagged, published to crates.io, or API/pixel compatible with alpha.1.
   failure, compositing, Kani, fuzz, and cross-platform checks.
 - Retained first-party `unsafe` prohibition, panic policy, dependency policy,
   source-size limit, MSRV checks, and source-only prerelease policy.
+- Bound release-plan loading to the repository-owned plan instead of accepting
+  a user-controlled filesystem path.
 
 Pentest the exact implementation-stop commit announced by the maintainer. The
 permanent digest is added only after the external review passes.

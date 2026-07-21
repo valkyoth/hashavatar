@@ -38,11 +38,6 @@ def capture(command: list[str]) -> str:
     return subprocess.check_output(command, cwd=ROOT, text=True).strip()
 
 
-def load_toml(path: Path) -> dict:
-    with path.open("rb") as handle:
-        return tomllib.load(handle)
-
-
 def validate_version(version: object, *, field: str) -> str:
     if not isinstance(version, str) or SEMVER.fullmatch(version) is None:
         raise RuntimeError(f"{field} must be a complete SemVer version")
@@ -69,8 +64,9 @@ def workspace_packages(metadata: dict) -> dict[str, dict]:
     }
 
 
-def load_release_plan(path: Path) -> dict:
-    raw = load_toml(path)
+def load_release_plan() -> dict:
+    with DEFAULT_PLAN.open("rb") as handle:
+        raw = tomllib.load(handle)
     release = raw.get("release", {})
     crates = raw.get("crates", {})
     version = validate_version(release.get("version"), field="release.version")
@@ -266,16 +262,10 @@ def publish(package: str, *, dry_run: bool) -> None:
     run(["cargo", "publish", "-p", package, "--locked"], dry_run=dry_run)
 
 
-def plan_path(raw: str) -> Path:
-    path = Path(raw)
-    return path if path.is_absolute() else (ROOT / path).resolve()
-
-
 def main() -> int:
     parser = argparse.ArgumentParser(
         description="Validate or publish Hashavatar workspace crates in dependency order."
     )
-    parser.add_argument("--plan", default=str(DEFAULT_PLAN))
     parser.add_argument("--version", default=None)
     parser.add_argument("--start-at", default=None)
     parser.add_argument("--check", action="store_true")
@@ -291,7 +281,7 @@ def main() -> int:
     if args.prepare_only and args.require_tag:
         parser.error("--prepare-only cannot require a tag")
 
-    plan = load_release_plan(plan_path(args.plan))
+    plan = load_release_plan()
     if args.version is not None and args.version != plan["version"]:
         raise RuntimeError(
             f"--version {args.version} does not match release plan {plan['version']}"
