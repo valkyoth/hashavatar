@@ -157,6 +157,19 @@ pub(crate) struct AvatarRenderPlan {
 }
 
 impl AvatarRenderPlan {
+    pub(crate) fn from_identity(
+        spec: AvatarSpec,
+        identity: AvatarIdentity,
+        style: AvatarStyleOptions,
+    ) -> Result<Self, AvatarSpecError> {
+        spec.validate()?;
+        Ok(Self {
+            spec,
+            identity,
+            style,
+        })
+    }
+
     pub(crate) fn new<T: AsRef<[u8]>>(
         spec: AvatarSpec,
         identity_options: AvatarIdentityOptions<'_>,
@@ -203,6 +216,22 @@ impl AvatarRenderPlan {
 
     pub(crate) fn validate_style_strict(&self) -> Result<(), AvatarStyleValidationError> {
         self.style.validate_strict()
+    }
+
+    pub(crate) const fn spec(&self) -> AvatarSpec {
+        self.spec
+    }
+
+    pub(crate) const fn style(&self) -> AvatarStyleOptions {
+        self.style
+    }
+
+    pub(crate) fn set_style(&mut self, style: AvatarStyleOptions) {
+        self.style = style;
+    }
+
+    pub(crate) fn identity_cache_key(&self) -> IdentityCacheKey {
+        self.identity.identity_cache_key()
     }
 
     pub(crate) fn avatar_asset_key(&self) -> AvatarAssetKey {
@@ -768,6 +797,18 @@ impl<'a, T: AsRef<[u8]>> AvatarBuilder<'a, T> {
         Ok(encode_owned_rgba_image(image, format)?)
     }
 
+    /// Freezes this legacy builder into the 1.3 prepared-request preview.
+    ///
+    /// This preserves the builder's existing skip-on-unsupported behavior.
+    /// Use [`AvatarRequestBuilder`] for strict-by-default new integrations.
+    pub fn prepare(self) -> Result<PreparedAvatar, AvatarError> {
+        let automatically_derived = self.style.is_none();
+        Ok(PreparedAvatar::from_legacy_plan(
+            self.render_plan()?,
+            automatically_derived,
+        ))
+    }
+
     fn render_plan(&self) -> Result<AvatarRenderPlan, AvatarError> {
         let spec = self.spec?;
         let namespace = self.namespace?;
@@ -900,6 +941,15 @@ impl<'a, T: AsRef<[u8]>> StrictAvatarBuilder<'a, T> {
         encode_owned_rgba_image(image, format)
             .map_err(AvatarError::from)
             .map_err(StrictAvatarError::from)
+    }
+
+    /// Freezes this strictly validated builder into a prepared request.
+    pub fn prepare(self) -> Result<PreparedAvatar, StrictAvatarError> {
+        let automatically_derived = self.inner.style.is_none();
+        Ok(PreparedAvatar::from_legacy_plan(
+            self.validated_plan()?,
+            automatically_derived,
+        ))
     }
 }
 

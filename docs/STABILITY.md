@@ -74,6 +74,19 @@ Legacy rendering skips unsupported face layers. Strict validation is additive:
 `AvatarStyleOptions::validate_strict()` and `StrictAvatarBuilder` reject those
 combinations without changing legacy output.
 
+The 1.3 `AvatarRequest`/`PreparedAvatar` workflow is also additive. Explicit
+request styles are strict by default, while `LegacyV1` mode canonicalizes
+unsupported face layers and reports both requested and effective styles.
+Existing `AvatarBuilder::prepare()` retains the builder's legacy policy;
+`StrictAvatarBuilder::prepare()` retains strict validation. Preparation binds
+metadata, typed keys, and output to one immutable validated tuple.
+
+The complete default-SHA-512 request/style/key/RGBA/SVG corpus for every 1.x
+family is frozen in `tests/compatibility_corpus_v1.tsv`. Hashavatar 2.0 may use
+a new renderer. Applications requiring exact 1.x pixels should pin 1.3 as
+described in `docs/MIGRATION_2.0.md`; no separate compatibility renderer is
+currently promised.
+
 ## Security And Resource Contract
 
 - Public dimensions remain bounded by `AvatarSpec`.
@@ -85,6 +98,12 @@ combinations without changing legacy output.
 - The default build keeps SHA-512 identity hashing and WebP encoding.
 - Optional hash modes and extra raster encoders remain explicit Cargo feature
   choices.
+- `ResourceBudget` reports known RGBA memory only. Codec scratch allocations
+  and service-wide concurrency remain caller policy.
+- `RasterSurfaceMut` validates dimensions, stride, and capacity before copy.
+  The 1.3 adapter still allocates one internal renderer image.
+- Writer methods propagate failures and leave partial caller-owned output in
+  the caller's sink.
 
 ## Known Residuals
 

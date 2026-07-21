@@ -63,6 +63,7 @@ test -s CONTRIBUTING.md
 test -s SECURITY.md
 test -s docs/DEPENDENCIES.md
 test -s docs/KANI.md
+test -s docs/MIGRATION_2.0.md
 test -s docs/PANIC_POLICY.md
 test -s docs/RELEASE.md
 test -s docs/SECURITY_CONTROLS.md
@@ -177,6 +178,7 @@ for required_package_file in \
     "deny.toml" \
     "docs/DEPENDENCIES.md" \
     "docs/KANI.md" \
+    "docs/MIGRATION_2.0.md" \
     "docs/PANIC_POLICY.md" \
     "docs/RELEASE.md" \
     "docs/SECURITY_CONTROLS.md" \
@@ -199,6 +201,8 @@ for required_package_file in \
     "scripts/validate-unsafe-boundary.sh" \
     "src/kani_proofs.rs" \
     "src/lib.rs" \
+    "tests/compatibility_corpus.rs" \
+    "tests/compatibility_corpus_v1.tsv" \
     "tests/golden_fingerprints.txt"
 do
     if ! printf '%s\n' "$package_list" | grep -qx "$required_package_file"; then

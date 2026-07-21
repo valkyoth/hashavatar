@@ -29,7 +29,7 @@ The crate starts conservative: validated avatar dimensions, bounded identity inp
 
 ## Current Status
 
-The current crate version is `1.2.0`.
+The current crate version is `1.3.0`.
 
 Implemented now:
 
@@ -59,6 +59,13 @@ Implemented now:
 - Compact SVG string rendering.
 - Fluent `AvatarBuilder` API for common render, encode, SVG, and cache-key
   workflows.
+- Additive `AvatarRequest` and `PreparedAvatar` migration API that freezes one
+  validated identity/spec/style tuple before metadata, keys, or output are
+  produced.
+- Strict-by-default explicit request styles with opt-in 1.x fallback reporting
+  through `ResolvedStyle` and family capabilities through `LayoutReport`.
+- `ResourceBudget`, validated strided `RasterSurfaceMut`, and caller-owned SVG
+  and encoded writers for applications preparing their 2.0 ownership model.
 - Opt-in strict style validation that rejects unsupported accessory and
   expression layers before rendering.
 - Typed `IdentityCacheKey`, `AvatarAssetKey`, `SemanticEncodedAssetKey`, and
@@ -76,6 +83,8 @@ Implemented now:
 - No public path-writing helpers; callers own their storage and filesystem boundary.
 - `#![forbid(unsafe_code)]` in library code.
 - Golden visual regression fingerprints.
+- A frozen compatibility corpus covering the request, complete style, asset
+  key, RGBA digest, and SVG digest for every 1.x avatar family.
 - Isolated fuzz harness for avatar identities, families, backgrounds, SVG
   rendering, default WebP encoding, and feature-gated encoder paths.
 - Local release gates for formatting, clippy, tests, docs, dependency policy,
@@ -109,6 +118,7 @@ Planned or intentionally external:
 | Namespace limits | 128 bytes per tenant/style-version component |
 | Hashing posture | SHA-512 default with length-prefixed domain, namespace, style, and identity components; optional BLAKE3 and non-cryptographic XXH3-128 |
 | SVG posture | Generated numeric markup only; caller input is not inserted into SVG fragments |
+| Prepared output posture | Strict explicit styles by default; validated caller surfaces and writers; documented 1.x internal allocations |
 | Kani | Bounded no-default-features harnesses for spec/resource/geometry arithmetic through the Rust `1.90.0` verifier toolchain; mandatory in stable release mode, but not a whole-crate formal-verification claim |
 | Release evidence | fmt, clippy, tests, docs, deny, audit, fuzz harness compile, mandatory Kani and SBOM evidence in release mode, byte-identical package check, publish dry run |
 
@@ -117,8 +127,9 @@ Security-control details live in [docs/SECURITY_CONTROLS.md](docs/SECURITY_CONTR
 The accepted preparation and 2.0 roadmap lives in
 [plan-towards-2.0.0.md](plan-towards-2.0.0.md). The historical path to the
 current crate remains in [docs/VERSION_PLAN.md](docs/VERSION_PLAN.md).
-`hashavatar` remains one crate through `1.2.0` and `1.3.0`; the workspace split
-begins with `2.0.0-alpha.1`.
+`hashavatar` remains one crate through `1.3.0`; the workspace split begins with
+`2.0.0-alpha.1`. Applications preparing for that transition should follow
+[docs/MIGRATION_2.0.md](docs/MIGRATION_2.0.md).
 
 ## Rust Version Support
 
@@ -128,7 +139,7 @@ The minimum supported Rust version is Rust `1.90.0`, as declared by
 to Rust `1.90.0` so the MSRV stays honest. New deployments should prefer the
 latest stable Rust; as of July 20, 2026, that is Rust `1.97.1`.
 
-Compatibility evidence for `1.2.0`:
+Compatibility evidence for `1.3.0`:
 
 | Rust | Local Evidence |
 | --- | --- |
@@ -150,7 +161,7 @@ Optional hash modes are mutually exclusive, so `hashavatar` cannot use a single
 
 ```toml
 [dependencies]
-hashavatar = "1.2.0"
+hashavatar = "1.3.0"
 ```
 
 Optional identity hash modes and extra raster encoders are disabled by default.
@@ -158,28 +169,28 @@ Hash modes are mutually exclusive, so enable at most one of `blake3` or `xxh3`:
 
 ```toml
 [dependencies]
-hashavatar = { version = "1.2.0", features = ["blake3"] }
+hashavatar = { version = "1.3.0", features = ["blake3"] }
 ```
 
 Enable additional raster formats explicitly:
 
 ```toml
 [dependencies]
-hashavatar = { version = "1.2.0", features = ["png", "jpeg", "gif"] }
+hashavatar = { version = "1.3.0", features = ["png", "jpeg", "gif"] }
 ```
 
 Or enable every optional raster encoder at once:
 
 ```toml
 [dependencies]
-hashavatar = { version = "1.2.0", features = ["all-formats"] }
+hashavatar = { version = "1.3.0", features = ["all-formats"] }
 ```
 
 Enable string serialization/deserialization for public style enums:
 
 ```toml
 [dependencies]
-hashavatar = { version = "1.2.0", features = ["serde"] }
+hashavatar = { version = "1.3.0", features = ["serde"] }
 ```
 
 Combine these as needed, for example `features = ["blake3", "png", "serde"]`.
@@ -201,7 +212,7 @@ license = "MIT OR Apache-2.0"
 
 ## Builder API
 
-`AvatarBuilder` is the recommended entry point for application code. It keeps
+`AvatarBuilder` remains the established entry point for application code. It keeps
 the same validation and security boundaries as the lower-level functions while
 avoiding long positional argument lists.
 
@@ -353,7 +364,7 @@ For example, using keyed BLAKE3 from the sanitization sister crate:
 
 ```toml
 [dependencies]
-hashavatar = "1.2.0"
+hashavatar = "1.3.0"
 sanitization = "2.0.1"
 sanitization-crypto-interop = { version = "2.0.1", features = ["blake3"] }
 ```
@@ -380,6 +391,57 @@ the tenant key deliberately changes avatar/cache identity, so coordinate key
 rotation with cache invalidation and visual-stability requirements. The caller
 still owns and must handle the raw identifier according to its own memory and
 logging policy.
+
+## Prepared Request API
+
+New integrations and applications preparing for 2.0 can derive an identity
+once and freeze validation, effective style, metadata, resource accounting,
+cache keys, and output behind `PreparedAvatar`:
+
+```rust
+use hashavatar::prelude::*;
+
+let namespace = AvatarNamespace::new("tenant-a", "v2")?;
+let identity = AvatarIdentity::new_with_namespace(namespace, "user-123")?;
+let prepared = AvatarRequest::builder(identity)
+    .size(256, 256)
+    .kind(AvatarKind::Robot)
+    .background(AvatarBackground::Transparent)
+    .accessory(AvatarAccessory::Glasses)
+    .shape(AvatarShape::Circle)
+    .prepare()?;
+
+let report = prepared.layout_report();
+let budget = prepared.resource_budget();
+let cache_key = prepared.avatar_asset_key();
+let webp = prepared.encode(AvatarOutputFormat::WebP)?;
+
+assert!(report.family_capabilities().supports_accessories());
+assert_eq!(budget.minimum_rgba8_surface_bytes(), 256 * 256 * 4);
+assert!(!cache_key.to_hex().is_empty());
+assert!(!webp.is_empty());
+
+# Ok::<(), Box<dyn std::error::Error>>(())
+```
+
+Explicit `AvatarRequest` styles are strict by default, so unsupported
+accessory or expression selections return `AvatarRequestError::Style`. Use
+`.legacy_v1_compatibility()` only when reproducing the old deterministic skip
+behavior; `resolved_style()` then reports requested and effective values.
+Existing `AvatarBuilder` and `StrictAvatarBuilder` values can adopt this
+workflow with `.prepare()` without changing their compatibility policy.
+
+`PreparedAvatar::write_svg()` and `encode_to_writer()` write to caller-owned
+sinks. `render_into()` accepts a validated RGBA8 surface with an explicit row
+stride. These are ownership adapters, not zero-allocation claims: the 1.x
+renderer still creates one temporary `RgbaImage`, SVG still creates a temporary
+`String`, and codecs can allocate format-specific scratch buffers. Use
+`ResourceBudget` for known RGBA memory and enforce aggregate concurrency at the
+service boundary.
+
+See [docs/MIGRATION_2.0.md](docs/MIGRATION_2.0.md) for cache migration,
+surface setup, writer failure semantics, and the exact 1.x compatibility
+decision.
 
 ## Stable Contract
 
@@ -672,7 +734,7 @@ your namespace style version when intentionally migrating output.
 
 ```toml
 [dependencies]
-hashavatar = { version = "1.2.0", features = ["blake3"] }
+hashavatar = { version = "1.3.0", features = ["blake3"] }
 ```
 
 ```rust
@@ -700,7 +762,7 @@ assert!(svg.contains("alien avatar"));
 
 ```toml
 [dependencies]
-hashavatar = { version = "1.2.0", features = ["xxh3"] }
+hashavatar = { version = "1.3.0", features = ["xxh3"] }
 ```
 
 ```rust

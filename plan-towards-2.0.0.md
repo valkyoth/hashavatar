@@ -2,7 +2,7 @@
 
 Status: accepted direction, 1.x preparation in progress
 
-Current stable line: `1.1.x`
+Current stable line: `1.2.x`
 
 Target: a polished, security-oriented Rust rendering workspace with a canonical
 safe-Rust CPU renderer, SVG generated from the same private fixed-point scene,
@@ -649,9 +649,7 @@ security claims are internally consistent.
 
 ### v1.2.0 - Contracts And Strict Preparation
 
-**Status:** Implementation stop reached. Local release gate passed; independent
-pentest, GitHub validation, and downstream integration testing remain before
-tagging.
+**Status:** Released as `v1.2.0`.
 
 **Goal:** Give 1.x consumers the identifiers and validation path needed for a
 safe 2.0 migration.
@@ -673,7 +671,9 @@ identity implementation also receives focused cryptographic review.
 
 ### v1.3.0 - Migration API And Corpus
 
-**Status:** Planned.
+**Status:** Implementation stop reached. The full local stable release gate
+passed; independent pentest, GitHub validation, and downstream
+`hashavatar-website` testing remain before tagging.
 
 **Goal:** Let real applications exercise the future workflow before the 2.0
 engine replaces rendering internals.
@@ -692,6 +692,11 @@ request/style/pixel/SVG/key fixtures, and unchanged existing output helpers.
 **Exit criteria:** A downstream can migrate request construction and cache-key
 logic before accepting 2.0 pixel changes; exact 1.x compatibility has an
 explicit keep-or-pin decision.
+
+**Compatibility decision:** Exact 1.x requests, styles, keys, RGBA output, and
+SVG output are frozen in the 1.3 corpus. Applications requiring those pixels
+after 2.0 should pin 1.3. A separate compatibility crate is deferred unless
+real downstream demand justifies maintaining and auditing two renderers.
 
 `v1.3.0 implementation stop reached. Run pentest for this exact commit.`
 

@@ -45,7 +45,10 @@ Visual output may change when:
 
 ## Regression Protection
 
-The repository includes golden fingerprint regression tests. Those tests are meant to catch unintended visual changes before release.
+The repository includes golden fingerprint regression tests. Hashavatar 1.3
+also freezes one complete request, style, asset key, RGBA digest, and SVG digest
+for every 1.x family in `tests/compatibility_corpus_v1.tsv`. Those checks are
+meant to catch unintended contract or visual changes before release.
 
 ## Explicit Contract And Cache IDs
 
@@ -60,6 +63,19 @@ artifact being stored. The latter
 two prevent dimensions, seed, style, format, or encoder-setting changes from
 reusing an incomplete cache key. Existing `cache_key()` strings remain stable
 for compatibility.
+
+Hashavatar 1.3 adds `AvatarRequest` and `PreparedAvatar` as an additive
+migration path. Explicit styles are strict by default in that path; opt-in
+`LegacyV1` preparation reports both requested and effective style values.
+Prepared keys and output methods are bound to the same immutable request tuple.
+
+## Exact 1.x Output After 2.0
+
+The 2.0 renderer may intentionally change pixels. Applications that require
+the exact frozen 1.x corpus should pin the latest 1.x release. A separate
+compatibility renderer is not currently planned and will be considered only if
+downstream demand justifies maintaining two engines. See
+`docs/MIGRATION_2.0.md`.
 
 ## Exhaustive Public Enums
 

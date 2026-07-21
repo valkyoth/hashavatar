@@ -65,8 +65,9 @@
   is consumed or dropped, and cloning a builder clones `T`. It cannot sanitize
   arbitrary caller-defined storage. High-assurance integrations should pass a
   short-lived borrow to sanitized storage or, preferably, derive a keyed
-  pseudonym first and build only from that pseudonym. The prepared,
-  identity-only request/builder boundary is planned for the 1.3 migration API.
+  pseudonym first and build only from that pseudonym. `AvatarRequest` and its
+  builder instead own an already-derived `AvatarIdentity`, and their `Debug`
+  implementations redact that identity.
 - `AvatarIdentity::cache_key()` derives an opaque display key by hashing the
   internal identity digest under a cache-key domain instead of returning raw
   digest bytes. Cache keys are still stable correlators for the same identity
@@ -99,6 +100,9 @@
   can fail closed before rendering with
   `AvatarStyleOptions::validate_strict()` or `StrictAvatarBuilder`. Automatic
   derivation remains total under the frozen legacy compatibility behavior.
+- Explicit `AvatarRequest` styles are strict by default. The opt-in
+  `LegacyV1` mode reports requested and effective values so migration code can
+  detect canonicalized no-op layers rather than losing that information.
 - Hashavatar does not own keyed identity secrets in 1.x. Key storage, rotation,
   tenant separation, and pseudonym lifetime are application policy. Sensitive,
   guessable identifiers should be mapped through a reviewed keyed construction
@@ -155,6 +159,10 @@
   into a replacement allocation, sanitizing the retired allocation, and only
   then installing the replacement. JPEG export also wraps the temporary RGB
   flattening buffer in `SanitizingVec`.
+  `PreparedAvatar::encode_to_writer()` writes directly to a caller-owned sink;
+  codec failures can leave partial output there, and cleanup is the caller's
+  responsibility. `write_svg()` has the same partial-output ownership rule and
+  currently builds a temporary SVG `String` before writing.
   Returned encoded bytes and images returned by render APIs are caller-owned
   and must be cleared by the caller if their environment requires that. The
   README includes `sanitization` examples for returned `Vec<u8>` and
@@ -175,6 +183,12 @@
   the application's memory budget. The crate intentionally does not ship a
   semaphore wrapper because concurrency primitives belong to the caller's
   async/runtime boundary.
+- `PreparedAvatar::resource_budget()` makes known 1.x RGBA memory explicit.
+  `render_into()` validates caller-surface dimensions, checked stride, and
+  required capacity, and preserves row padding. It still uses one sanitized
+  internal `RgbaImage`, so caller surface plus temporary image is the known
+  peak RGBA footprint. Codec-owned allocations are format-dependent and are
+  excluded.
 - Internal rectangle helpers use saturating or clamping arithmetic for edge and
   intersection calculations. Rectangle size construction promotes zero
   dimensions to a one-pixel rectangle so rounded-down decorative features remain
@@ -203,6 +217,9 @@
   for test/fuzz builds. A compile-time guard rejects ordinary non-fuzzing
   release builds if that feature is accidentally enabled.
 - Golden fingerprint tests protect deterministic rendering output.
+- A default-SHA-512 compatibility corpus additionally freezes the complete
+  request/style tuple, typed avatar key, RGBA digest, and SVG digest for every
+  1.x family.
 - The crate package excludes fuzz harnesses and generated build output.
 - `scripts/checks.sh` runs formatting, metadata, dependency, unsafe-boundary, panic-policy, tests, `cargo deny`, and `cargo audit`.
 - Stable release mode requires exactly `cargo-kani 0.67.0`, its pinned Rust

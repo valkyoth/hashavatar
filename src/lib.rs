@@ -111,12 +111,14 @@ pub const AVATAR_STYLE_SHAPE_BYTE: usize = 5;
 /// Common imports for application code using the high-level avatar APIs.
 pub mod prelude {
     pub use crate::{
-        AvatarAccessory, AvatarAssetKey, AvatarBackground, AvatarBuilder, AvatarColor, AvatarError,
-        AvatarExpression, AvatarFamilyCapabilities, AvatarIdentity, AvatarIdentityOptions,
-        AvatarKind, AvatarNamespace, AvatarOptions, AvatarOutputFormat, AvatarShape, AvatarSpec,
-        AvatarStyleOptions, AvatarStyleValidationError, BuildEncodedAssetKey, CatalogVersion,
-        EncoderBuildId, IdentityCacheKey, RenderContractId, SemanticEncodedAssetKey,
-        StrictAvatarBuilder, StrictAvatarError,
+        AvatarAccessory, AvatarAssetKey, AvatarBackground, AvatarBuilder, AvatarColor,
+        AvatarCompatibilityMode, AvatarError, AvatarExpression, AvatarFamilyCapabilities,
+        AvatarIdentity, AvatarIdentityOptions, AvatarKind, AvatarNamespace, AvatarOptions,
+        AvatarOutputFormat, AvatarRequest, AvatarRequestBuilder, AvatarRequestError, AvatarShape,
+        AvatarSpec, AvatarStyleOptions, AvatarStyleValidationError, BuildEncodedAssetKey,
+        CatalogVersion, EncoderBuildId, IdentityCacheKey, LayoutReport, PreparedAvatar,
+        RasterSurfaceError, RasterSurfaceMut, RenderContractId, ResolvedStyle, ResourceBudget,
+        SemanticEncodedAssetKey, StrictAvatarBuilder, StrictAvatarError,
     };
 }
 
@@ -141,8 +143,10 @@ mod core;
 mod encoding;
 mod layers;
 mod model;
+mod prepared;
 mod primitives;
 mod renderer_types;
+mod request;
 mod svg;
 
 #[cfg(kani)]
@@ -163,7 +167,9 @@ pub use self::avatars::*;
 pub use self::contracts::*;
 pub use self::core::*;
 pub use self::model::*;
+pub use self::prepared::*;
 pub use self::primitives::Color;
 #[cfg(feature = "fuzzing")]
 pub use self::primitives::fuzz_draw_polygon_rgba;
 pub use self::renderer_types::*;
+pub use self::request::*;

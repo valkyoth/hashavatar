@@ -1,5 +1,39 @@
 # Changelog
 
+## 1.3.0
+
+- Added the additive `AvatarRequest`/`AvatarRequestBuilder` and immutable
+  `PreparedAvatar` migration workflow without removing or changing established
+  1.x render helpers.
+- Made explicit prepared-request styles strict by default, with an opt-in
+  `LegacyV1` policy and `ResolvedStyle` reporting for canonicalized accessory
+  and expression fallbacks.
+- Added `LayoutReport` for the resolved style, family capabilities, catalog
+  version, and render contract bound to a prepared request.
+- Added `ResourceBudget` for known caller-surface, temporary-render, and
+  pre-encoder RGBA memory accounting.
+- Added validated, strided `RasterSurfaceMut` output and fail-closed errors for
+  zero dimensions, short strides, short buffers, overflow, and request/surface
+  dimension mismatches.
+- Added `PreparedAvatar::write_svg()` and `encode_to_writer()` for
+  caller-owned sinks with documented partial-output and internal-allocation
+  semantics.
+- Added `.prepare()` adapters to `AvatarBuilder` and `StrictAvatarBuilder` so
+  existing applications can migrate request and cache-key ownership without
+  changing their current style-compatibility behavior.
+- Added downstream-only tests for strict and legacy resolution, redacted
+  diagnostics, output/key parity, resource estimates, tight and padded
+  surfaces, short writes, injected writer failures, and encoded output parity.
+- Added a complete default-SHA-512 1.x compatibility corpus containing the
+  explicit request/style tuple, typed asset key, RGBA SHA-512 digest, and SVG
+  SHA-512 digest for every avatar family.
+- Added `docs/MIGRATION_2.0.md` with prepared-workflow examples and the explicit
+  decision that applications requiring exact 1.x pixels should pin 1.3; a
+  separate compatibility renderer is deferred unless real demand appears.
+- Bumped crate and fuzz path dependency metadata to `1.3.0`. No third-party
+  dependency versions changed.
+- Existing raster and SVG rendering behavior remains unchanged.
+
 ## 1.2.0
 
 - Added explicit `CatalogVersion::LEGACY_V1` and
