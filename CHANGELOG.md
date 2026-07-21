@@ -29,7 +29,8 @@
   changing their current style-compatibility behavior.
 - Added downstream-only tests for strict and legacy resolution, redacted
   diagnostics, output/key parity, resource estimates, tight and padded
-  surfaces, short writes, injected writer failures, and encoded output parity.
+  surfaces, fail-fast dimension preflight, short writes, injected writer
+  failures, and encoded output parity.
 - Added a complete default-SHA-512 1.x compatibility corpus containing the
   explicit request/style tuple, typed asset key, RGBA SHA-512 digest, and SVG
   SHA-512 digest for every avatar family.

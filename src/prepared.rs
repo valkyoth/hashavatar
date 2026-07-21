@@ -407,6 +407,17 @@ impl PreparedAvatar {
         &self,
         surface: &mut RasterSurfaceMut<'_>,
     ) -> Result<(), RasterSurfaceError> {
+        self.render_into_with(surface, || self.plan.render_rgba())
+    }
+
+    fn render_into_with<F>(
+        &self,
+        surface: &mut RasterSurfaceMut<'_>,
+        render: F,
+    ) -> Result<(), RasterSurfaceError>
+    where
+        F: FnOnce() -> Result<RgbaImage, AvatarSpecError>,
+    {
         let spec = self.spec();
         if (surface.width(), surface.height()) != (spec.width(), spec.height()) {
             return Err(RasterSurfaceError::DimensionMismatch {
@@ -417,7 +428,7 @@ impl PreparedAvatar {
             });
         }
 
-        let image = SanitizingRgbaImage::new(self.plan.render_rgba()?);
+        let image = SanitizingRgbaImage::new(render()?);
         copy_rgba_image_into_surface(spec, image.as_image(), surface)
     }
 
@@ -461,3 +472,6 @@ impl PreparedAvatar {
         encode_into_writer(image.as_image(), format, writer)
     }
 }
+
+#[cfg(test)]
+mod tests;

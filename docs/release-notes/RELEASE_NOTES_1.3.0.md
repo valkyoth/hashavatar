@@ -45,8 +45,8 @@ planned for 2.0 while continuing to use the frozen Hashavatar 1.x renderer.
 
 - Added external integration tests covering strict rejection, legacy fallback
   reporting, redacted diagnostics, existing-builder output/key parity, resource
-  math, padded stride preservation, short writes, writer failures, and WebP
-  writer/`Vec` parity.
+  math, padded stride preservation, observable fail-fast dimension preflight,
+  short writes, writer failures, and WebP writer/`Vec` parity.
 - Added `tests/compatibility_corpus_v1.tsv`, freezing one complete explicit
   request/style tuple, `AvatarAssetKey`, RGBA SHA-512 digest, and SVG SHA-512
   digest for every 1.x avatar family under the default SHA-512 identity mode.
