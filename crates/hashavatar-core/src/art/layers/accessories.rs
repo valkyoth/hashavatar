@@ -1,7 +1,8 @@
-use super::common::{LayerRig, ellipse, line, rect, triangle};
+use super::common::{
+    LayerRig, curved_line, ellipse, line, outline_ellipse, polygon, rect, triangle,
+};
 use crate::{
-    AvatarAccessory, AvatarAnchorSet, AvatarColorRoles, AvatarError, geometry::Point, paint::Color,
-    scene::Scene,
+    AvatarAccessory, AvatarAnchorSet, AvatarColorRoles, AvatarError, geometry::Point, scene::Scene,
 };
 
 pub(super) fn compile(
@@ -28,43 +29,48 @@ pub(super) fn compile(
 fn glasses(scene: &mut Scene, rig: LayerRig, adjustment: i16) -> Result<(), AvatarError> {
     let left = rig.point(rig.anchors.left_eye(), adjustment)?;
     let right = rig.point(rig.anchors.right_eye(), adjustment)?;
-    let outer = rig
+    let radius = rig
         .eye_radius()?
         .checked_mul(crate::fixed::Fixed::from_integer(2)?)?;
-    let inner = outer.checked_mul(crate::fixed::Fixed::from_ratio(3, 4)?)?;
     for center in [left, right] {
-        ellipse(scene, center, outer, outer, rig.ink)?;
-        ellipse(
-            scene,
-            center,
-            inner,
-            inner,
-            Color::rgba(rig.light.red, rig.light.green, rig.light.blue, 150),
-        )?;
+        outline_ellipse(scene, center, radius, radius, rig.size(180)?, rig.ink)?;
     }
-    line(scene, left, right, rig.size(100)?, rig.ink)
+    line(
+        scene,
+        Point::new(left.x.checked_add(radius)?, left.y),
+        Point::new(right.x.checked_sub(radius)?, right.y),
+        rig.size(180)?,
+        rig.ink,
+    )
 }
 
 fn hat(scene: &mut Scene, rig: LayerRig, adjustment: i16) -> Result<(), AvatarError> {
     let top = rig.point(rig.anchors.crown(), adjustment)?;
-    let half = rig.face_half()?;
-    let body_half = half.checked_mul(crate::fixed::Fixed::from_ratio(7, 10)?)?;
+    let brim_width = rig
+        .face_half()?
+        .checked_mul(crate::fixed::Fixed::from_ratio(14, 10)?)?;
+    let brim_half = brim_width.checked_mul(crate::fixed::Fixed::from_ratio(1, 2)?)?;
+    let body_half = brim_width.checked_mul(crate::fixed::Fixed::from_ratio(7, 20)?)?;
     let height = rig.size(1_800)?;
-    let brim = rig.size(450)?;
+    let brim_height = rig.size(500)?;
+    let body_top = top
+        .y
+        .checked_sub(height.checked_mul(crate::fixed::Fixed::from_ratio(1, 2)?)?)?;
+    let body_bottom = body_top.checked_add(height)?;
     rect(
         scene,
         top.x.checked_sub(body_half)?,
-        top.y.checked_sub(height)?,
+        body_top,
         top.x.checked_add(body_half)?,
-        top.y,
+        body_bottom,
         rig.accent,
     )?;
     rect(
         scene,
-        top.x.checked_sub(half)?,
-        top.y.checked_sub(brim)?,
-        top.x.checked_add(half)?,
-        top.y.checked_add(brim)?,
+        top.x.checked_sub(brim_half)?,
+        body_bottom,
+        top.x.checked_add(brim_half)?,
+        body_bottom.checked_add(brim_height)?,
         rig.ink,
     )
 }
@@ -74,59 +80,52 @@ fn headphones(scene: &mut Scene, rig: LayerRig, adjustment: i16) -> Result<(), A
     let right_eye = rig.point(rig.anchors.right_eye(), adjustment)?;
     let crown = rig.point(rig.anchors.crown(), adjustment)?;
     let half = rig.face_half()?;
-    let left = Point::new(crown.x.checked_sub(half)?, left_eye.y);
-    let right = Point::new(crown.x.checked_add(half)?, right_eye.y);
-    line(scene, left, crown, rig.size(180)?, rig.ink)?;
-    line(scene, crown, right, rig.size(180)?, rig.ink)?;
+    let eye_y = left_eye
+        .y
+        .checked_add(right_eye.y)?
+        .checked_mul(crate::fixed::Fixed::from_ratio(1, 2)?)?;
+    let left = Point::new(crown.x.checked_sub(half)?, eye_y);
+    let right = Point::new(crown.x.checked_add(half)?, eye_y);
+    let control_y = crown.y.checked_add(crown.y)?.checked_sub(eye_y)?;
+    curved_line(
+        scene,
+        left,
+        Point::new(crown.x, control_y),
+        right,
+        rig.size(180)?,
+        rig.ink,
+    )?;
     for center in [left, right] {
-        ellipse(scene, center, rig.size(550)?, rig.size(850)?, rig.accent)?;
+        ellipse(scene, center, rig.size(700)?, rig.size(1_000)?, rig.ink)?;
+        ellipse(scene, center, rig.size(480)?, rig.size(780)?, rig.accent)?;
     }
     Ok(())
 }
 
 fn crown(scene: &mut Scene, rig: LayerRig, adjustment: i16) -> Result<(), AvatarError> {
     let top = rig.point(rig.anchors.crown(), adjustment)?;
-    let half = rig
-        .face_half()?
-        .checked_mul(crate::fixed::Fixed::from_ratio(4, 5)?)?;
-    let rise = rig.size(1_500)?;
-    let base = top.y.checked_add(rig.size(900)?)?;
-    for offset in [-1_i32, 0, 1] {
-        let center = top
-            .x
-            .checked_add(half.checked_mul(crate::fixed::Fixed::from_ratio(offset, 2)?)?)?;
-        triangle(
-            scene,
-            [
-                Point::new(
-                    center
-                        .checked_sub(half.checked_mul(crate::fixed::Fixed::from_ratio(1, 2)?)?)?,
-                    base,
-                ),
-                Point::new(center, top.y.checked_sub(rise)?),
-                Point::new(
-                    center
-                        .checked_add(half.checked_mul(crate::fixed::Fixed::from_ratio(1, 2)?)?)?,
-                    base,
-                ),
-            ],
-            rig.accent,
-        )?;
-    }
-    rect(
-        scene,
-        top.x.checked_sub(half)?,
-        base.checked_sub(rig.size(350)?)?,
-        top.x.checked_add(half)?,
-        base.checked_add(rig.size(350)?)?,
-        rig.ink,
-    )
+    let half = rig.face_half()?;
+    let x = |numerator: i32| {
+        half.checked_mul(crate::fixed::Fixed::from_ratio(numerator, 100)?)
+            .and_then(|offset| top.x.checked_add(offset))
+    };
+    let points = [
+        Point::new(x(-70)?, top.y.checked_add(rig.size(1_200)?)?),
+        Point::new(x(-45)?, top.y),
+        Point::new(x(-16)?, top.y.checked_add(rig.size(1_000)?)?),
+        Point::new(top.x, top.y.checked_sub(rig.size(400)?)?),
+        Point::new(x(16)?, top.y.checked_add(rig.size(1_000)?)?),
+        Point::new(x(45)?, top.y),
+        Point::new(x(70)?, top.y.checked_add(rig.size(1_200)?)?),
+    ];
+    polygon(scene, &points, rig.accent)?;
+    line(scene, points[0], points[6], rig.size(180)?, rig.ink)
 }
 
 fn bowtie(scene: &mut Scene, rig: LayerRig, adjustment: i16) -> Result<(), AvatarError> {
     let neck = rig.point(rig.anchors.neck(), adjustment)?;
-    let width = rig.size(1_250)?;
-    let height = rig.size(850)?;
+    let width = rig.size(2_000)?;
+    let height = rig.size(1_000)?;
     triangle(
         scene,
         [
@@ -150,12 +149,18 @@ fn bowtie(scene: &mut Scene, rig: LayerRig, adjustment: i16) -> Result<(), Avata
 
 fn eyepatch(scene: &mut Scene, rig: LayerRig, adjustment: i16) -> Result<(), AvatarError> {
     let left = rig.point(rig.anchors.left_eye(), adjustment)?;
-    let right = rig.point(rig.anchors.right_eye(), adjustment)?;
-    let crown = rig.point(rig.anchors.crown(), adjustment)?;
+    let mouth = rig.point(rig.anchors.mouth(), adjustment)?;
+    let crown = rig.point(rig.anchors.crown(), adjustment / 2)?;
+    let half = rig.face_half()?;
     line(
         scene,
-        Point::new(crown.x.checked_sub(rig.face_half()?)?, crown.y),
-        right,
+        Point::new(crown.x.checked_sub(half)?, crown.y),
+        Point::new(
+            crown
+                .x
+                .checked_add(half.checked_mul(crate::fixed::Fixed::from_ratio(7, 10)?)?)?,
+            mouth.y.checked_sub(rig.eye_radius()?)?,
+        ),
         rig.size(140)?,
         rig.ink,
     )?;
@@ -196,32 +201,32 @@ fn scarf(scene: &mut Scene, rig: LayerRig, adjustment: i16) -> Result<(), Avatar
 
 fn halo(scene: &mut Scene, rig: LayerRig, adjustment: i16) -> Result<(), AvatarError> {
     let crown = rig.point(rig.anchors.crown(), adjustment)?;
-    ellipse(
+    outline_ellipse(
         scene,
-        Point::new(crown.x, crown.y.checked_sub(rig.size(900)?)?),
+        Point::new(crown.x, crown.y.checked_sub(rig.size(700)?)?),
         rig.face_half()?
-            .checked_mul(crate::fixed::Fixed::from_ratio(4, 5)?)?,
-        rig.size(500)?,
-        Color::rgba(rig.accent.red, rig.accent.green, rig.accent.blue, 120),
+            .checked_mul(crate::fixed::Fixed::from_ratio(7, 10)?)?,
+        rig.size(700)?,
+        rig.size(220)?,
+        rig.accent,
     )
 }
 
 fn horns(scene: &mut Scene, rig: LayerRig, adjustment: i16) -> Result<(), AvatarError> {
     let crown = rig.point(rig.anchors.crown(), adjustment)?;
     let half = rig.face_half()?;
-    let rise = rig.size(1_800)?;
+    let y = crown.y.checked_add(rig.size(500)?)?;
     for direction in [-1_i32, 1] {
-        let side = half.checked_mul(crate::fixed::Fixed::from_ratio(direction, 1)?)?;
-        let inner = half.checked_mul(crate::fixed::Fixed::from_ratio(direction, 2)?)?;
+        let offset = |numerator: i32| {
+            half.checked_mul(crate::fixed::Fixed::from_ratio(direction * numerator, 10)?)
+                .and_then(|value| crown.x.checked_add(value))
+        };
         triangle(
             scene,
             [
-                Point::new(
-                    crown.x.checked_add(side)?,
-                    crown.y.checked_add(rig.size(700)?)?,
-                ),
-                Point::new(crown.x.checked_add(side)?, crown.y.checked_sub(rise)?),
-                Point::new(crown.x.checked_add(inner)?, crown.y),
+                Point::new(offset(6)?, y.checked_add(rig.size(700)?)?),
+                Point::new(offset(10)?, y.checked_sub(rig.size(1_200)?)?),
+                Point::new(offset(3)?, y.checked_add(rig.size(200)?)?),
             ],
             rig.accent,
         )?;

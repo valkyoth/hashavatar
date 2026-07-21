@@ -32,9 +32,22 @@ prerelease.
 - Restores family-aware default colors, light themed fields with accent motifs,
   and the defining geometry needed to recognize all 31 existing subjects.
 - Intentionally rebases prerelease canonical pixels while preserving frozen
-  catalog IDs, stateless derivation, and alpha.4 layout behavior.
+  catalog IDs and stateless derivation. Alpha.4 layer identifiers and ordering
+  remain stable, while its provisional anchors are deliberately recalibrated.
 - Adds ordered per-family pixel fingerprints alongside the aggregate catalog
   KAT, so failures identify the affected family directly.
+- Applies a second family-by-family visual pass after downstream testing found
+  that several subjects still used generic geometry and alpha.4 face anchors
+  no longer matched the rebuilt artwork.
+- Restores recognizable animal and creature details, including canine muzzle
+  features, slime drips, bird crest feathers, monster limbs, rounded octopus
+  tentacles, and a more clearly draconic silhouette.
+- Rebuilds all accessory geometry around calibrated canonical anchors. Glasses,
+  hats, headphones, crowns, bowties, eyepatches, scarves, halos, and horns now
+  target their intended anatomical regions across every face-capable family.
+- Makes expressions replace the affected default eyes or mouth instead of
+  painting duplicate features, and adds a 340-render layered-corpus KAT plus
+  fixed-path accessory and expression review sheets.
 - Adds exact WebP/PNG decode-to-canonical comparisons, bounded JPEG/GIF lossy
   evidence, writer-failure tests, key tests, scratch-reuse tests, and a bounded
   format/writer fuzz target.

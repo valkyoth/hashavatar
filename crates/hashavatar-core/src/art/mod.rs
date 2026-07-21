@@ -19,7 +19,13 @@ pub(crate) fn compile_avatar_scene(
     let frame = frame::begin(&mut scene, style.shape())?;
     background::compile(&mut scene, style, traits)?;
     layers::compile_accessories(&mut scene, style, layout, AvatarZBand::BehindSubject)?;
-    families::compile(&mut scene, style.kind(), traits, style.color_roles())?;
+    families::compile(
+        &mut scene,
+        style.kind(),
+        traits,
+        style.color_roles(),
+        style.expression(),
+    )?;
     layers::compile_expression(&mut scene, style, layout)?;
     layers::compile_accessories(&mut scene, style, layout, AvatarZBand::Foreground)?;
     frame::finish(&mut scene, frame)?;

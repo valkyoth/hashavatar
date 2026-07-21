@@ -1,11 +1,12 @@
 //! Generates a dependency-free PPM contact sheet for complete catalog review.
 
-use std::fs;
+use std::{fs, path::Path};
 
 use hashavatar::{AvatarBackground, AvatarKind, AvatarRequest, AvatarShape, AvatarStyle};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    const OUTPUT: &str = "hashavatar-catalog.ppm";
+    const OUTPUT_DIRECTORY: &str = "target/visual-review";
+    const OUTPUT: &str = "target/visual-review/catalog.ppm";
     const AVATAR: usize = 88;
     const TILE: usize = 96;
     const COLUMNS: usize = 6;
@@ -52,7 +53,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let mut ppm = format!("P6\n{width} {height}\n255\n").into_bytes();
     ppm.extend_from_slice(&pixels);
-    fs::write(OUTPUT, ppm)?;
+    fs::create_dir_all(Path::new(OUTPUT_DIRECTORY))?;
+    fs::write(Path::new(OUTPUT), ppm)?;
     println!("wrote {OUTPUT}");
     Ok(())
 }

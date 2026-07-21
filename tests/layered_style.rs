@@ -5,6 +5,7 @@ use hashavatar::{
     AvatarExpression, AvatarKind, AvatarPalette, AvatarRequest, AvatarShape, AvatarStyle,
     LayoutDisposition, MAX_ACCESSORY_LAYERS, MAX_DIMENSION, StyleResolutionPolicy,
 };
+use sanitization_crypto_interop::sha2::SanitizedSha512;
 use std::collections::BTreeSet;
 
 fn prepare(
@@ -256,5 +257,54 @@ fn representative_layers_and_palettes_have_distinct_pixels() -> Result<(), Avata
             expression.as_str()
         );
     }
+    Ok(())
+}
+
+#[test]
+fn complete_face_layer_corpus_is_distinct_and_stable() -> Result<(), AvatarError> {
+    let mut aggregate = SanitizedSha512::new();
+    for kind in AvatarKind::ALL {
+        if !kind.capabilities().has_face_anchors() {
+            continue;
+        }
+
+        let mut expression_digests = BTreeSet::new();
+        for expression in AvatarExpression::ALL {
+            let prepared = prepare(kind, base(kind).with_expression(expression))?;
+            let digest = prepared.render_rgba()?.pixel_digest()?;
+            assert!(
+                expression_digests.insert(*digest.as_bytes()),
+                "duplicate {} expression pixels: {}",
+                kind.as_str(),
+                expression.as_str()
+            );
+            aggregate.update(digest.as_bytes());
+        }
+
+        let baseline = prepare(kind, base(kind))?.render_rgba()?.pixel_digest()?;
+        let mut accessory_digests = BTreeSet::from([*baseline.as_bytes()]);
+        aggregate.update(baseline.as_bytes());
+        for accessory in AvatarAccessory::ALL {
+            let prepared = prepare(kind, base(kind).with_accessory(accessory)?)?;
+            let digest = prepared.render_rgba()?.pixel_digest()?;
+            assert!(
+                accessory_digests.insert(*digest.as_bytes()),
+                "duplicate {} accessory pixels: {}",
+                kind.as_str(),
+                accessory.as_str()
+            );
+            aggregate.update(digest.as_bytes());
+        }
+    }
+
+    assert_eq!(
+        aggregate.finalize(),
+        [
+            171, 11, 200, 239, 95, 60, 69, 59, 100, 101, 55, 22, 193, 61, 92, 213, 215, 104, 54,
+            19, 243, 245, 202, 135, 143, 79, 247, 92, 226, 222, 206, 24, 136, 33, 130, 103, 30,
+            157, 35, 99, 34, 94, 248, 145, 3, 11, 117, 221, 185, 23, 105, 3, 244, 208, 107, 151,
+            166, 23, 85, 38, 222, 26, 236, 103,
+        ]
+    );
     Ok(())
 }

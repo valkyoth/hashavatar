@@ -4,15 +4,18 @@ mod faces;
 mod objects;
 
 use self::common::FamilyRig;
-use crate::{AvatarColorRoles, AvatarError, AvatarKind, AvatarTraitVector, scene::Scene};
+use crate::{
+    AvatarColorRoles, AvatarError, AvatarExpression, AvatarKind, AvatarTraitVector, scene::Scene,
+};
 
 pub(super) fn compile(
     scene: &mut Scene,
     kind: AvatarKind,
     traits: AvatarTraitVector,
     colors: AvatarColorRoles,
+    expression: AvatarExpression,
 ) -> Result<(), AvatarError> {
-    let rig = FamilyRig::new(scene, traits, colors)?;
+    let rig = FamilyRig::new(scene, traits, colors, expression)?;
     match kind {
         AvatarKind::Cat
         | AvatarKind::Dog

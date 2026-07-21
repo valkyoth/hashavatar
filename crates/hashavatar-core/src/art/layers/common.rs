@@ -103,6 +103,25 @@ pub(super) fn triangle(
     })
 }
 
+pub(super) fn polygon(
+    scene: &mut Scene,
+    points: &[Point],
+    color: Color,
+) -> Result<(), AvatarError> {
+    let first = *points.first().ok_or(AvatarError::InvalidScene)?;
+    let mut path = Path::builder(first)?;
+    for point in points.iter().copied().skip(1) {
+        path.line_to(point)?;
+    }
+    let path_index = scene.push_path(path.finish(true)?)?;
+    scene.push(Command::Path {
+        path_index,
+        fill_rule: FillRule::NonZero,
+        fill: Some(Paint::solid(color)),
+        stroke: None,
+    })
+}
+
 pub(super) fn line(
     scene: &mut Scene,
     start: Point,
@@ -130,6 +149,54 @@ pub(super) fn curved_line(
 ) -> Result<(), AvatarError> {
     let mut path = Path::builder(start)?;
     path.quad_to(control, end)?;
+    let path_index = scene.push_path(path.finish(false)?)?;
+    scene.push(Command::Path {
+        path_index,
+        fill_rule: FillRule::NonZero,
+        fill: None,
+        stroke: Some(Stroke {
+            width,
+            paint: Paint::solid(color),
+        }),
+    })
+}
+
+pub(super) fn outline_ellipse(
+    scene: &mut Scene,
+    center: Point,
+    radius_x: Fixed,
+    radius_y: Fixed,
+    width: Fixed,
+    color: Color,
+) -> Result<(), AvatarError> {
+    let kappa = Fixed::from_ratio(5_523, 10_000)?;
+    let control_x = radius_x.checked_mul(kappa)?;
+    let control_y = radius_y.checked_mul(kappa)?;
+    let left = center.x.checked_sub(radius_x)?;
+    let right = center.x.checked_add(radius_x)?;
+    let top = center.y.checked_sub(radius_y)?;
+    let bottom = center.y.checked_add(radius_y)?;
+    let mut path = Path::builder(Point::new(left, center.y))?;
+    path.cubic_to(
+        Point::new(left, center.y.checked_sub(control_y)?),
+        Point::new(center.x.checked_sub(control_x)?, top),
+        Point::new(center.x, top),
+    )?;
+    path.cubic_to(
+        Point::new(center.x.checked_add(control_x)?, top),
+        Point::new(right, center.y.checked_sub(control_y)?),
+        Point::new(right, center.y),
+    )?;
+    path.cubic_to(
+        Point::new(right, center.y.checked_add(control_y)?),
+        Point::new(center.x.checked_add(control_x)?, bottom),
+        Point::new(center.x, bottom),
+    )?;
+    path.cubic_to(
+        Point::new(center.x.checked_sub(control_x)?, bottom),
+        Point::new(left, center.y.checked_add(control_y)?),
+        Point::new(left, center.y),
+    )?;
     let path_index = scene.push_path(path.finish(false)?)?;
     scene.push(Command::Path {
         path_index,

@@ -37,5 +37,11 @@ pub(super) fn compile_expression(
     let Some(anchors) = layout.anchors() else {
         return Ok(());
     };
-    expressions::compile(scene, anchors, style.color_roles(), style.expression())
+    expressions::compile(
+        scene,
+        style.kind(),
+        anchors,
+        style.color_roles(),
+        style.expression(),
+    )
 }

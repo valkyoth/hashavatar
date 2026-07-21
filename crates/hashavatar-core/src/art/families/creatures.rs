@@ -1,5 +1,9 @@
-use super::common::{FamilyRig, ellipse, eyes, line, polygon, smile, triangle};
-use crate::{AvatarError, AvatarKind, geometry::Point, scene::Scene};
+use super::common::{FamilyRig, ellipse, eyes, polygon, rect, smile, triangle};
+use crate::{
+    AvatarError, AvatarKind,
+    geometry::{Point, Rect},
+    scene::Scene,
+};
 
 pub(super) fn compile(
     scene: &mut Scene,
@@ -41,38 +45,69 @@ fn ghost(scene: &mut Scene, rig: FamilyRig) -> Result<(), AvatarError> {
         ],
         rig.light,
     )?;
-    eyes(scene, rig, 50, 10, 4)?;
-    ellipse(
-        scene,
-        Point::new(rig.canvas.x(50)?, rig.canvas.y(65)?),
-        rig.canvas.s(4)?,
-        rig.canvas.s(6)?,
-        rig.ink,
-    )
+    for x in [23, 77] {
+        ellipse(
+            scene,
+            Point::new(rig.canvas.x(x)?, rig.canvas.y(59)?),
+            rig.canvas.s(7)?,
+            rig.canvas.s(4)?,
+            rig.light.with_opacity(215),
+        )?;
+    }
+    eyes(scene, rig, 50, 6, 4)?;
+    if rig.draws_default_mouth() {
+        ellipse(
+            scene,
+            Point::new(rig.canvas.x(50)?, rig.canvas.y(65)?),
+            rig.canvas.s(4)?,
+            rig.canvas.s(6)?,
+            rig.ink,
+        )
+    } else {
+        Ok(())
+    }
 }
 
 fn slime(scene: &mut Scene, rig: FamilyRig) -> Result<(), AvatarError> {
-    polygon(
+    ellipse(
         scene,
-        rig,
-        &[
-            (24, 76),
-            (27, 50),
-            (35, 33),
-            (50, 26),
-            (65, 33),
-            (73, 50),
-            (76, 76),
-            (66, 72),
-            (58, 78),
-            (50, 72),
-            (42, 78),
-            (34, 72),
-        ],
+        Point::new(rig.canvas.x(50)?, rig.canvas.y(54)?),
+        rig.canvas.s(24)?,
+        rig.canvas.s(21)?,
         rig.primary,
     )?;
-    eyes(scene, rig, 53, 10, 3)?;
-    smile(scene, rig, 65)
+    for (index, x) in [34, 45, 56, 67].iter().copied().enumerate() {
+        let extra = i32::from((rig.traits.pattern_seed() >> (index * 3)) & 3);
+        let bottom = 70 + extra * 3;
+        rect(
+            scene,
+            Rect::new(
+                rig.canvas.x(x - 4)?,
+                rig.canvas.y(54)?,
+                rig.canvas.x(x + 4)?,
+                rig.canvas.y(bottom)?,
+            ),
+            rig.primary,
+        )?;
+        ellipse(
+            scene,
+            Point::new(rig.canvas.x(x)?, rig.canvas.y(bottom)?),
+            rig.canvas.s(4)?,
+            rig.canvas.s(4)?,
+            rig.primary,
+        )?;
+    }
+    for (x, y, size) in [(39, 44, 3), (56, 38, 2), (63, 55, 3)] {
+        ellipse(
+            scene,
+            Point::new(rig.canvas.x(x)?, rig.canvas.y(y)?),
+            rig.canvas.s(size)?,
+            rig.canvas.s(size)?,
+            rig.light.with_opacity(100),
+        )?;
+    }
+    eyes(scene, rig, 48, 10, 3)?;
+    smile(scene, rig, 64)
 }
 
 fn bird(scene: &mut Scene, rig: FamilyRig) -> Result<(), AvatarError> {
@@ -83,6 +118,17 @@ fn bird(scene: &mut Scene, rig: FamilyRig) -> Result<(), AvatarError> {
         rig.canvas.s(23)?,
         rig.primary,
     )?;
+    for x in [43, 50, 57] {
+        triangle(
+            scene,
+            [
+                Point::new(rig.canvas.x(x - 4)?, rig.canvas.y(38)?),
+                Point::new(rig.canvas.x(x)?, rig.canvas.y(25)?),
+                Point::new(rig.canvas.x(x + 4)?, rig.canvas.y(39)?),
+            ],
+            rig.secondary,
+        )?;
+    }
     for x in [34, 66] {
         ellipse(
             scene,
@@ -101,7 +147,7 @@ fn bird(scene: &mut Scene, rig: FamilyRig) -> Result<(), AvatarError> {
         ],
         rig.accent,
     )?;
-    eyes(scene, rig, 49, 8, 3)
+    eyes(scene, rig, 51, 6, 3)
 }
 
 fn octopus(scene: &mut Scene, rig: FamilyRig) -> Result<(), AvatarError> {
@@ -112,17 +158,29 @@ fn octopus(scene: &mut Scene, rig: FamilyRig) -> Result<(), AvatarError> {
         rig.canvas.s(24)?,
         rig.primary,
     )?;
-    for x in [31, 43, 57, 69] {
-        line(
+    for (index, x) in [31, 43, 57, 69].iter().copied().enumerate() {
+        let bend = if index.is_multiple_of(2) { -3 } else { 3 };
+        let bottom = 77 + i32::from((rig.traits.detail_b() >> (index * 2)) & 3);
+        rect(
             scene,
-            Point::new(rig.canvas.x(x)?, rig.canvas.y(63)?),
-            Point::new(rig.canvas.x(x - 4 + (x % 3) * 4)?, rig.canvas.y(82)?),
-            rig.canvas.s(6)?,
+            Rect::new(
+                rig.canvas.x(x - 3)?,
+                rig.canvas.y(59)?,
+                rig.canvas.x(x + 3)?,
+                rig.canvas.y(bottom)?,
+            ),
+            rig.primary,
+        )?;
+        ellipse(
+            scene,
+            Point::new(rig.canvas.x(x + bend)?, rig.canvas.y(bottom)?),
+            rig.canvas.s(5)?,
+            rig.canvas.s(5)?,
             rig.primary,
         )?;
     }
-    eyes(scene, rig, 48, 10, 3)?;
-    smile(scene, rig, 60)
+    eyes(scene, rig, 52, 8, 3)?;
+    smile(scene, rig, 63)
 }
 
 fn penguin(scene: &mut Scene, rig: FamilyRig) -> Result<(), AvatarError> {

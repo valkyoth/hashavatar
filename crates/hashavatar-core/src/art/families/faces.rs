@@ -67,40 +67,44 @@ fn robot(scene: &mut Scene, rig: FamilyRig) -> Result<(), AvatarError> {
         ),
         rig.secondary,
     )?;
-    for x in [39, 61] {
-        ellipse(
+    if rig.draws_default_eyes() {
+        for x in [39, 61] {
+            ellipse(
+                scene,
+                Point::new(rig.canvas.x(x)?, rig.canvas.y(48)?),
+                rig.canvas.s(5)?,
+                rig.canvas.s(5)?,
+                rig.accent,
+            )?;
+            ellipse(
+                scene,
+                Point::new(rig.canvas.x(x)?, rig.canvas.y(48)?),
+                rig.canvas.s(2)?,
+                rig.canvas.s(2)?,
+                rig.ink,
+            )?;
+        }
+    }
+    if rig.draws_default_mouth() {
+        rect(
             scene,
-            Point::new(rig.canvas.x(x)?, rig.canvas.y(48)?),
-            rig.canvas.s(5)?,
-            rig.canvas.s(5)?,
-            rig.accent,
-        )?;
-        ellipse(
-            scene,
-            Point::new(rig.canvas.x(x)?, rig.canvas.y(48)?),
-            rig.canvas.s(2)?,
-            rig.canvas.s(2)?,
+            Rect::new(
+                rig.canvas.x(36)?,
+                rig.canvas.y(67)?,
+                rig.canvas.x(64)?,
+                rig.canvas.y(73)?,
+            ),
             rig.ink,
         )?;
-    }
-    rect(
-        scene,
-        Rect::new(
-            rig.canvas.x(36)?,
-            rig.canvas.y(67)?,
-            rig.canvas.x(64)?,
-            rig.canvas.y(73)?,
-        ),
-        rig.ink,
-    )?;
-    for x in [42, 50, 58] {
-        line(
-            scene,
-            Point::new(rig.canvas.x(x)?, rig.canvas.y(68)?),
-            Point::new(rig.canvas.x(x)?, rig.canvas.y(72)?),
-            rig.canvas.s(1)?,
-            rig.light,
-        )?;
+        for x in [42, 50, 58] {
+            line(
+                scene,
+                Point::new(rig.canvas.x(x)?, rig.canvas.y(68)?),
+                Point::new(rig.canvas.x(x)?, rig.canvas.y(72)?),
+                rig.canvas.s(1)?,
+                rig.light,
+            )?;
+        }
     }
     Ok(())
 }
@@ -113,22 +117,28 @@ fn alien(scene: &mut Scene, rig: FamilyRig) -> Result<(), AvatarError> {
         rig.canvas.s(33)?,
         rig.primary,
     )?;
-    for x in [41, 59] {
-        ellipse(
-            scene,
-            Point::new(rig.canvas.x(x)?, rig.canvas.y(47)?),
-            rig.canvas.s(5)?,
-            rig.canvas.s(11)?,
-            rig.ink,
-        )?;
+    if rig.draws_default_eyes() {
+        for x in [41, 59] {
+            ellipse(
+                scene,
+                Point::new(rig.canvas.x(x)?, rig.canvas.y(47)?),
+                rig.canvas.s(5)?,
+                rig.canvas.s(11)?,
+                rig.ink,
+            )?;
+        }
     }
-    ellipse(
-        scene,
-        Point::new(rig.canvas.x(50)?, rig.canvas.y(62)?),
-        rig.canvas.s(2)?,
-        rig.canvas.s(2)?,
-        rig.secondary,
-    )
+    if rig.draws_default_mouth() {
+        line(
+            scene,
+            Point::new(rig.canvas.x(46)?, rig.canvas.y(65)?),
+            Point::new(rig.canvas.x(54)?, rig.canvas.y(65)?),
+            rig.canvas.s(1)?,
+            rig.secondary,
+        )
+    } else {
+        Ok(())
+    }
 }
 
 fn monster(scene: &mut Scene, rig: FamilyRig) -> Result<(), AvatarError> {
@@ -143,6 +153,22 @@ fn monster(scene: &mut Scene, rig: FamilyRig) -> Result<(), AvatarError> {
             rig.secondary,
         )?;
     }
+    for (start_x, end_x, end_y) in [(36, 30, 84), (50, 50, 87), (64, 70, 84)] {
+        line(
+            scene,
+            Point::new(rig.canvas.x(start_x)?, rig.canvas.y(72)?),
+            Point::new(rig.canvas.x(end_x)?, rig.canvas.y(end_y)?),
+            rig.canvas.s(6)?,
+            rig.secondary,
+        )?;
+        ellipse(
+            scene,
+            Point::new(rig.canvas.x(end_x)?, rig.canvas.y(end_y)?),
+            rig.canvas.s(4)?,
+            rig.canvas.s(4)?,
+            rig.secondary,
+        )?;
+    }
     ellipse(
         scene,
         Point::new(rig.canvas.x(50)?, rig.canvas.y(56)?),
@@ -150,48 +176,55 @@ fn monster(scene: &mut Scene, rig: FamilyRig) -> Result<(), AvatarError> {
         rig.canvas.s(27)?,
         rig.primary,
     )?;
-    let eye_count = 1 + usize::from(rig.traits.detail_a() % 3);
-    let eye_positions: &[i32] = match eye_count {
-        1 => &[50],
-        2 => &[39, 61],
-        _ => &[36, 50, 64],
-    };
-    for x in eye_positions.iter().copied() {
+    for (x, y, size) in [(35, 58, 3), (51, 37, 4), (66, 60, 3)] {
         ellipse(
             scene,
-            Point::new(rig.canvas.x(x)?, rig.canvas.y(49)?),
-            rig.canvas.s(5)?,
-            rig.canvas.s(6)?,
-            rig.light,
-        )?;
-        ellipse(
-            scene,
-            Point::new(rig.canvas.x(x)?, rig.canvas.y(49)?),
-            rig.canvas.s(2)?,
-            rig.canvas.s(3)?,
-            rig.ink,
+            Point::new(rig.canvas.x(x)?, rig.canvas.y(y)?),
+            rig.canvas.s(size)?,
+            rig.canvas.s(size)?,
+            rig.secondary.with_opacity(145),
         )?;
     }
-    rect(
-        scene,
-        Rect::new(
-            rig.canvas.x(36)?,
-            rig.canvas.y(66)?,
-            rig.canvas.x(64)?,
-            rig.canvas.y(76)?,
-        ),
-        rig.ink,
-    )?;
-    for x in [42, 58] {
-        triangle(
+    if rig.draws_default_eyes() {
+        for x in [40, 60] {
+            ellipse(
+                scene,
+                Point::new(rig.canvas.x(x)?, rig.canvas.y(51)?),
+                rig.canvas.s(5)?,
+                rig.canvas.s(6)?,
+                rig.light,
+            )?;
+            ellipse(
+                scene,
+                Point::new(rig.canvas.x(x)?, rig.canvas.y(51)?),
+                rig.canvas.s(2)?,
+                rig.canvas.s(3)?,
+                rig.ink,
+            )?;
+        }
+    }
+    if rig.draws_default_mouth() {
+        rect(
             scene,
-            [
-                Point::new(rig.canvas.x(x - 3)?, rig.canvas.y(66)?),
-                Point::new(rig.canvas.x(x + 3)?, rig.canvas.y(66)?),
-                Point::new(rig.canvas.x(x)?, rig.canvas.y(73)?),
-            ],
-            rig.light,
+            Rect::new(
+                rig.canvas.x(36)?,
+                rig.canvas.y(66)?,
+                rig.canvas.x(64)?,
+                rig.canvas.y(76)?,
+            ),
+            rig.ink,
         )?;
+        for x in [42, 58] {
+            triangle(
+                scene,
+                [
+                    Point::new(rig.canvas.x(x - 3)?, rig.canvas.y(66)?),
+                    Point::new(rig.canvas.x(x + 3)?, rig.canvas.y(66)?),
+                    Point::new(rig.canvas.x(x)?, rig.canvas.y(73)?),
+                ],
+                rig.light,
+            )?;
+        }
     }
     Ok(())
 }
@@ -232,7 +265,7 @@ fn wizard(scene: &mut Scene, rig: FamilyRig) -> Result<(), AvatarError> {
             rig.accent,
         )?;
     }
-    eyes(scene, rig, 54, 7, 2)?;
+    eyes(scene, rig, 55, 5, 2)?;
     polygon(
         scene,
         rig,
@@ -259,14 +292,16 @@ fn skull(scene: &mut Scene, rig: FamilyRig) -> Result<(), AvatarError> {
         ),
         rig.light,
     )?;
-    for x in [39, 61] {
-        ellipse(
-            scene,
-            Point::new(rig.canvas.x(x)?, rig.canvas.y(50)?),
-            rig.canvas.s(6)?,
-            rig.canvas.s(8)?,
-            rig.ink,
-        )?;
+    if rig.draws_default_eyes() {
+        for x in [39, 61] {
+            ellipse(
+                scene,
+                Point::new(rig.canvas.x(x)?, rig.canvas.y(50)?),
+                rig.canvas.s(6)?,
+                rig.canvas.s(8)?,
+                rig.ink,
+            )?;
+        }
     }
     triangle(
         scene,

@@ -61,6 +61,12 @@ use the behind-subject band, expressions use the expression band, and other
 accessories use the foreground band. Reordering equivalent input stacks cannot
 change the resolved style, report, scene, raster pixels, or SVG.
 
+Non-default expressions replace the affected default facial feature. Happy,
+grumpy, surprised, and crying replace the default mouth; sleepy, winking, and
+cool replace the default eyes. This prevents two mouths or two eye sets from
+being composited on top of each other. Family anchors are calibrated against
+the canonical integer artwork, not inherited floating-point coordinates.
+
 ## Capabilities
 
 `AvatarKind::capabilities()` is authoritative. Face-capable families admit all
@@ -73,6 +79,7 @@ face layers. Automatic attempts are reported rather than silently skipped.
 Integration tests cover every family against every palette, expression, and
 accessory; strict invalid cases; automatic fallback; permutation invariance;
 maximum-capacity stacks; minimum/default/maximum dimensions; pixel-distinct
-catalog choices; parsed SVG; and the complete alpha.3 baseline KAT. Fuzzing
+catalog choices; parsed SVG; a complete face-layer aggregate KAT; and fixed-path
+raster review sheets for all supported family/layer pairs. Fuzzing
 compares forward and reverse stack resolution, and Kani proves fail-closed
 fixed-capacity admission.

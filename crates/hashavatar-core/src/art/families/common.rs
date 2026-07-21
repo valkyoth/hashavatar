@@ -1,5 +1,5 @@
 use crate::{
-    AvatarColorRoles, AvatarError, AvatarTraitVector,
+    AvatarColorRoles, AvatarError, AvatarExpression, AvatarTraitVector,
     art::util::{Canvas, role_color, vary},
     fixed::Fixed,
     geometry::{FillRule, Path, Point, Rect},
@@ -16,6 +16,7 @@ pub(super) struct FamilyRig {
     pub(super) accent: Color,
     pub(super) light: Color,
     pub(super) ink: Color,
+    expression: AvatarExpression,
 }
 
 impl FamilyRig {
@@ -23,6 +24,7 @@ impl FamilyRig {
         scene: &Scene,
         traits: AvatarTraitVector,
         colors: AvatarColorRoles,
+        expression: AvatarExpression,
     ) -> Result<Self, AvatarError> {
         Ok(Self {
             canvas: Canvas::new(scene)?,
@@ -32,7 +34,25 @@ impl FamilyRig {
             accent: role_color(colors.accent()),
             light: role_color(colors.light()),
             ink: role_color(colors.ink()),
+            expression,
         })
+    }
+
+    pub(super) const fn draws_default_eyes(self) -> bool {
+        !matches!(
+            self.expression,
+            AvatarExpression::Sleepy | AvatarExpression::Winking | AvatarExpression::Cool
+        )
+    }
+
+    pub(super) const fn draws_default_mouth(self) -> bool {
+        matches!(
+            self.expression,
+            AvatarExpression::Default
+                | AvatarExpression::Sleepy
+                | AvatarExpression::Winking
+                | AvatarExpression::Cool
+        )
     }
 
     pub(super) fn head_rx(self) -> Result<Fixed, AvatarError> {
@@ -121,6 +141,9 @@ pub(super) fn eyes(
     spacing: i32,
     size: i32,
 ) -> Result<(), AvatarError> {
+    if !rig.draws_default_eyes() {
+        return Ok(());
+    }
     for x in [50 - spacing, 50 + spacing] {
         ellipse(
             scene,
@@ -141,6 +164,9 @@ pub(super) fn eyes(
 }
 
 pub(super) fn smile(scene: &mut Scene, rig: FamilyRig, y: i32) -> Result<(), AvatarError> {
+    if !rig.draws_default_mouth() {
+        return Ok(());
+    }
     let mut path = Path::builder(Point::new(rig.canvas.x(43)?, rig.canvas.y(y)?))?;
     path.quad_to(
         Point::new(rig.canvas.x(50)?, rig.canvas.y(y + 7)?),

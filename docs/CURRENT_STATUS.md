@@ -47,11 +47,12 @@ portable core, established-format provider, and recommended facade workflow:
 - source-size enforcement at 500 lines per Rust file;
 - portable core CI for WASM, AArch64 Linux, and 32-bit x86 Linux.
 
-The first alpha.5 downstream trial exposed a broad visual regression in the
-initial catalog port. Family palettes, themed composition, and defining
-geometry have been corrected and the prerelease pixel baseline intentionally
-rebased. The remediated alpha.5 candidate requires a fresh exact-commit
-website comparison and pentest.
+Two alpha.5 downstream reviews exposed visual regressions in the initial
+catalog port. Family palettes, themed composition, defining geometry, face
+anchors, accessory placement, and expression replacement semantics have been
+corrected. The prerelease family and complete layered-corpus pixel baselines
+were intentionally rebased after raster-sheet review. The remediated alpha.5
+candidate requires a fresh exact-commit website comparison and pentest.
 
 The alpha.5 implementation-stop candidate is ready for exact-commit external pentesting.
 The milestone is not complete until findings are resolved, the permanent

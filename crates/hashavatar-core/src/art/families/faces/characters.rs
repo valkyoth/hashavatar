@@ -36,7 +36,7 @@ fn ninja(scene: &mut Scene, rig: FamilyRig) -> Result<(), AvatarError> {
         ),
         rig.primary,
     )?;
-    eyes(scene, rig, 51, 11, 3)?;
+    eyes(scene, rig, 48, 10, 3)?;
     line(
         scene,
         Point::new(rig.canvas.x(71)?, rig.canvas.y(44)?),
@@ -59,7 +59,7 @@ fn astronaut(scene: &mut Scene, rig: FamilyRig) -> Result<(), AvatarError> {
             color,
         )?;
     }
-    eyes(scene, rig, 51, 9, 3)?;
+    eyes(scene, rig, 47, 9, 3)?;
     rect(
         scene,
         Rect::new(

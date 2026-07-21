@@ -310,9 +310,13 @@ scripts/check_kani.sh
 cargo test --workspace --release
 cargo run --example catalog_sheet
 cargo run --example catalog_raster_sheet
-cargo run --example layered_raster_sheet
+cargo run --example layer_raster_sheet
 cargo run --example encoded_webp
 ```
+
+The raster examples write fixed-path PPM review sheets under
+`target/visual-review/`. The layer sheet includes the baseline plus every
+accessory and expression for each face-capable family.
 
 The standard gate checks formatting, strict Clippy, debug and release KATs,
 rustdoc, MSRV `1.90.0`, package metadata, dependency and license policy,
