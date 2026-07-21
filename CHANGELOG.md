@@ -2,6 +2,9 @@
 
 ## 2.0.0-alpha.3
 
+- Corrected conservative scene work accounting so every active clip predicate
+  is charged for each enclosed command's candidate pixels.
+
 - Added `AvatarRequest`, `PreparedAvatar`, and explicit `AvatarStyle` catalog
   preparation while retaining the transitional alpha.2 Cat API.
 - Ported all 31 existing families to bounded semantic compilers that emit only
